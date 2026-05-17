@@ -1,0 +1,305 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model usuario {
+  id              Int       @id @default(autoincrement()) @map("id_usuario")
+  email           String    @unique @db.VarChar(150)
+  hash_contrasena String    @db.VarChar(255)
+  rol             String    @db.VarChar(20)
+  activo          Boolean   @default(true)
+  fecha_creacion  DateTime  @default(now()) @db.Timestamp
+  ultimo_acceso   DateTime? @db.Timestamp
+  id_docente      Int?      @unique @map("id_docente")
+  docente         docente?  @relation(fields: [id_docente], references: [id], onDelete: SetNull)
+
+  @@map("usuario")
+}
+
+// ─── Períodos Académicos ───
+model periodo_academico {
+  id              Int                @id @default(autoincrement()) @map("id_periodo")
+  nombre          String             @unique @db.VarChar(20) // ej: "2026-I"
+  fecha_inicio    DateTime           @db.Date
+  fecha_fin       DateTime           @db.Date
+  estado          String             @default("BORRADOR") @db.VarChar(20) // BORRADOR, ACTIVO, CERRADO
+  configuraciones configuracion[]
+  horarios        horario_asignado[]
+  ventanas        ventana_atencion[]
+
+  @@map("periodo_academico")
+}
+
+// ─── Docentes ───
+model docente {
+  id              Int                       @id @default(autoincrement()) @map("id_docente")
+  nombres         String                    @db.VarChar(100)
+  apellidos       String                    @db.VarChar(100)
+  email           String                    @unique @db.VarChar(150)
+  telefono        String?                   @db.VarChar(20)
+  modalidad       String                    @db.VarChar(20) // NOMBRADO, CONTRATADO
+  categoria       String                    @db.VarChar(30) // PRINCIPAL, ASOCIADO, AUXILIAR, JEFE_PRACTICA
+  antiguedad      Int                       @default(0) // años
+  activo          Boolean                   @default(true)
+  usuario         usuario?
+  preferencias    preferencia_notificacion?
+  cursos_dictados docente_curso[]
+  horarios        horario_asignado[]
+  disponibilidad  disponibilidad_docente[]
+  atenciones      atencion_docente[]
+
+  @@index([modalidad, categoria, antiguedad])
+  @@map("docente")
+}
+
+// ─── Cursos ───
+model curso {
+  id                Int                @id @default(autoincrement()) @map("id_curso")
+  nombre            String             @db.VarChar(150)
+  codigo            String             @unique @db.VarChar(20)
+  horas_teoria      Int                @default(0)
+  horas_laboratorio Int                @default(0)
+  creditos          Int                @default(1)
+  docentes          docente_curso[]
+  grupos            grupo[]
+  ambientes         curso_ambiente[]
+  horarios          horario_asignado[]
+
+  @@map("curso")
+}
+
+// ─── Relación muchos a muchos: Docente-Curso (preasignación) ───
+model docente_curso {
+  id         Int     @id @default(autoincrement()) @map("id_docente_curso")
+  docente    docente @relation(fields: [id_docente], references: [id], onDelete: Cascade)
+  id_docente Int     @map("id_docente")
+  curso      curso   @relation(fields: [id_curso], references: [id], onDelete: Cascade)
+  id_curso   Int     @map("id_curso")
+
+  @@unique([id_docente, id_curso])
+  @@map("docente_curso")
+}
+
+// ─── Ambientes (Aulas / Laboratorios) ───
+model ambiente {
+  id               Int                @id @default(autoincrement()) @map("id_ambiente")
+  codigo           String             @unique @db.VarChar(20)
+  tipo             String             @db.VarChar(20) // AULA, LABORATORIO
+  capacidad        Int                @default(40)
+  piso             Int?
+  equipamiento     String?            @db.Text
+  activo           Boolean            @default(true)
+  cursos_asignados curso_ambiente[]
+  horarios         horario_asignado[]
+  mantenimientos   mantenimiento[]
+
+  @@map("ambiente")
+}
+
+// ─── Relación muchos a muchos: Curso-Ambiente ───
+model curso_ambiente {
+  id          Int      @id @default(autoincrement()) @map("id_curso_ambiente")
+  curso       curso    @relation(fields: [id_curso], references: [id], onDelete: Cascade)
+  id_curso    Int      @map("id_curso")
+  ambiente    ambiente @relation(fields: [id_ambiente], references: [id], onDelete: Cascade)
+  id_ambiente Int      @map("id_ambiente")
+  tipo_clase  String   @db.VarChar(20) // TEORIA, LABORATORIO
+
+  @@unique([id_curso, id_ambiente, tipo_clase])
+  @@map("curso_ambiente")
+}
+
+// ─── Grupos ───
+model grupo {
+  id               Int                @id @default(autoincrement()) @map("id_grupo")
+  curso            curso              @relation(fields: [id_curso], references: [id], onDelete: Cascade)
+  id_curso         Int                @map("id_curso")
+  codigo_grupo     String             @db.VarChar(5) // 'A', 'B', 'C'
+  capacidad_maxima Int                @default(40)
+  horarios         horario_asignado[]
+
+  @@unique([id_curso, codigo_grupo])
+  @@map("grupo")
+}
+
+// ─── Disponibilidad declarada por el docente ───
+model disponibilidad_docente {
+  id          Int     @id @default(autoincrement()) @map("id_disponibilidad")
+  docente     docente @relation(fields: [id_docente], references: [id], onDelete: Cascade)
+  id_docente  Int     @map("id_docente")
+  dia_semana  String  @db.VarChar(15) // LUNES, MARTES, ...
+  hora_inicio String  @db.VarChar(5) // HH:MM
+  hora_fin    String  @db.VarChar(5)
+  disponible  Boolean @default(true)
+
+  @@map("disponibilidad_docente")
+}
+
+// ─── Ventanas de atención ───
+model ventana_atencion {
+  id          Int                @id @default(autoincrement()) @map("id_ventana")
+  periodo     periodo_academico  @relation(fields: [id_periodo], references: [id])
+  id_periodo  Int                @map("id_periodo")
+  fecha       DateTime           @db.Date
+  hora_inicio String             @db.VarChar(5)
+  hora_fin    String             @db.VarChar(5)
+  categoria   String             @db.VarChar(30) // PRINCIPAL, ASOCIADO, ...
+  modalidad   String             @db.VarChar(20) // NOMBRADO, CONTRATADO
+  orden       Int // orden dentro del día
+  estado      String             @default("PENDIENTE") @db.VarChar(20)
+  atenciones  atencion_docente[]
+
+  @@map("ventana_atencion")
+}
+
+// ─── Control de atención por docente en ventana ───
+model atencion_docente {
+  id           Int              @id @default(autoincrement()) @map("id_atencion")
+  ventana      ventana_atencion @relation(fields: [id_ventana], references: [id])
+  id_ventana   Int              @map("id_ventana")
+  docente      docente          @relation(fields: [id_docente], references: [id])
+  id_docente   Int              @map("id_docente")
+  estado       String           @default("PENDIENTE") @db.VarChar(20) // PENDIENTE, EN_PROGRESO, COMPLETADO, PARCIAL
+  orden_espera Int
+
+  @@unique([id_ventana, id_docente])
+  @@map("atencion_docente")
+}
+
+// ─── Horarios Asignados (corazón del sistema) ───
+model horario_asignado {
+  id                 Int               @id @default(autoincrement()) @map("id_horario")
+  periodo            periodo_academico @relation(fields: [id_periodo], references: [id])
+  id_periodo         Int               @map("id_periodo")
+  docente            docente           @relation(fields: [id_docente], references: [id])
+  id_docente         Int               @map("id_docente")
+  curso              curso             @relation(fields: [id_curso], references: [id])
+  id_curso           Int               @map("id_curso")
+  grupo              grupo?            @relation(fields: [id_grupo], references: [id])
+  id_grupo           Int?              @map("id_grupo")
+  ambiente           ambiente          @relation(fields: [id_ambiente], references: [id])
+  id_ambiente        Int               @map("id_ambiente")
+  tipo_clase         String            @db.VarChar(20) // TEORIA, LABORATORIO
+  dia_semana         String            @db.VarChar(15) // LUNES, MARTES, ...
+  hora_inicio        String            @db.VarChar(5)
+  hora_fin           String            @db.VarChar(5)
+  estado             String            @default("BORRADOR") @db.VarChar(20) // BORRADOR, CONFIRMADO, PUBLICADO, CERRADO
+  id_ventana         Int?              @map("id_ventana") // ventana en que se asignó
+  comentario         String?           @db.Text
+  fecha_modificacion DateTime          @default(now()) @db.Timestamp
+
+  @@index([id_periodo, id_docente])
+  @@index([id_periodo, id_ambiente, dia_semana, hora_inicio])
+  @@index([id_periodo, id_grupo, dia_semana, hora_inicio])
+  @@map("horario_asignado")
+}
+
+// ─── Auditoría de cambios en horarios ───
+model auditoria_horario {
+  id               Int      @id @default(autoincrement()) @map("id_auditoria")
+  id_horario       Int?
+  tipo_accion      String   @db.VarChar(30) // CREAR, MODIFICAR, ELIMINAR, REASIGNAR
+  usuario          String   @db.VarChar(100)
+  fecha            DateTime @default(now()) @db.Timestamp
+  detalle          String   @db.Text
+  datos_anteriores Json?
+
+  @@map("auditoria_horario")
+}
+
+// ─── Configuraciones del sistema ───
+model configuracion {
+  id         Int               @id @default(autoincrement()) @map("id_configuracion")
+  periodo    periodo_academico @relation(fields: [id_periodo], references: [id])
+  id_periodo Int               @map("id_periodo")
+  clave      String            @db.VarChar(50) // FRANJA_INICIO, FRANJA_FIN, HORAS_MAX_DIARIAS, BLOQUEO_ALMUERZO, ...
+  valor      String            @db.Text
+  tipo       String            @default("TEXTO") @db.VarChar(20)
+
+  @@unique([id_periodo, clave])
+  @@map("configuracion")
+}
+
+// ─── Días no laborables (feriados) ───
+model dia_no_laborable {
+  id          Int      @id @default(autoincrement()) @map("id_dia_no_laborable")
+  fecha       DateTime @db.Date
+  descripcion String   @db.VarChar(200)
+  tipo        String   @default("FERIADO") @db.VarChar(20) // FERIADO, MANTENIMIENTO
+
+  @@map("dia_no_laborable")
+}
+
+// ─── Mantenimiento de ambientes ───
+model mantenimiento {
+  id           Int      @id @default(autoincrement()) @map("id_mantenimiento")
+  ambiente     ambiente @relation(fields: [id_ambiente], references: [id])
+  id_ambiente  Int      @map("id_ambiente")
+  fecha_inicio DateTime @db.Timestamp
+  fecha_fin    DateTime @db.Timestamp
+  descripcion  String?  @db.Text
+
+  @@map("mantenimiento")
+}
+
+// ─── Sistema de Notificaciones ───
+model preferencia_notificacion {
+  id                  Int     @id @default(autoincrement()) @map("id_preferencia")
+  docente             docente @relation(fields: [id_docente], references: [id], onDelete: Cascade)
+  id_docente          Int     @unique @map("id_docente")
+  correo_habilitado   Boolean @default(true)
+  whatsapp_habilitado Boolean @default(false)
+  telegram_habilitado Boolean @default(false)
+  whatsapp_verificado Boolean @default(false)
+  telegram_id         String? @db.VarChar(50)
+
+  @@map("preferencia_notificacion")
+}
+
+model historial_notificacion {
+  id           Int      @id @default(autoincrement()) @map("id_historial")
+  id_docente   Int
+  canal        String   @db.VarChar(20) // CORREO, WHATSAPP, TELEGRAM
+  tipo_mensaje String   @db.VarChar(50) // RECORDATORIO_24H, ALERTA_15MIN, PERSONALIZADO
+  estado_envio String   @db.VarChar(20) // ENVIADO, FALLIDO, REINTENTO
+  fecha_envio  DateTime @default(now()) @db.Timestamp
+  contenido    String?  @db.Text
+  reintentos   Int      @default(0)
+
+  @@index([id_docente, fecha_envio])
+  @@map("historial_notificacion")
+}
+
+model cola_notificacion {
+  id           Int       @id @default(autoincrement()) @map("id_cola")
+  id_docente   Int
+  canal        String    @db.VarChar(20)
+  tipo_mensaje String    @db.VarChar(50)
+  contenido    String    @db.Text
+  estado       String    @default("PENDIENTE") @db.VarChar(20)
+  creado_en    DateTime  @default(now()) @db.Timestamp
+  procesado_en DateTime?
+
+  @@index([estado, creado_en])
+  @@map("cola_notificacion")
+}
+
+// ─── Selecciones temporales (para tiempo real) ─── (se maneja en Redis, pero opcional)
+model seleccion_temporal {
+  id          String   @id @default(uuid()) @map("id_seleccion")
+  id_docente  Int
+  id_ambiente Int
+  dia_semana  String   @db.VarChar(15)
+  hora_inicio String   @db.VarChar(5)
+  hora_fin    String   @db.VarChar(5)
+  expiracion  DateTime @db.Timestamp
+  sesion_id   String   @db.VarChar(100)
+
+  @@index([expiracion])
+  @@map("seleccion_temporal")
+}

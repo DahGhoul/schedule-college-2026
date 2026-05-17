@@ -1,0 +1,30 @@
+# Dependencias
+node_modules/
+.pnp/
+.pnp.js
+
+# Archivos de entorno (contienen contraseñas y tokens)
+.env
+.env.local
+.env.production
+
+# Builds
+.next/
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Prisma (opcional, las migraciones suelen subirse; los modelos estáticos no)
+# prisma/*.db
+# prisma/*.db-journal
+
+# Editor
+.vscode/
+.idea/
