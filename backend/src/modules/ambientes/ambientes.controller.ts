@@ -39,7 +39,13 @@ export class AmbientesController {
    */
   static async crear(req: Request, res: Response) {
     try {
-      const datos = crearAmbienteSchema.parse(req.body);
+      const datos = crearAmbienteSchema.parse(req.body) as {
+        codigo: string;
+        tipo: string;
+        capacidad: number;
+        piso?: number;
+        equipamiento?: string;
+      };
       const ambiente = await AmbientesService.crear(datos);
       res.status(201).json(ambiente);
     } catch (error: any) {
@@ -165,7 +171,11 @@ export class AmbientesController {
       const idAmbiente = parseInt(req.params.id);
       if (isNaN(idAmbiente)) return res.status(400).json({ error: 'ID de ambiente inválido' });
 
-      const datos = registroMantenimientoSchema.parse(req.body);
+      const datos = registroMantenimientoSchema.parse(req.body) as {
+        fecha_inicio: string;
+        fecha_fin: string;
+        descripcion?: string;
+      };
       const mantenimiento = await AmbientesService.registrarMantenimiento(idAmbiente, datos);
       res.status(201).json(mantenimiento);
     } catch (error: any) {

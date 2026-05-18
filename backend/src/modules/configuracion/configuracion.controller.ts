@@ -37,7 +37,11 @@ export class ConfiguracionController {
   }
 
   static async crearDiaNoLaborable(req: Request, res: Response) {
-    const datos = diaNoLaborableSchema.parse(req.body);
+    const datos = diaNoLaborableSchema.parse(req.body) as {
+      fecha: string;
+      descripcion: string;
+      tipo: string;
+    };
     const dia = await ConfiguracionService.crearDiaNoLaborable(datos);
     res.status(201).json(dia);
   }

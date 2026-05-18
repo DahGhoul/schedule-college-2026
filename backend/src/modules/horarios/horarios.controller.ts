@@ -27,7 +27,17 @@ export class HorariosController {
 
   static async seleccionarCelda(req: Request, res: Response) {
     try {
-      const datos = seleccionarCeldaSchema.parse(req.body);
+      const datos = seleccionarCeldaSchema.parse(req.body) as {
+        idDocente: number;
+        idCurso: number;
+        idGrupo?: number;
+        idAmbiente: number;
+        tipoClase: string;
+        diaSemana: string;
+        horaInicio: string;
+        horaFin: string;
+        sesionId: string;
+      };
       const resultado = await HorariosService.seleccionarCelda(datos);
       res.status(201).json(resultado);
     } catch (error: any) {

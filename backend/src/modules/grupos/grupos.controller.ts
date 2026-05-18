@@ -44,7 +44,11 @@ export class GruposController {
    */
   static async crear(req: Request, res: Response) {
     try {
-      const datos = crearGrupoSchema.parse(req.body);
+      const datos = crearGrupoSchema.parse(req.body) as {
+        id_curso: number;
+        codigo_grupo: string;
+        capacidad_maxima: number;
+      };
       const grupo = await GruposService.crear(datos);
       res.status(201).json(grupo);
     } catch (error: any) {

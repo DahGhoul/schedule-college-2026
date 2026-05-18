@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const crearDocenteSchema = z.object({
+const baseCrearDocenteSchema = z.object({
   nombres: z.string().min(1).max(100),
   apellidos: z.string().min(1).max(100),
   email: z.string().email(),
@@ -12,4 +12,14 @@ export const crearDocenteSchema = z.object({
   password: z.string().min(6).optional(),
 });
 
-export const actualizarDocenteSchema = crearDocenteSchema.partial();
+export const crearDocenteSchema = baseCrearDocenteSchema.refine((data) => {
+  if (data.crear_usuario) {
+    return !!data.password;
+  }
+  return true;
+}, {
+  message: "Password es requerido cuando crear_usuario es true",
+  path: ["password"]
+});
+
+export const actualizarDocenteSchema = baseCrearDocenteSchema.partial();

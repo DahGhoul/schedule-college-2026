@@ -28,6 +28,7 @@ model periodo_academico {
   fecha_inicio    DateTime           @db.Date
   fecha_fin       DateTime           @db.Date
   estado          String             @default("BORRADOR") @db.VarChar(20) // BORRADOR, ACTIVO, CERRADO
+  activo          Boolean            @default(true)
   configuraciones configuracion[]
   horarios        horario_asignado[]
   ventanas        ventana_atencion[]
