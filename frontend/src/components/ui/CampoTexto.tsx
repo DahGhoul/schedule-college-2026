@@ -8,8 +8,8 @@ export function CampoTexto({ label, error, ...props }: CampoTextoProps) {
     <div>
       <label className="block text-sm font-medium text-gray-700">{label}</label>
       <input
-        className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 ${
-          error ? 'border-red-500' : ''
+        className={`mt-1 block w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 shadow-sm transition-all duration-200 placeholder:text-gray-400 focus:border-unt-primary focus:ring-2 focus:ring-unt-primary/20 focus:outline-none bg-white ${
+          error ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' : 'hover:border-gray-400'
         }`}
         {...props}
       />
