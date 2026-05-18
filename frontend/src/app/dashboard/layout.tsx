@@ -1,14 +1,15 @@
 'use client';
 import { useEffect } from 'react';
 import { useAuthStore } from '@/stores/auth.store';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { Sidebar } from '@/components/layouts/Sidebar';
 import { BarraSuperior } from '@/components/layouts/BarraSuperior';
 import { SpinnerCarga } from '@/components/ui/SpinnerCarga';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { estaAutenticado, estaCargando, token, cargarSesion } = useAuthStore();
+  const { estaAutenticado, estaCargando, token, cargarSesion, usuario } = useAuthStore();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (token && !estaAutenticado && !estaCargando) {
@@ -18,6 +19,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       router.push('/auth/login');
     }
   }, [token, estaAutenticado, estaCargando]);
+
+  // Protección de rutas por rol
+  useEffect(() => {
+    if (estaAutenticado && usuario) {
+      const rutasAdmin = ['/ambientes', '/configuracion', '/cursos', '/docentes', '/periodos', '/reportes'];
+      const esRutaAdmin = rutasAdmin.some((ruta) => pathname.startsWith(`/dashboard${ruta}`));
+      
+      if (esRutaAdmin && usuario.rol !== 'ADMIN') {
+        // Si no es ADMIN y quiere entrar a algo restringido, mandarlo a su inicio
+        router.replace('/dashboard');
+      }
+    }
+  }, [estaAutenticado, usuario, pathname, router]);
 
   if (!estaAutenticado && token) {
     return (

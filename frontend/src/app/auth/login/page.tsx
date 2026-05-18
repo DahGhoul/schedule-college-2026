@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth.store';
 import { Boton } from '@/components/ui/Boton';
@@ -12,7 +12,21 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
   const router = useRouter();
-  const iniciarSesion = useAuthStore((state) => state.iniciarSesion);
+  const { iniciarSesion, estaAutenticado, token, cargarSesion } = useAuthStore();
+
+  useEffect(() => {
+    if (token) {
+      if (!estaAutenticado) {
+        cargarSesion().then(() => {
+          if (useAuthStore.getState().estaAutenticado) {
+            router.push('/dashboard');
+          }
+        });
+      } else {
+        router.push('/dashboard');
+      }
+    }
+  }, [token, estaAutenticado, router, cargarSesion]);
 
   const manejarSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
