@@ -5,7 +5,7 @@ export class AmbientesService {
    * Listar ambientes, opcionalmente filtrados por tipo
    */
   static async listar(tipo?: string) {
-    const where: any = {};
+    const where: any = { activo: true };
     if (tipo) where.tipo = tipo;
     return prisma.ambiente.findMany({
       where,

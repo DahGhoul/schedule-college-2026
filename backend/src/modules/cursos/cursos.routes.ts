@@ -15,6 +15,7 @@ router.post('/importar', CursosController.importar);
 router.get('/:id', CursosController.obtener);
 router.put('/:id', CursosController.actualizar);
 router.delete('/:id', CursosController.eliminar);
+router.put('/:id/reactivar', CursosController.reactivar);
 
 // Gestión de ambientes del curso
 router.get('/:id/ambientes', CursosController.listarAmbientes);

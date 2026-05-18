@@ -65,6 +65,7 @@ model curso {
   horas_teoria      Int                @default(0)
   horas_laboratorio Int                @default(0)
   creditos          Int                @default(1)
+  activo            Boolean            @default(true)
   docentes          docente_curso[]
   grupos            grupo[]
   ambientes         curso_ambiente[]
@@ -121,6 +122,7 @@ model grupo {
   id_curso         Int                @map("id_curso")
   codigo_grupo     String             @db.VarChar(5) // 'A', 'B', 'C'
   capacidad_maxima Int                @default(40)
+  activo           Boolean            @default(true)
   horarios         horario_asignado[]
 
   @@unique([id_curso, codigo_grupo])

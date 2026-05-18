@@ -39,6 +39,12 @@ export class DocentesController {
     res.json({ mensaje: 'Docente desactivado' });
   }
 
+  static async reactivar(req: Request, res: Response) {
+    const id = parseInt(req.params.id);
+    const docente = await DocentesService.reactivar(id);
+    res.json(docente);
+  }
+
   static async buscar(req: Request, res: Response) {
     const { q } = req.query;
     const docentes = await DocentesService.buscar(q as string);

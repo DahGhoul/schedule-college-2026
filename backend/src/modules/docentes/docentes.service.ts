@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 
 export class DocentesService {
   static async listar(params: { modalidad?: string; categoria?: string; buscar?: string }) {
-    const where: any = {};
+    const where: any = { activo: true };
     if (params.modalidad) where.modalidad = params.modalidad;
     if (params.categoria) where.categoria = params.categoria;
     if (params.buscar) {
@@ -54,6 +54,10 @@ export class DocentesService {
 
   static async eliminar(id: number) {
     return prisma.docente.update({ where: { id }, data: { activo: false } });
+  }
+
+  static async reactivar(id: number) {
+    return prisma.docente.update({ where: { id }, data: { activo: true } });
   }
 
   static async buscar(query: string) {

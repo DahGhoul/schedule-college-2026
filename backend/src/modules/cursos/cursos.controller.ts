@@ -83,10 +83,23 @@ export class CursosController {
       if (isNaN(id)) return res.status(400).json({ error: 'ID inválido' });
 
       await CursosService.eliminar(id);
-      res.json({ mensaje: 'Curso eliminado correctamente' });
+      res.json({ mensaje: 'Curso desactivado correctamente' });
     } catch (error) {
       console.error('Error al eliminar curso:', error);
       res.status(500).json({ error: 'Error al eliminar el curso' });
+    }
+  }
+
+  static async reactivar(req: Request, res: Response) {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: 'ID inválido' });
+
+      const curso = await CursosService.reactivar(id);
+      res.json(curso);
+    } catch (error) {
+      console.error('Error al reactivar curso:', error);
+      res.status(500).json({ error: 'Error al reactivar el curso' });
     }
   }
 

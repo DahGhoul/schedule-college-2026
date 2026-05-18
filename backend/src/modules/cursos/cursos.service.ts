@@ -5,7 +5,7 @@ export class CursosService {
    * Listar cursos con búsqueda opcional
    */
   static async listar(buscar?: string) {
-    const where: any = {};
+    const where: any = { activo: true };
     if (buscar) {
       where.OR = [
         { nombre: { contains: buscar, mode: 'insensitive' } },
@@ -72,14 +72,17 @@ export class CursosService {
   }
 
   /**
-   * Eliminar un curso (borrado físico)
+   * Desactivar un curso (borrado lógico)
    */
   static async eliminar(id: number) {
-    // Primero eliminar dependencias
-    await prisma.curso_ambiente.deleteMany({ where: { id_curso: id } });
-    await prisma.docente_curso.deleteMany({ where: { id_curso: id } });
-    await prisma.grupo.deleteMany({ where: { id_curso: id } });
-    return prisma.curso.delete({ where: { id } });
+    return prisma.curso.update({ where: { id }, data: { activo: false } });
+  }
+
+  /**
+   * Reactivar un curso
+   */
+  static async reactivar(id: number) {
+    return prisma.curso.update({ where: { id }, data: { activo: true } });
   }
 
   /**

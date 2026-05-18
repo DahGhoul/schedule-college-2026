@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma';
 
 export class PeriodosService {
   static async listar() {
-    return prisma.periodo_academico.findMany({ orderBy: { nombre: 'desc' } });
+    return prisma.periodo_academico.findMany({ where: { activo: true }, orderBy: { nombre: 'desc' } });
   }
 
   static async obtenerPorId(id: number) {
@@ -31,7 +31,11 @@ export class PeriodosService {
   }
 
   static async eliminar(id: number) {
-    return prisma.periodo_academico.delete({ where: { id } });
+    return prisma.periodo_academico.update({ where: { id }, data: { activo: false } });
+  }
+
+  static async reactivar(id: number) {
+    return prisma.periodo_academico.update({ where: { id }, data: { activo: true } });
   }
 
   static async cambiarEstado(id: number, estado: string) {

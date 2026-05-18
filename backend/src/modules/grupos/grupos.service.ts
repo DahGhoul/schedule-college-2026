@@ -6,6 +6,7 @@ export class GruposService {
    */
   static async listar() {
     return prisma.grupo.findMany({
+      where: { activo: true },
       include: {
         curso: true,
       },
@@ -103,19 +104,17 @@ export class GruposService {
   }
 
   /**
-   * Eliminar un grupo
+   * Desactivar un grupo (borrado lógico)
    */
   static async eliminar(id: number) {
-    // Verificar que no tenga horarios asignados
-    const horarios = await prisma.horario_asignado.count({
-      where: { id_grupo: id },
-    });
+    return prisma.grupo.update({ where: { id }, data: { activo: false } });
+  }
 
-    if (horarios > 0) {
-      throw new Error('No se puede eliminar el grupo porque tiene horarios asignados');
-    }
-
-    return prisma.grupo.delete({ where: { id } });
+  /**
+   * Reactivar un grupo
+   */
+  static async reactivar(id: number) {
+    return prisma.grupo.update({ where: { id }, data: { activo: true } });
   }
 
   /**
