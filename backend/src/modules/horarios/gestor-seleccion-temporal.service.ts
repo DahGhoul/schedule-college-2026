@@ -11,16 +11,30 @@ export class GestorSeleccionTemporal {
   static async seleccionarCelda(seleccion: SeleccionTemporal): Promise<void> {
     const clave = this.generarClave(seleccion.idAmbiente, seleccion.diaSemana, seleccion.horaInicio);
 
-    // Verificar si la celda ya está ocupada temporalmente por otro usuario
+    // Intentar establecer la selección de forma atómica usando SET NX.
+    // Si la clave no existe, SET con NX devolverá 'OK' y la reserva se realiza.
+    const valor = JSON.stringify(seleccion);
+    const resultado = await (redis as any).set(clave, valor, 'EX', TTL_SEGUNDOS, 'NX');
+
+    if (resultado === 'OK') return;
+
+    // Si no se pudo establecer con NX, leer el valor existente y permitir
+    // la renovación del TTL si la selección pertenece al mismo docente.
     const existente = await redis.get(clave);
     if (existente) {
       const data = JSON.parse(existente);
-      if (data.idDocente !== seleccion.idDocente) {
-        throw new Error('La celda ya está seleccionada por otro docente');
+      if (data.idDocente === seleccion.idDocente) {
+        // Renovar TTL y actualizar contenido usando SET XX
+        await (redis as any).set(clave, valor, 'EX', TTL_SEGUNDOS, 'XX');
+        return;
       }
+      throw new Error('La celda ya está seleccionada por otro docente');
     }
 
-    await redis.setex(clave, TTL_SEGUNDOS, JSON.stringify(seleccion));
+    // En caso raro de condición de carrera, intentar de nuevo una vez
+    const intento = await (redis as any).set(clave, valor, 'EX', TTL_SEGUNDOS, 'NX');
+    if (intento === 'OK') return;
+    throw new Error('No se pudo seleccionar la celda temporalmente');
   }
 
   static async deseleccionarCelda(

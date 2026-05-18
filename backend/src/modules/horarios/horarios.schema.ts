@@ -45,4 +45,5 @@ export const generarHorariosSchema = z.object({
   idPeriodo: z.number().int().positive(),
   idCiclo: z.number().int().positive().optional(),
   modoPrueba: z.boolean().optional(),
+  metodo: z.enum(['HEURISTICO', 'GENETICO']).optional(),
 });

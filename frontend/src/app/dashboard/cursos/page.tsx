@@ -149,6 +149,17 @@ export default function CursosPage() {
         <div className="flex gap-2">
           <Boton
             type="button"
+            variante="primario"
+            onClick={(event) => {
+              event.stopPropagation();
+              setCursoSeleccionado(item);
+              setMostrarModal(true);
+            }}
+          >
+            Grupos
+          </Boton>
+          <Boton
+            type="button"
             variante="secundario"
             onClick={(event) => {
               event.stopPropagation();
@@ -187,7 +198,7 @@ export default function CursosPage() {
             onChange={(e) => setBuscar(e.target.value)}
             className="w-full sm:w-72 px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-unt-accent/30 focus:border-unt-accent transition-all bg-white shadow-sm"
           />
-          <Boton type="button" onClick={abrirCrearCurso}>Nuevo</Boton>
+          <Boton type="button" onClick={abrirCrearCurso}>Nuevo curso</Boton>
         </div>
       </div>
 
