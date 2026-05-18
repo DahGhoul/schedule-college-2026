@@ -31,6 +31,7 @@ export function Sidebar() {
     { href: '/dashboard/docentes', etiqueta: 'Docentes', Icono: Users },
     { href: '/dashboard/cursos', etiqueta: 'Cursos', Icono: BookOpen },
     { href: '/dashboard/ambientes', etiqueta: 'Ambientes', Icono: School },
+    { href: '/dashboard/horarios', etiqueta: 'Gestor de Horarios', Icono: Calendar },
     { href: '/dashboard/horarios/ventanas/configurar', etiqueta: 'Ventanas', Icono: Clock },
     { href: '/dashboard/horarios/ventanas/monitorear', etiqueta: 'Monitor Ventanas', Icono: Activity },
     { href: '/dashboard/horarios/vista-docente', etiqueta: 'Horario Docentes', Icono: Eye },
@@ -62,7 +63,9 @@ export function Sidebar() {
       </div>
       <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-1.5 custom-scrollbar">
         {enlaces.map((enlace) => {
-          const activo = pathname === enlace.href || pathname.startsWith(enlace.href + '/');
+          const activo = enlace.href === '/dashboard' 
+            ? pathname === '/dashboard' 
+            : pathname.startsWith(enlace.href);
           const Icon = enlace.Icono;
           
           return (

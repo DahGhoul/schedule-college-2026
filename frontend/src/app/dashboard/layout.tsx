@@ -26,7 +26,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       const rutasAdmin = ['/ambientes', '/configuracion', '/cursos', '/docentes', '/periodos', '/reportes'];
       const esRutaAdmin = rutasAdmin.some((ruta) => pathname.startsWith(`/dashboard${ruta}`));
       
-      if (esRutaAdmin && usuario.rol !== 'ADMIN') {
+      if (esRutaAdmin && usuario.rol !== 'ADMINISTRADOR') {
         // Si no es ADMIN y quiere entrar a algo restringido, mandarlo a su inicio
         router.replace('/dashboard');
       }

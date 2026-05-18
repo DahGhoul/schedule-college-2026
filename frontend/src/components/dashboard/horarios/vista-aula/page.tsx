@@ -5,7 +5,7 @@ import { ambientesService } from '@/services/ambientes.service';
 import { horariosService } from '@/services/horarios.service';
 import { periodosService } from '@/services/periodos.service';
 import { Selector } from '@/components/ui/Selector';
-import { VistaHorarioAula } from '@/components/horarios/VistaHorarioAula';
+import { CalendarioGeneral } from '@/components/horarios/CalendarioGeneral';
 import { SpinnerCarga } from '@/components/ui/SpinnerCarga';
 
 export default function VistaHorarioAulaPage() {
@@ -57,19 +57,13 @@ export default function VistaHorarioAulaPage() {
         />
       </div>
 
-      {!ambienteSeleccionado && (
-        <p className="text-gray-500">Seleccione un ambiente para visualizar su horario.</p>
-      )}
-
-      {ambienteSeleccionado && isLoading && <SpinnerCarga />}
-
-      {ambienteSeleccionado && !isLoading && horarios?.length > 0 && (
-        <VistaHorarioAula horarios={horarios} />
-      )}
-
-      {ambienteSeleccionado && !isLoading && horarios?.length === 0 && (
-        <p>No hay horarios asignados para este ambiente en el período activo.</p>
-      )}
+      {!ambienteSeleccionado ? (
+        <p className="text-gray-500 text-center py-10 bg-white rounded-xl shadow-sm border border-gray-100">Seleccione un ambiente para visualizar su horario.</p>
+      ) : isLoading ? (
+        <SpinnerCarga />
+      ) : periodoActivo ? (
+        <CalendarioGeneral idPeriodo={periodoActivo.id} filtroTipo="AULA" filtroId={ambienteSeleccionado} modo="LECTURA" />
+      ) : null}
     </div>
   );
 }

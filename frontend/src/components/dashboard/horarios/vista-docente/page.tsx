@@ -5,7 +5,7 @@ import { docentesService } from '@/services/docentes.service';
 import { horariosService } from '@/services/horarios.service';
 import { periodosService } from '@/services/periodos.service';
 import { Selector } from '@/components/ui/Selector';
-import { VistaHorarioDocente } from '@/components/horarios/VistaHorarioDocente';
+import { CalendarioGeneral } from '@/components/horarios/CalendarioGeneral';
 import { SpinnerCarga } from '@/components/ui/SpinnerCarga';
 
 export default function VistaHorarioDocentePage() {
@@ -46,10 +46,12 @@ export default function VistaHorarioDocentePage() {
       </div>
       {isLoading ? (
         <SpinnerCarga />
-      ) : horarios?.length > 0 ? (
-        <VistaHorarioDocente selecciones={horarios.map((h: any) => ({ ...h, nombreCurso: h.curso?.nombre, codigoAmbiente: h.ambiente?.codigo }))} alQuitarCelda={() => {}} />
+      ) : docenteSeleccionado && periodoActivo ? (
+        <CalendarioGeneral idPeriodo={periodoActivo.id} filtroTipo="DOCENTE" filtroId={docenteSeleccionado} modo="LECTURA" />
       ) : (
-        <p>No hay horarios para este docente.</p>
+        <p className="text-gray-500 text-center py-10 bg-white rounded-xl shadow-sm border border-gray-100">
+          Seleccione un docente para ver su horario.
+        </p>
       )}
     </div>
   );
