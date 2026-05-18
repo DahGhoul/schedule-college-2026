@@ -1,6 +1,16 @@
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 
+// Función para generar una contraseña temporal aleatoria
+const generarPasswordTemporal = (longitud: number = 8): string => {
+  const caracteres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+  let password = '';
+  for (let i = 0; i < longitud; i++) {
+    password += caracteres.charAt(Math.floor(Math.random() * caracteres.length));
+  }
+  return password;
+};
+
 export class DocentesService {
   static async listar(params: { modalidad?: string; categoria?: string; buscar?: string }) {
     const where: any = { activo: true };
@@ -33,8 +43,10 @@ export class DocentesService {
       },
     });
 
-    if (datos.crear_usuario && datos.password) {
-      const hash = await bcrypt.hash(datos.password, 12);
+    let passwordTemporal: string | null = null;
+    if (datos.crear_usuario) {
+      passwordTemporal = datos.password || generarPasswordTemporal();
+      const hash = await bcrypt.hash(passwordTemporal, 12);
       await prisma.usuario.create({
         data: {
           email: datos.email,
@@ -45,7 +57,39 @@ export class DocentesService {
       });
     }
 
-    return docente;
+    // Inicializar disponibilidad del docente (horario completo disponible)
+    const dias = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES'];
+    const horas = [
+      { inicio: '07:00', fin: '08:00' },
+      { inicio: '08:00', fin: '09:00' },
+      { inicio: '09:00', fin: '10:00' },
+      { inicio: '10:00', fin: '11:00' },
+      { inicio: '11:00', fin: '12:00' },
+      { inicio: '14:00', fin: '15:00' },
+      { inicio: '15:00', fin: '16:00' },
+      { inicio: '16:00', fin: '17:00' },
+      { inicio: '17:00', fin: '18:00' },
+      { inicio: '18:00', fin: '19:00' },
+      { inicio: '19:00', fin: '20:00' },
+      { inicio: '20:00', fin: '21:00' },
+      { inicio: '21:00', fin: '22:00' },
+    ];
+
+    for (const dia of dias) {
+      for (const hora of horas) {
+        await prisma.disponibilidad_docente.create({
+          data: {
+            id_docente: docente.id,
+            dia_semana: dia,
+            hora_inicio: hora.inicio,
+            hora_fin: hora.fin,
+            disponible: true,
+          },
+        });
+      }
+    }
+
+    return { ...docente, passwordTemporal };
   }
 
   static async actualizar(id: number, datos: any) {
@@ -77,5 +121,39 @@ export class DocentesService {
       where: { categoria, modalidad },
       orderBy: { antiguedad: 'desc' },
     });
+  }
+
+  static async obtenerDisponibilidad(idDocente: number) {
+    return prisma.disponibilidad_docente.findMany({
+      where: { id_docente: idDocente },
+      orderBy: [{ dia_semana: 'asc' }, { hora_inicio: 'asc' }],
+    });
+  }
+
+  static async guardarDisponibilidad(
+    idDocente: number,
+    disponibilidad: Array<{
+      diaSemana: string;
+      horaInicio: string;
+      horaFin: string;
+      disponible: boolean;
+    }>
+  ) {
+    await prisma.$transaction(async (tx) => {
+      await tx.disponibilidad_docente.deleteMany({ where: { id_docente: idDocente } });
+      if (disponibilidad.length > 0) {
+        await tx.disponibilidad_docente.createMany({
+          data: disponibilidad.map((item) => ({
+            id_docente: idDocente,
+            dia_semana: item.diaSemana,
+            hora_inicio: item.horaInicio,
+            hora_fin: item.horaFin,
+            disponible: item.disponible,
+          })),
+        });
+      }
+    });
+
+    return this.obtenerDisponibilidad(idDocente);
   }
 }

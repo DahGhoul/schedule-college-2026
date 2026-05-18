@@ -20,12 +20,15 @@ export class HorariosService {
     idCurso: number;
     idGrupo?: number;
     idAmbiente: number;
+    modoPrueba?: boolean;
     tipoClase: string;
     diaSemana: string;
     horaInicio: string;
     horaFin: string;
     sesionId: string;
   }) {
+    await this.validarDatosSeleccion(datos);
+
     await GestorSeleccionTemporal.seleccionarCelda(datos);
 
     // Publicar evento para notificar a otros clientes
@@ -35,6 +38,87 @@ export class HorariosService {
     );
 
     return { mensaje: 'Celda seleccionada temporalmente' };
+  }
+
+  private static async validarDatosSeleccion(datos: {
+    idDocente: number;
+    idCurso: number;
+    idGrupo?: number;
+    idAmbiente: number;
+    modoPrueba?: boolean;
+    tipoClase: string;
+    diaSemana: string;
+    horaInicio: string;
+    horaFin: string;
+  }) {
+    const [docente, curso, ambiente] = await Promise.all([
+      prisma.docente.findUnique({ where: { id: datos.idDocente } }),
+      prisma.curso.findUnique({ where: { id: datos.idCurso } }),
+      prisma.ambiente.findUnique({ where: { id: datos.idAmbiente } }),
+    ]);
+
+    if (!docente || !docente.activo) throw new Error('Docente inválido o inactivo');
+    if (!curso) throw new Error('Curso inválido');
+    if (!ambiente || !ambiente.activo) throw new Error('Ambiente inválido o inactivo');
+
+    const docenteCurso = await prisma.docente_curso.findFirst({
+      where: {
+        id_docente: datos.idDocente,
+        id_curso: datos.idCurso,
+      },
+    });
+    if (!docenteCurso) {
+      throw new Error('El docente no tiene asignado este curso');
+    }
+
+    const compatibilidadAmbiente = await prisma.curso_ambiente.findFirst({
+      where: {
+        id_curso: datos.idCurso,
+        id_ambiente: datos.idAmbiente,
+        tipo_clase: datos.tipoClase,
+      },
+    });
+    if (!compatibilidadAmbiente) {
+      throw new Error('El curso no es compatible con el ambiente/tipo de clase seleccionado');
+    }
+
+    if (datos.idGrupo) {
+      const grupo = await prisma.grupo.findUnique({ where: { id: datos.idGrupo } });
+      if (!grupo || !grupo.activo) throw new Error('Grupo inválido o inactivo');
+      if (grupo.id_curso !== datos.idCurso) {
+        throw new Error('El grupo no corresponde al curso seleccionado');
+      }
+
+      if (!datos.modoPrueba && grupo.capacidad_maxima > ambiente.capacidad) {
+        throw new Error(
+          `Aforo insuficiente: grupo ${grupo.capacidad_maxima} > ambiente ${ambiente.capacidad}`
+        );
+      }
+    }
+
+    const conflictoAmbiente = await prisma.horario_asignado.findFirst({
+      where: {
+        id_ambiente: datos.idAmbiente,
+        dia_semana: datos.diaSemana,
+        hora_inicio: datos.horaInicio,
+        estado: { in: ['BORRADOR', 'CONFIRMADO', 'PUBLICADO'] },
+      },
+    });
+    if (conflictoAmbiente) {
+      throw new Error('El ambiente ya está ocupado en ese bloque horario');
+    }
+
+    const conflictoDocente = await prisma.horario_asignado.findFirst({
+      where: {
+        id_docente: datos.idDocente,
+        dia_semana: datos.diaSemana,
+        hora_inicio: datos.horaInicio,
+        estado: { in: ['BORRADOR', 'CONFIRMADO', 'PUBLICADO'] },
+      },
+    });
+    if (conflictoDocente) {
+      throw new Error('El docente ya tiene una clase en ese bloque horario');
+    }
   }
 
   /**

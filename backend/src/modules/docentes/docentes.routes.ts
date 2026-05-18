@@ -9,6 +9,8 @@ router.get('/', DocentesController.listar);
 router.post('/', DocentesController.crear);
 router.get('/buscar', DocentesController.buscar);
 router.get('/categoria/:modalidad/:categoria', DocentesController.porCategoria);
+router.get('/:id/disponibilidad', DocentesController.obtenerDisponibilidad);
+router.put('/:id/disponibilidad', DocentesController.guardarDisponibilidad);
 router.get('/:id', DocentesController.obtener);
 router.put('/:id', DocentesController.actualizar);
 router.delete('/:id', DocentesController.eliminar);

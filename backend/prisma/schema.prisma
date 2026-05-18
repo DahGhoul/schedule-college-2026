@@ -65,6 +65,7 @@ model curso {
   nombre            String             @db.VarChar(150)
   codigo            String             @unique @db.VarChar(20)
   horas_teoria      Int                @default(0)
+  horas_practica    Int                @default(0)
   horas_laboratorio Int                @default(0)
   creditos          Int                @default(1)
   activo            Boolean            @default(true)
@@ -126,6 +127,7 @@ model ambiente {
   cursos_asignados curso_ambiente[]
   horarios         horario_asignado[]
   mantenimientos   mantenimiento[]
+  disponibilidad   disponibilidad_ambiente[]
 
   @@map("ambiente")
 }
@@ -168,6 +170,20 @@ model disponibilidad_docente {
   disponible  Boolean @default(true)
 
   @@map("disponibilidad_docente")
+}
+
+// ─── Disponibilidad declarada por el ambiente ───
+model disponibilidad_ambiente {
+  id          Int      @id @default(autoincrement()) @map("id_disponibilidad_ambiente")
+  ambiente    ambiente  @relation(fields: [id_ambiente], references: [id], onDelete: Cascade)
+  id_ambiente Int      @map("id_ambiente")
+  dia_semana  String   @db.VarChar(15)
+  hora_inicio String   @db.VarChar(5)
+  hora_fin    String   @db.VarChar(5)
+  disponible  Boolean  @default(true)
+
+  @@unique([id_ambiente, dia_semana, hora_inicio])
+  @@map("disponibilidad_ambiente")
 }
 
 // ─── Ventanas de atención ───

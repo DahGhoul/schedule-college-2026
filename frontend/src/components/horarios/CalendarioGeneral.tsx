@@ -10,18 +10,20 @@ interface Props {
   idPeriodo: number;
   filtroTipo: 'AULA' | 'DOCENTE';
   filtroId: number | null;
+  ambienteAsignacionId?: number | null;
   modo?: 'EDICION' | 'LECTURA';
 }
 
-const DIAS = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
+const DIAS = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES'];
 const HORAS = Array.from({ length: 15 }, (_, i) => {
   const h = i + 7;
   return `${h.toString().padStart(2, '0')}:00`;
 });
 
-export function CalendarioGeneral({ idPeriodo, filtroTipo, filtroId, modo = 'EDICION' }: Props) {
+export function CalendarioGeneral({ idPeriodo, filtroTipo, filtroId, ambienteAsignacionId = null, modo = 'EDICION' }: Props) {
   const queryClient = useQueryClient();
   const [errorToast, setErrorToast] = useState<{mensaje: string, id: number} | null>(null);
+  const [modoPruebaAforo, setModoPruebaAforo] = useState(false);
   
   // Drag & Drop States
   const [draggedItem, setDraggedItem] = useState<any>(null);
@@ -55,8 +57,8 @@ export function CalendarioGeneral({ idPeriodo, filtroTipo, filtroId, modo = 'EDI
   // Cursos pendientes (mockeado hasta que se implemente endpoint real de pendientes)
   // En producción, esto vendría de un endpoint como /docentes/:id/cursos-pendientes
   const [cursosPendientes, setCursosPendientes] = useState([
-    { id: 1, nombre: 'Matemática Básica', tipo: 'TEORIA', horasFaltantes: 4, docente: { id: 1, apellidos: 'Pérez' }, grupo: { id: 1, codigo_grupo: 'A', capacidad_maxima: 45 } },
-    { id: 2, nombre: 'Programación I', tipo: 'LABORATORIO', horasFaltantes: 2, docente: { id: 2, apellidos: 'Sánchez' }, grupo: { id: 2, codigo_grupo: 'B', capacidad_maxima: 20 } },
+    { id: 1, nombre: 'Matemática Básica', tipo: 'TEORIA', horasFaltantes: 4, docente: { id: 1, apellidos: 'Pérez' }, grupo: { codigo_grupo: 'A', capacidad_maxima: 45 } },
+    { id: 2, nombre: 'Programación I', tipo: 'LABORATORIO', horasFaltantes: 2, docente: { id: 2, apellidos: 'Sánchez' }, grupo: { codigo_grupo: 'B', capacidad_maxima: 20 } },
   ]);
 
   const showError = (mensaje: string) => {
@@ -65,11 +67,18 @@ export function CalendarioGeneral({ idPeriodo, filtroTipo, filtroId, modo = 'EDI
   };
 
   const mutacionAsignar = useMutation({
-    mutationFn: async (datos: any) => {
-      return horariosService.seleccionarCelda(datos);
+    mutationFn: async (datos: { payload: any; pendingCourseId?: number }) => {
+      return horariosService.seleccionarCelda(datos.payload);
     },
-    onSuccess: () => {
+    onSuccess: (_res, datos) => {
       queryClient.invalidateQueries({ queryKey: ['horarios-general'] });
+      if (datos.pendingCourseId) {
+        setCursosPendientes(prev => prev.map(c =>
+          c.id === datos.pendingCourseId
+            ? { ...c, horasFaltantes: Math.max(0, c.horasFaltantes - 1) }
+            : c
+        ));
+      }
     },
     onError: (error: any) => {
       showError(error.response?.data?.error || 'Error al asignar horario. Cruce detectado.');
@@ -108,21 +117,40 @@ export function CalendarioGeneral({ idPeriodo, filtroTipo, filtroId, modo = 'EDI
   const handleDrop = (e: React.DragEvent, dia: string, hora: string) => {
     e.preventDefault();
     if (!draggedItem) return;
+
+    if (filtroTipo === 'AULA' && !filtroId) {
+      showError('Selecciona un ambiente antes de asignar un curso.');
+      setDraggedItem(null);
+      return;
+    }
+
+    if (filtroTipo === 'DOCENTE' && !ambienteAsignacionId) {
+      showError('Selecciona un salón para asignar el curso en vista por docente.');
+      setDraggedItem(null);
+      return;
+    }
     
     const horaFin = `${(parseInt(hora) + 1).toString().padStart(2, '0')}:00`;
     
     // Preparar payload
     const payload = {
       idDocente: draggedItem.docente?.id || draggedItem.id_docente,
-      idCurso: draggedItem.idCurso || draggedItem.id || draggedItem.id_curso,
+      idCurso: draggedItem.id_curso || draggedItem.idCurso || draggedItem.id,
       idGrupo: draggedItem.grupo?.id || draggedItem.id_grupo,
-      idAmbiente: filtroTipo === 'AULA' ? filtroId : (draggedItem.id_ambiente || 1), // Requiere ambiente
+      idAmbiente: filtroTipo === 'AULA' ? filtroId : ambienteAsignacionId,
+      modoPrueba: modoPruebaAforo,
       tipoClase: draggedItem.tipo || draggedItem.tipo_clase || 'TEORIA',
       diaSemana: dia,
       horaInicio: hora,
       horaFin,
       sesionId: crypto.randomUUID()
     };
+
+    if (!payload.idDocente || !payload.idCurso || !payload.idAmbiente) {
+      showError('Faltan datos obligatorios para asignar (docente, curso o ambiente).');
+      setDraggedItem(null);
+      return;
+    }
 
     // Validación de Aforo Premium
     if (filtroTipo === 'AULA' && draggedItem.grupo?.capacidad_maxima > 30) {
@@ -131,14 +159,10 @@ export function CalendarioGeneral({ idPeriodo, filtroTipo, filtroId, modo = 'EDI
     }
 
     draggedItem.target = { dia, hora };
-    mutacionAsignar.mutate(payload);
-    
-    // Reducir horas si viene del panel de pendientes
-    if (!draggedItem.isFromGrid) {
-      setCursosPendientes(prev => prev.map(c => 
-        c.id === draggedItem.id ? { ...c, horasFaltantes: c.horasFaltantes - 1 } : c
-      ));
-    }
+    mutacionAsignar.mutate({
+      payload,
+      pendingCourseId: !draggedItem.isFromGrid ? draggedItem.id : undefined,
+    });
     
     setDraggedItem(null);
   };
@@ -161,6 +185,14 @@ export function CalendarioGeneral({ idPeriodo, filtroTipo, filtroId, modo = 'EDI
           <AlertTriangle className="w-5 h-5 text-amber-500" />
           Clases Pendientes
         </h3>
+        <label className="mb-4 flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
+          <span className="font-medium">Modo prueba (ignorar aforo)</span>
+          <input
+            type="checkbox"
+            checked={modoPruebaAforo}
+            onChange={(e) => setModoPruebaAforo(e.target.checked)}
+          />
+        </label>
         <div className="space-y-3">
           {cursosPendientes.filter(c => c.horasFaltantes > 0).map(curso => (
             <div 

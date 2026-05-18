@@ -15,6 +15,8 @@ import rutasAuditoria from './modules/auditoria/auditoria.routes';
 import rutasEstadisticas from './modules/estadisticas/estadisticas.routes';
 import rutasReportes from './modules/reportes/reportes.routes';
 import rutasNotificaciones from './modules/notificaciones/notificaciones.routes';
+import rutasDisponibilidad from './modules/disponibilidad/disponibilidad.routes';
+import rutasUsuarios from './modules/usuarios/usuarios.routes';
 
 const app: Express = express();
 
@@ -36,6 +38,8 @@ app.use('/api/auditoria', rutasAuditoria);
 app.use('/api/estadisticas', rutasEstadisticas);
 app.use('/api/reportes', rutasReportes);
 app.use('/api/notificaciones', rutasNotificaciones);
+app.use('/api/disponibilidad', rutasDisponibilidad);
+app.use('/api/usuarios', rutasUsuarios);
 
 
 // Ruta de salud

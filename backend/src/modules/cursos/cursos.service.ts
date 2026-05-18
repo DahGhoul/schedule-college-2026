@@ -47,6 +47,7 @@ export class CursosService {
     nombre: string;
     codigo: string;
     horas_teoria: number;
+    horas_practica: number;
     horas_laboratorio: number;
     creditos: number;
   }) {
@@ -55,6 +56,7 @@ export class CursosService {
         nombre: datos.nombre,
         codigo: datos.codigo,
         horas_teoria: datos.horas_teoria,
+        horas_practica: datos.horas_practica,
         horas_laboratorio: datos.horas_laboratorio,
         creditos: datos.creditos,
       },
@@ -159,6 +161,7 @@ export class CursosService {
     nombre: string;
     codigo: string;
     horas_teoria: number;
+    horas_practica: number;
     horas_laboratorio: number;
     creditos: number;
   }>) {

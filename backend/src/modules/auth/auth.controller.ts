@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { loginSchema, cambiarPasswordSchema, recuperarPasswordSchema } from './auth.schema';
-import { DatosUsuario, TokenPayload } from './auth.types';
+import { Credenciales, DatosUsuario, TokenPayload } from './auth.types';
 
 export class AuthController {
   /**
@@ -9,7 +9,7 @@ export class AuthController {
    */
   static async login(req: Request, res: Response) {
     try {
-      const datos = loginSchema.parse(req.body);
+      const datos = loginSchema.parse(req.body) as Credenciales;
       const usuario = await AuthService.validarCredenciales(datos);
 
       const payload: TokenPayload = {

@@ -15,3 +15,14 @@ export const registroMantenimientoSchema = z.object({
   fecha_fin: z.string().datetime(),
   descripcion: z.string().optional(),
 });
+
+export const disponibilidadAmbienteSchema = z.object({
+  disponibilidad: z.array(
+    z.object({
+      diaSemana: z.enum(['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES']),
+      horaInicio: z.string().regex(/^\d{2}:\d{2}$/),
+      horaFin: z.string().regex(/^\d{2}:\d{2}$/),
+      disponible: z.boolean().default(true),
+    })
+  ).min(1),
+});

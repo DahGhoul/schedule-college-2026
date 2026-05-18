@@ -20,6 +20,7 @@ export const horariosService = {
     cambiarEstado: (datos: any) => apiClient.post('/horarios/cambiar-estado', datos),
     publicar: (idPeriodo: number) => apiClient.post('/horarios/publicar', { idPeriodo }),
     despublicar: (idPeriodo: number) => apiClient.post('/horarios/despublicar', { idPeriodo }),
+    generarAutomatico: (datos: any) => apiClient.post('/horarios/generar-automatico', datos),
     obtenerConflictos: (idPeriodo: number) => apiClient.get('/horarios/conflictos', { params: { idPeriodo } }),
     listarHorarios: (filtros?: any) => apiClient.get('/horarios', { params: filtros }),
 };

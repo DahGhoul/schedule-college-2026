@@ -7,4 +7,7 @@ export const docentesService = {
   actualizar: (id: number, datos: any) => apiClient.put(`/docentes/${id}`, datos),
   eliminar: (id: number) => apiClient.delete(`/docentes/${id}`),
   buscar: (q: string) => apiClient.get('/docentes/buscar', { params: { q } }),
+  obtenerDisponibilidad: (id: number) => apiClient.get(`/docentes/${id}/disponibilidad`),
+  guardarDisponibilidad: (id: number, disponibilidad: any) =>
+    apiClient.put(`/docentes/${id}/disponibilidad`, { disponibilidad }),
 };

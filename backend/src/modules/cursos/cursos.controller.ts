@@ -39,7 +39,14 @@ export class CursosController {
    */
   static async crear(req: Request, res: Response) {
     try {
-      const datos = crearCursoSchema.parse(req.body);
+      const datos = crearCursoSchema.parse(req.body) as {
+        nombre: string;
+        codigo: string;
+        horas_teoria: number;
+        horas_practica: number;
+        horas_laboratorio: number;
+        creditos: number;
+      };
       const curso = await CursosService.crear(datos);
       res.status(201).json(curso);
     } catch (error: any) {

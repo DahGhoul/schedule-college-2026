@@ -6,10 +6,12 @@ import {
   validarSeleccionSchema,
   confirmarSeleccionSchema, 
   cambiarEstadoSchema,
-  publicarSchema
+  publicarSchema,
+  generarHorariosSchema
 } from './horarios.schema';
 import { prisma } from '@/lib/prisma';
 import { PublicadorHorarios } from './publicador-horarios.service';
+import { GeneradorHorariosService } from './generador-horarios.service';
 
 export class HorariosController {
   static async obtenerMatrizDisponibilidad(req: Request, res: Response) {
@@ -27,7 +29,17 @@ export class HorariosController {
 
   static async seleccionarCelda(req: Request, res: Response) {
     try {
-      const datos = seleccionarCeldaSchema.parse(req.body);
+      const datos = seleccionarCeldaSchema.parse(req.body) as {
+        idDocente: number;
+        idCurso: number;
+        idGrupo?: number;
+        idAmbiente: number;
+        tipoClase: string;
+        diaSemana: string;
+        horaInicio: string;
+        horaFin: string;
+        sesionId: string;
+      };
       const resultado = await HorariosService.seleccionarCelda(datos);
       res.status(201).json(resultado);
     } catch (error: any) {
@@ -181,6 +193,24 @@ export class HorariosController {
         res.json(horarios);
     } catch (error) {
         res.status(500).json({ error: 'Error al listar horarios' });
+    }
+    }
+
+    static async generarHorarios(req: Request, res: Response) {
+    try {
+      const datos = generarHorariosSchema.parse(req.body) as {
+        idPeriodo: number;
+        idCiclo?: number | null;
+        modoPrueba?: boolean;
+      };
+      const resultado = await GeneradorHorariosService.generar(datos);
+      res.status(201).json(resultado);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+      res.status(400).json({ error: 'Datos inválidos', detalles: error.errors });
+      } else {
+      res.status(400).json({ error: error.message });
+      }
     }
     }
 }

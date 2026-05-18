@@ -24,6 +24,7 @@ router.post('/confirmar-seleccion', HorariosController.confirmarSeleccion);
 router.post('/cambiar-estado', HorariosController.cambiarEstado);
 router.post('/publicar', HorariosController.publicar);
 router.post('/despublicar', HorariosController.despublicar);
+router.post('/generar-automatico', HorariosController.generarHorarios);
 router.get('/conflictos', HorariosController.obtenerConflictos);
 router.get('/', HorariosController.listarHorarios);
 

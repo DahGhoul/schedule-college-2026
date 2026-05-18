@@ -1,6 +1,11 @@
 import { Request, Response } from 'express';
 import { AmbientesService } from './ambientes.service';
-import { crearAmbienteSchema, actualizarAmbienteSchema, registroMantenimientoSchema } from './ambientes.schema';
+import {
+  crearAmbienteSchema,
+  actualizarAmbienteSchema,
+  registroMantenimientoSchema,
+  disponibilidadAmbienteSchema,
+} from './ambientes.schema';
 
 export class AmbientesController {
   /**
@@ -39,7 +44,13 @@ export class AmbientesController {
    */
   static async crear(req: Request, res: Response) {
     try {
-      const datos = crearAmbienteSchema.parse(req.body);
+      const datos = crearAmbienteSchema.parse(req.body) as {
+        codigo: string;
+        tipo: string;
+        capacidad: number;
+        piso?: number;
+        equipamiento?: string;
+      };
       const ambiente = await AmbientesService.crear(datos);
       res.status(201).json(ambiente);
     } catch (error: any) {
@@ -165,7 +176,11 @@ export class AmbientesController {
       const idAmbiente = parseInt(req.params.id);
       if (isNaN(idAmbiente)) return res.status(400).json({ error: 'ID de ambiente inválido' });
 
-      const datos = registroMantenimientoSchema.parse(req.body);
+      const datos = registroMantenimientoSchema.parse(req.body) as {
+        fecha_inicio: string;
+        fecha_fin: string;
+        descripcion?: string;
+      };
       const mantenimiento = await AmbientesService.registrarMantenimiento(idAmbiente, datos);
       res.status(201).json(mantenimiento);
     } catch (error: any) {
@@ -174,6 +189,44 @@ export class AmbientesController {
       }
       console.error('Error al registrar mantenimiento:', error);
       res.status(500).json({ error: 'Error al registrar mantenimiento' });
+    }
+  }
+
+  static async obtenerDisponibilidadDeclarada(req: Request, res: Response) {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: 'ID inválido' });
+
+      const disponibilidad = await AmbientesService.obtenerDisponibilidadDeclarada(id);
+      res.json(disponibilidad);
+    } catch (error) {
+      console.error('Error al obtener disponibilidad declarada:', error);
+      res.status(500).json({ error: 'Error al obtener la disponibilidad declarada' });
+    }
+  }
+
+  static async guardarDisponibilidadDeclarada(req: Request, res: Response) {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: 'ID inválido' });
+
+      const datos = disponibilidadAmbienteSchema.parse(req.body);
+      const disponibilidad = await AmbientesService.guardarDisponibilidadDeclarada(
+        id,
+        datos.disponibilidad as Array<{
+          diaSemana: string;
+          horaInicio: string;
+          horaFin: string;
+          disponible: boolean;
+        }>
+      );
+      res.json(disponibilidad);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Datos inválidos', detalles: error.errors });
+      }
+      console.error('Error al guardar disponibilidad declarada:', error);
+      res.status(500).json({ error: 'Error al guardar disponibilidad declarada' });
     }
   }
 }

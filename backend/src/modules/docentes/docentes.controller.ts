@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { DocentesService } from './docentes.service';
-import { crearDocenteSchema, actualizarDocenteSchema } from './docentes.schema';
+import { crearDocenteSchema, actualizarDocenteSchema, disponibilidadDocenteSchema } from './docentes.schema';
 
 export class DocentesController {
   static async listar(req: Request, res: Response) {
@@ -55,5 +55,26 @@ export class DocentesController {
     const { categoria, modalidad } = req.params;
     const docentes = await DocentesService.porCategoria(categoria, modalidad);
     res.json(docentes);
+  }
+
+  static async obtenerDisponibilidad(req: Request, res: Response) {
+    const id = parseInt(req.params.id);
+    const disponibilidad = await DocentesService.obtenerDisponibilidad(id);
+    res.json(disponibilidad);
+  }
+
+  static async guardarDisponibilidad(req: Request, res: Response) {
+    const id = parseInt(req.params.id);
+    const datos = disponibilidadDocenteSchema.parse(req.body);
+    const disponibilidad = await DocentesService.guardarDisponibilidad(
+      id,
+      datos.disponibilidad as Array<{
+        diaSemana: string;
+        horaInicio: string;
+        horaFin: string;
+        disponible: boolean;
+      }>
+    );
+    res.json(disponibilidad);
   }
 }
