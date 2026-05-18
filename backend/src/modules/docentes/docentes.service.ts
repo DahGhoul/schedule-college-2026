@@ -78,4 +78,38 @@ export class DocentesService {
       orderBy: { antiguedad: 'desc' },
     });
   }
+
+  static async obtenerDisponibilidad(idDocente: number) {
+    return prisma.disponibilidad_docente.findMany({
+      where: { id_docente: idDocente },
+      orderBy: [{ dia_semana: 'asc' }, { hora_inicio: 'asc' }],
+    });
+  }
+
+  static async guardarDisponibilidad(
+    idDocente: number,
+    disponibilidad: Array<{
+      diaSemana: string;
+      horaInicio: string;
+      horaFin: string;
+      disponible: boolean;
+    }>
+  ) {
+    await prisma.$transaction(async (tx) => {
+      await tx.disponibilidad_docente.deleteMany({ where: { id_docente: idDocente } });
+      if (disponibilidad.length > 0) {
+        await tx.disponibilidad_docente.createMany({
+          data: disponibilidad.map((item) => ({
+            id_docente: idDocente,
+            dia_semana: item.diaSemana,
+            hora_inicio: item.horaInicio,
+            hora_fin: item.horaFin,
+            disponible: item.disponible,
+          })),
+        });
+      }
+    });
+
+    return this.obtenerDisponibilidad(idDocente);
+  }
 }

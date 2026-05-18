@@ -32,6 +32,7 @@ model periodo_academico {
   configuraciones configuracion[]
   horarios        horario_asignado[]
   ventanas        ventana_atencion[]
+  ciclos          ciclo[]
 
   @@map("periodo_academico")
 }
@@ -64,6 +65,7 @@ model curso {
   nombre            String             @db.VarChar(150)
   codigo            String             @unique @db.VarChar(20)
   horas_teoria      Int                @default(0)
+  horas_practica    Int                @default(0)
   horas_laboratorio Int                @default(0)
   creditos          Int                @default(1)
   activo            Boolean            @default(true)
@@ -71,8 +73,34 @@ model curso {
   grupos            grupo[]
   ambientes         curso_ambiente[]
   horarios          horario_asignado[]
+  ciclos            curso_ciclo[]
 
   @@map("curso")
+}
+
+// ─── Ciclos (por periodo) ───
+model ciclo {
+  id         Int               @id @default(autoincrement()) @map("id_ciclo")
+  numero     Int               @db.SmallInt
+  nombre     String?           @db.VarChar(50)
+  periodo    periodo_academico @relation(fields: [id_periodo], references: [id])
+  id_periodo Int               @map("id_periodo")
+  cursos     curso_ciclo[]
+
+  @@unique([id_periodo, numero])
+  @@map("ciclo")
+}
+
+// ─── Relación Curso-Ciclo (many-to-many) ───
+model curso_ciclo {
+  id        Int   @id @default(autoincrement()) @map("id_curso_ciclo")
+  curso     curso @relation(fields: [id_curso], references: [id], onDelete: Cascade)
+  id_curso  Int   @map("id_curso")
+  ciclo     ciclo @relation(fields: [id_ciclo], references: [id], onDelete: Cascade)
+  id_ciclo  Int   @map("id_ciclo")
+
+  @@unique([id_curso, id_ciclo])
+  @@map("curso_ciclo")
 }
 
 // ─── Relación muchos a muchos: Docente-Curso (preasignación) ───
@@ -99,6 +127,7 @@ model ambiente {
   cursos_asignados curso_ambiente[]
   horarios         horario_asignado[]
   mantenimientos   mantenimiento[]
+  disponibilidad   disponibilidad_ambiente[]
 
   @@map("ambiente")
 }
@@ -141,6 +170,20 @@ model disponibilidad_docente {
   disponible  Boolean @default(true)
 
   @@map("disponibilidad_docente")
+}
+
+// ─── Disponibilidad declarada por el ambiente ───
+model disponibilidad_ambiente {
+  id          Int      @id @default(autoincrement()) @map("id_disponibilidad_ambiente")
+  ambiente    ambiente  @relation(fields: [id_ambiente], references: [id], onDelete: Cascade)
+  id_ambiente Int      @map("id_ambiente")
+  dia_semana  String   @db.VarChar(15)
+  hora_inicio String   @db.VarChar(5)
+  hora_fin    String   @db.VarChar(5)
+  disponible  Boolean  @default(true)
+
+  @@unique([id_ambiente, dia_semana, hora_inicio])
+  @@map("disponibilidad_ambiente")
 }
 
 // ─── Ventanas de atención ───

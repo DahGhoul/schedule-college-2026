@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { periodosService } from '@/services/periodos.service';
 import { ambientesService } from '@/services/ambientes.service';
+import { docentesService } from '@/services/docentes.service';
 import { Boton } from '@/components/ui/Boton';
 import { Selector } from '@/components/ui/Selector';
 import { CalendarioGeneral } from '@/components/horarios/CalendarioGeneral';
@@ -15,7 +16,9 @@ export default function HorariosDashboardPage() {
   const [idPeriodo, setIdPeriodo] = useState<number | null>(null);
   const [filtroTipo, setFiltroTipo] = useState<'AULA' | 'DOCENTE'>('AULA');
   const [filtroId, setFiltroId] = useState<number | null>(null);
+  const [idAmbienteAsignacion, setIdAmbienteAsignacion] = useState<number | null>(null);
   const [cargando, setCargando] = useState(false);
+  const [generando, setGenerando] = useState(false);
   const [notificacion, setNotificacion] = useState<{mensaje: string, tipo: 'exito' | 'error'} | null>(null);
 
   // Cargar periodos
@@ -28,6 +31,11 @@ export default function HorariosDashboardPage() {
   const { data: ambientes } = useQuery({
     queryKey: ['ambientes'],
     queryFn: () => ambientesService.listar().then((res) => res.data),
+  });
+
+  const { data: docentes } = useQuery({
+    queryKey: ['docentes'],
+    queryFn: () => docentesService.listar().then((res) => res.data),
   });
 
   // Seleccionar automáticamente el primer periodo activo si no hay uno seleccionado
@@ -51,6 +59,21 @@ export default function HorariosDashboardPage() {
     }
   };
 
+  const generarAutomatico = async () => {
+    if (!idPeriodo) return;
+    setGenerando(true);
+    try {
+      const res = await apiClient.post('/horarios/generar-automatico', { idPeriodo, modoPrueba: false });
+      const creados = res.data?.creados ?? 0;
+      setNotificacion({ mensaje: `Generación completada: ${creados} bloques creados`, tipo: 'exito' });
+    } catch (error: any) {
+      setNotificacion({ mensaje: error.response?.data?.error || 'Error al generar horarios', tipo: 'error' });
+    } finally {
+      setGenerando(false);
+      setTimeout(() => setNotificacion(null), 5000);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -59,6 +82,13 @@ export default function HorariosDashboardPage() {
           <p className="text-gray-500 mt-1">Coordina clases, asigna aulas y resuelve cruces en tiempo real.</p>
         </div>
         <div className="flex gap-3">
+          <Boton
+            onClick={generarAutomatico}
+            disabled={generando || !idPeriodo}
+            className="bg-sky-600 hover:bg-sky-700 shadow-sky-600/20"
+          >
+            {generando ? 'Generando...' : 'Generar Borrador'}
+          </Boton>
           <Boton 
             onClick={publicarHorario} 
             disabled={cargando || !idPeriodo} 
@@ -91,7 +121,12 @@ export default function HorariosDashboardPage() {
               { valor: 'DOCENTE', etiqueta: 'Vista por Docente' },
             ]}
             value={filtroTipo}
-            onChange={(e) => setFiltroTipo(e.target.value as 'AULA' | 'DOCENTE')}
+            onChange={(e) => {
+              const tipo = e.target.value as 'AULA' | 'DOCENTE';
+              setFiltroTipo(tipo);
+              setFiltroId(null);
+              setIdAmbienteAsignacion(null);
+            }}
           />
         </div>
         <div className="flex-1">
@@ -103,25 +138,45 @@ export default function HorariosDashboardPage() {
                 ...(ambientes?.map((a: any) => ({ valor: String(a.id), etiqueta: `${a.codigo} - ${a.tipo}` })) || []),
               ]}
               value={filtroId?.toString() || ''}
-              onChange={(e) => setFiltroId(e.target.value ? parseInt(e.target.value) : null)}
+              onChange={(e) => {
+                const valor = e.target.value ? parseInt(e.target.value) : null;
+                setFiltroId(valor);
+                setIdAmbienteAsignacion(valor);
+              }}
             />
           ) : (
             <Selector
               label="Seleccionar Docente"
               opciones={[
                 { valor: '', etiqueta: 'Buscar docente...' },
-                // Aquí irían los docentes mapeados
+                ...(docentes?.map((d: any) => ({ valor: String(d.id), etiqueta: `${d.nombres} ${d.apellidos}` })) || []),
               ]}
               value={filtroId?.toString() || ''}
               onChange={(e) => setFiltroId(e.target.value ? parseInt(e.target.value) : null)}
             />
           )}
         </div>
+        <div className="flex-1">
+          <Selector
+            label="Salón para asignación"
+            opciones={[
+              { valor: '', etiqueta: 'Selecciona un salón' },
+              ...(ambientes?.map((a: any) => ({ valor: String(a.id), etiqueta: `${a.codigo} - ${a.tipo}` })) || []),
+            ]}
+            value={idAmbienteAsignacion?.toString() || ''}
+            onChange={(e) => setIdAmbienteAsignacion(e.target.value ? parseInt(e.target.value) : null)}
+          />
+        </div>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         {idPeriodo ? (
-          <CalendarioGeneral idPeriodo={idPeriodo} filtroTipo={filtroTipo} filtroId={filtroId} />
+          <CalendarioGeneral
+            idPeriodo={idPeriodo}
+            filtroTipo={filtroTipo}
+            filtroId={filtroId}
+            ambienteAsignacionId={idAmbienteAsignacion}
+          />
         ) : (
           <div className="p-12 text-center text-gray-500">
             Selecciona un periodo académico para comenzar a gestionar el horario.

@@ -1,6 +1,11 @@
 import { Request, Response } from 'express';
 import { AmbientesService } from './ambientes.service';
-import { crearAmbienteSchema, actualizarAmbienteSchema, registroMantenimientoSchema } from './ambientes.schema';
+import {
+  crearAmbienteSchema,
+  actualizarAmbienteSchema,
+  registroMantenimientoSchema,
+  disponibilidadAmbienteSchema,
+} from './ambientes.schema';
 
 export class AmbientesController {
   /**
@@ -174,6 +179,36 @@ export class AmbientesController {
       }
       console.error('Error al registrar mantenimiento:', error);
       res.status(500).json({ error: 'Error al registrar mantenimiento' });
+    }
+  }
+
+  static async obtenerDisponibilidadDeclarada(req: Request, res: Response) {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: 'ID inválido' });
+
+      const disponibilidad = await AmbientesService.obtenerDisponibilidadDeclarada(id);
+      res.json(disponibilidad);
+    } catch (error) {
+      console.error('Error al obtener disponibilidad declarada:', error);
+      res.status(500).json({ error: 'Error al obtener la disponibilidad declarada' });
+    }
+  }
+
+  static async guardarDisponibilidadDeclarada(req: Request, res: Response) {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: 'ID inválido' });
+
+      const datos = disponibilidadAmbienteSchema.parse(req.body);
+      const disponibilidad = await AmbientesService.guardarDisponibilidadDeclarada(id, datos.disponibilidad);
+      res.json(disponibilidad);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Datos inválidos', detalles: error.errors });
+      }
+      console.error('Error al guardar disponibilidad declarada:', error);
+      res.status(500).json({ error: 'Error al guardar disponibilidad declarada' });
     }
   }
 }

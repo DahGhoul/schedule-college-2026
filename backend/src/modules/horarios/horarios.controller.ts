@@ -6,10 +6,12 @@ import {
   validarSeleccionSchema,
   confirmarSeleccionSchema, 
   cambiarEstadoSchema,
-  publicarSchema
+  publicarSchema,
+  generarHorariosSchema
 } from './horarios.schema';
 import { prisma } from '@/lib/prisma';
 import { PublicadorHorarios } from './publicador-horarios.service';
+import { GeneradorHorariosService } from './generador-horarios.service';
 
 export class HorariosController {
   static async obtenerMatrizDisponibilidad(req: Request, res: Response) {
@@ -181,6 +183,20 @@ export class HorariosController {
         res.json(horarios);
     } catch (error) {
         res.status(500).json({ error: 'Error al listar horarios' });
+    }
+    }
+
+    static async generarHorarios(req: Request, res: Response) {
+    try {
+      const datos = generarHorariosSchema.parse(req.body);
+      const resultado = await GeneradorHorariosService.generar(datos);
+      res.status(201).json(resultado);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+      res.status(400).json({ error: 'Datos inválidos', detalles: error.errors });
+      } else {
+      res.status(400).json({ error: error.message });
+      }
     }
     }
 }

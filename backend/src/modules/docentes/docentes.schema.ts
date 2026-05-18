@@ -1,5 +1,18 @@
 import { z } from 'zod';
 
+const diaSemanaSchema = z.enum(['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES']);
+
+export const disponibilidadDocenteSchema = z.object({
+  disponibilidad: z.array(
+    z.object({
+      diaSemana: diaSemanaSchema,
+      horaInicio: z.string().regex(/^\d{2}:\d{2}$/),
+      horaFin: z.string().regex(/^\d{2}:\d{2}$/),
+      disponible: z.boolean().default(true),
+    })
+  ).min(1),
+});
+
 export const crearDocenteSchema = z.object({
   nombres: z.string().min(1).max(100),
   apellidos: z.string().min(1).max(100),

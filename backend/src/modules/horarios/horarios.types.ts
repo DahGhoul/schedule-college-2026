@@ -9,6 +9,7 @@ export interface SeleccionTemporal {
   idCurso: number;
   idGrupo?: number;
   idAmbiente: number;
+  modoPrueba?: boolean;
   tipoClase: string;
   diaSemana: string;
   horaInicio: string;

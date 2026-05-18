@@ -21,6 +21,8 @@ router.put('/:id/reactivar', AmbientesController.reactivar);
 
 // Disponibilidad y mantenimiento
 router.get('/:id/disponibilidad', AmbientesController.obtenerDisponibilidad);
+router.get('/:id/disponibilidad-declarada', AmbientesController.obtenerDisponibilidadDeclarada);
+router.put('/:id/disponibilidad-declarada', AmbientesController.guardarDisponibilidadDeclarada);
 router.post('/:id/mantenimiento', AmbientesController.registrarMantenimiento);
 
 export default router;

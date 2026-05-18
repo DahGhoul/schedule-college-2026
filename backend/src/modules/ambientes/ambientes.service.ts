@@ -130,6 +130,40 @@ export class AmbientesService {
     return ambiente;
   }
 
+  static async obtenerDisponibilidadDeclarada(idAmbiente: number) {
+    return prisma.disponibilidad_ambiente.findMany({
+      where: { id_ambiente: idAmbiente },
+      orderBy: [{ dia_semana: 'asc' }, { hora_inicio: 'asc' }],
+    });
+  }
+
+  static async guardarDisponibilidadDeclarada(
+    idAmbiente: number,
+    disponibilidad: Array<{
+      diaSemana: string;
+      horaInicio: string;
+      horaFin: string;
+      disponible: boolean;
+    }>
+  ) {
+    await prisma.$transaction(async (tx) => {
+      await tx.disponibilidad_ambiente.deleteMany({ where: { id_ambiente: idAmbiente } });
+      if (disponibilidad.length > 0) {
+        await tx.disponibilidad_ambiente.createMany({
+          data: disponibilidad.map((item) => ({
+            id_ambiente: idAmbiente,
+            dia_semana: item.diaSemana,
+            hora_inicio: item.horaInicio,
+            hora_fin: item.horaFin,
+            disponible: item.disponible,
+          })),
+        });
+      }
+    });
+
+    return this.obtenerDisponibilidadDeclarada(idAmbiente);
+  }
+
   /**
    * Verificar disponibilidad general de todos los ambientes (para matrices)
    */

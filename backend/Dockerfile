@@ -19,4 +19,4 @@ COPY --from=build /app/prisma ./prisma
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/tsconfig.json ./tsconfig.json
 EXPOSE 4000
-CMD ["node", "-r", "module-alias/register", "dist/index.js"]
+CMD ["node", "-r", "module-alias/register", "dist/index.js"]    
