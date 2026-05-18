@@ -9,6 +9,7 @@ router.use(middlewareAutenticacion);
 
 // Rutas generales
 router.get('/por-curso/:cursoId', GruposController.listarPorCurso);
+router.post('/por-curso/:cursoId', GruposController.crearPorCurso);
 
 // CRUD básico
 router.get('/', GruposController.listar);

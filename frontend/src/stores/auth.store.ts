@@ -7,6 +7,12 @@ interface Usuario {
   rol: string;
   nombre?: string;
   idDocente?: number;
+  categoria?: string;
+  docente?: {
+    nombres?: string;
+    apellidos?: string;
+    categoria?: string;
+  };
 }
 
 interface AuthState {

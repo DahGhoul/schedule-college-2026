@@ -28,7 +28,7 @@ export function MenuUsuario() {
             Cambiar Contraseña
           </Link>
           <Link
-            href="/dashboard/docentes/notificaciones"
+            href="/dashboard/notificaciones/preferencias"
             className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
             onClick={() => setAbierto(false)}
           >

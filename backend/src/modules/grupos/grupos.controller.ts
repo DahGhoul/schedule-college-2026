@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { GruposService } from './grupos.service';
-import { crearGrupoSchema, actualizarGrupoSchema, crearGrupoPorCursoSchema } from './grupos.schema';
+import { crearGrupoSchema, actualizarGrupoSchema, crearGrupoPorCursoSchema, crearGruposMasivoSchema } from './grupos.schema';
 
 export class GruposController {
   /**
@@ -19,6 +19,30 @@ export class GruposController {
     } catch (error) {
       console.error('Error al listar grupos:', error);
       res.status(500).json({ error: 'Error al obtener los grupos' });
+    }
+  }
+
+  /**
+   * POST /api/grupos/por-curso/:cursoId
+   * Crear múltiples grupos para un curso (cantidad o lista de codigos)
+   */
+  static async crearPorCurso(req: Request, res: Response) {
+    try {
+      const idCurso = parseInt(req.params.cursoId);
+      if (isNaN(idCurso)) return res.status(400).json({ error: 'ID de curso inválido' });
+
+      const datos = crearGruposMasivoSchema.parse(req.body);
+      const resultado = await GruposService.crearMultiplesPorCurso(idCurso, datos);
+      res.status(201).json(resultado);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Datos inválidos', detalles: error.errors });
+      }
+      if (error.message === 'Curso no encontrado') {
+        return res.status(404).json({ error: error.message });
+      }
+      console.error('Error al crear grupos por curso:', error);
+      res.status(500).json({ error: 'Error al crear los grupos' });
     }
   }
 

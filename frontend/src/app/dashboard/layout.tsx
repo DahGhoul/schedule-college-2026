@@ -23,12 +23,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // Protección de rutas por rol
   useEffect(() => {
     if (estaAutenticado && usuario) {
-      const rutasAdmin = ['/ambientes', '/configuracion', '/cursos', '/docentes', '/periodos', '/reportes'];
+      const rutasAdmin = ['/admin', '/ambientes', '/configuracion', '/cursos', '/docentes', '/periodos', '/reportes'];
       const esRutaAdmin = rutasAdmin.some((ruta) => pathname.startsWith(`/dashboard${ruta}`));
-      
-      if (esRutaAdmin && usuario.rol !== 'ADMINISTRADOR') {
-        // Si no es ADMIN y quiere entrar a algo restringido, mandarlo a su inicio
-        router.replace('/dashboard');
+      const esRutaDocente = pathname.startsWith('/dashboard/docente');
+
+      if (usuario.rol !== 'ADMINISTRADOR' && (esRutaAdmin || pathname === '/dashboard')) {
+        router.replace('/dashboard/docente');
+      }
+
+      if (usuario.rol === 'ADMINISTRADOR' && esRutaDocente) {
+        router.replace('/dashboard/admin');
       }
     }
   }, [estaAutenticado, usuario, pathname, router]);

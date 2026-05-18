@@ -76,6 +76,9 @@ export class CursosController {
       if (error.name === 'ZodError') {
         return res.status(400).json({ error: 'Datos inválidos', detalles: error.errors });
       }
+      if (error.code === 'P2002') {
+        return res.status(409).json({ error: 'Ya existe un curso con ese código' });
+      }
       console.error('Error al actualizar curso:', error);
       res.status(500).json({ error: 'Error al actualizar el curso' });
     }

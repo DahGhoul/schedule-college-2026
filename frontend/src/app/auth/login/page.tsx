@@ -14,16 +14,21 @@ export default function LoginPage() {
   const router = useRouter();
   const { iniciarSesion, estaAutenticado, token, cargarSesion } = useAuthStore();
 
+  const redirigirSegunRol = () => {
+    const rol = useAuthStore.getState().usuario?.rol;
+    router.push(rol === 'PROFESOR' ? '/dashboard/docente' : '/dashboard/admin');
+  };
+
   useEffect(() => {
     if (token) {
       if (!estaAutenticado) {
         cargarSesion().then(() => {
           if (useAuthStore.getState().estaAutenticado) {
-            router.push('/dashboard');
+            redirigirSegunRol();
           }
         });
       } else {
-        router.push('/dashboard');
+        redirigirSegunRol();
       }
     }
   }, [token, estaAutenticado, router, cargarSesion]);
@@ -34,7 +39,7 @@ export default function LoginPage() {
     setCargando(true);
     try {
       await iniciarSesion(email, password);
-      router.push('/dashboard');
+      redirigirSegunRol();
     } catch (err: any) {
       setError(err.message);
     } finally {

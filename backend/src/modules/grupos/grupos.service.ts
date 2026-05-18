@@ -76,6 +76,65 @@ export class GruposService {
   }
 
   /**
+   * Crear múltiples grupos para un curso: se puede pasar `codigos` explícitos
+   * o `cantidad` para generar códigos consecutivos (A, B, C, ...).
+   */
+  static async crearMultiplesPorCurso(idCurso: number, datos: { cantidad?: number; codigos?: string[]; capacidad_maxima?: number }) {
+    const curso = await prisma.curso.findUnique({ where: { id: idCurso } });
+    if (!curso) throw new Error('Curso no encontrado');
+
+    const cantidad = datos.cantidad && datos.cantidad > 0 ? datos.cantidad : 1;
+    const existentes = await prisma.grupo.findMany({
+      where: { id_curso: idCurso },
+      select: { codigo_grupo: true },
+    });
+
+    const existentesSet = new Set(existentes.map((g) => g.codigo_grupo.toUpperCase()));
+    const genCodigo = (index: number) => {
+      let num = index;
+      let str = '';
+      do {
+        str = String.fromCharCode(65 + (num % 26)) + str;
+        num = Math.floor(num / 26) - 1;
+      } while (num >= 0);
+      return str;
+    };
+
+    const codes: string[] = [];
+    let i = 0;
+    while (codes.length < cantidad) {
+      const codigo = genCodigo(i);
+      if (!existentesSet.has(codigo)) {
+        codes.push(codigo);
+        existentesSet.add(codigo);
+      }
+      i += 1;
+    }
+
+    const creados = [] as any[];
+    const saltados: string[] = [];
+
+    for (const codigo of codes) {
+      const existente = await prisma.grupo.findFirst({ where: { id_curso: idCurso, codigo_grupo: codigo } });
+      if (existente) {
+        saltados.push(codigo);
+        continue;
+      }
+
+      const creado = await prisma.grupo.create({
+        data: {
+          id_curso: idCurso,
+          codigo_grupo: codigo,
+          capacidad_maxima: datos.capacidad_maxima ?? 40,
+        },
+      });
+      creados.push(creado);
+    }
+
+    return { creados, saltados };
+  }
+
+  /**
    * Actualizar un grupo existente
    */
   static async actualizar(id: number, datos: { codigo_grupo?: string; capacidad_maxima?: number }) {

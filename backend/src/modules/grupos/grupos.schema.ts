@@ -15,3 +15,8 @@ export const crearGrupoPorCursoSchema = z.object({
   codigo_grupo: z.string().min(1).max(5),
   capacidad_maxima: z.number().int().min(1).default(40),
 });
+
+export const crearGruposMasivoSchema = z.object({
+  cantidad: z.number().int().min(1),
+  capacidad_maxima: z.number().int().min(1).optional(),
+});

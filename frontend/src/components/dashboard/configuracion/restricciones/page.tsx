@@ -1,5 +1,6 @@
 'use client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { configuracionService } from '@/services/configuracion.service';
 import { Boton } from '@/components/ui/Boton';
 import { CampoTexto } from '@/components/ui/CampoTexto';
@@ -40,6 +41,18 @@ export default function RestriccionesPage() {
       BLOQUEO_ALMUERZO_FIN: restricciones.bloqueoAlmuerzoFin,
     } : undefined,
   });
+
+  useEffect(() => {
+    if (restricciones) {
+      reset({
+        FRANJA_INICIO: restricciones.franjaInicio,
+        FRANJA_FIN: restricciones.franjaFin,
+        HORAS_MAX_DIARIAS: String(restricciones.horasMaximasDiarias),
+        BLOQUEO_ALMUERZO_INICIO: restricciones.bloqueoAlmuerzoInicio,
+        BLOQUEO_ALMUERZO_FIN: restricciones.bloqueoAlmuerzoFin,
+      });
+    }
+  }, [restricciones, reset]);
 
   const mutation = useMutation({
     mutationFn: (datos: FormData) => configuracionService.actualizarRestricciones(datos),
