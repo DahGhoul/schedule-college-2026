@@ -20,6 +20,21 @@ async function main() {
     },
   });
 
+  // ─── Ciclos ───────────────────────────────
+  const ciclos: any[] = [];
+  for (let n = 1; n <= 10; n++) {
+    const c = await prisma.ciclo.upsert({
+      where: { id_periodo_numero: { id_periodo: periodo.id, numero: n } as any },
+      update: {},
+      create: {
+        numero: n,
+        nombre: `Ciclo ${n}`,
+        id_periodo: periodo.id,
+      },
+    });
+    ciclos.push(c);
+  }
+
   // ─── Docentes ────────────────────────────
   const docente1 = await prisma.docente.upsert({
     where: {
@@ -156,6 +171,45 @@ async function main() {
       tipo_clase: 'LABORATORIO',
     },
   });
+
+  // ─── Asociar cursos a ciclos (ejemplo básico)
+  // Curso1 -> Ciclo 1, Curso2 -> Ciclo 2
+  await prisma.curso_ciclo.upsert({
+    where: {
+      id_curso_id_ciclo: {
+        id_curso: curso1.id,
+        id_ciclo: ciclos[0].id,
+      },
+    },
+    update: {},
+    create: {
+      id_curso: curso1.id,
+      id_ciclo: ciclos[0].id,
+    },
+  });
+
+  await prisma.curso_ciclo.upsert({
+    where: {
+      id_curso_id_ciclo: {
+        id_curso: curso2.id,
+        id_ciclo: ciclos[1].id,
+      },
+    },
+    update: {},
+    create: {
+      id_curso: curso2.id,
+      id_ciclo: ciclos[1].id,
+    },
+  });
+
+  // Ensure mapping exists (compatible fallback using raw SQL)
+  await prisma.$executeRawUnsafe(`INSERT INTO curso_ciclo (id_curso, id_ciclo)
+    SELECT ${curso1.id}, ${ciclos[0].id}
+    WHERE NOT EXISTS (SELECT 1 FROM curso_ciclo WHERE id_curso=${curso1.id} AND id_ciclo=${ciclos[0].id});`);
+
+  await prisma.$executeRawUnsafe(`INSERT INTO curso_ciclo (id_curso, id_ciclo)
+    SELECT ${curso2.id}, ${ciclos[1].id}
+    WHERE NOT EXISTS (SELECT 1 FROM curso_ciclo WHERE id_curso=${curso2.id} AND id_ciclo=${ciclos[1].id});`);
 
   // ─── Usuario administrador ───────────────
   const hash = await bcrypt.hash('Admin123!', 12);

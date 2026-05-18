@@ -1,11 +1,10 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { horariosService } from '@/services/horarios.service';
 import { SpinnerCarga } from '@/components/ui/SpinnerCarga';
 import { NotificacionToast } from '@/components/ui/NotificacionToast';
 import { GripVertical, AlertTriangle } from 'lucide-react';
-import { apiClient } from '@/lib/api-client';
 
 interface Props {
   idPeriodo: number;
@@ -36,6 +35,7 @@ export function CalendarioGeneral({ idPeriodo, filtroTipo, filtroId, modo = 'EDI
       if (filtroId) {
         if (filtroTipo === 'AULA') params.idAmbiente = filtroId;
         if (filtroTipo === 'DOCENTE') params.idDocente = filtroId;
+      }
       return horariosService.listarHorarios(params).then(res => res.data);
     },
     enabled: !!idPeriodo,
