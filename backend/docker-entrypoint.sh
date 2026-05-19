@@ -19,6 +19,11 @@ until npx prisma migrate deploy; do
 done
 
 echo "[entrypoint] running prisma db seed (best-effort)"
+echo "[entrypoint] ensure schema with prisma db push (best-effort)"
+if ! npx prisma db push --accept-data-loss; then
+  echo "[entrypoint] prisma db push failed; continuing"
+fi
+
 if ! npx prisma db seed; then
   echo "[entrypoint] prisma db seed failed or already applied; continuing"
 fi
