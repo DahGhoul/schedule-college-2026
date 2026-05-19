@@ -22,16 +22,24 @@ export class UsuariosService {
     password: string;
     id_docente?: number;
   }) {
+    console.log('[UsuariosService] Creando usuario con datos:', { ...datos, password: '***' });
     const hash = await bcrypt.hash(datos.password, 12);
-    return prisma.usuario.create({
-      data: {
-        email: datos.email,
-        hash_contrasena: hash,
-        rol: datos.rol,
-        id_docente: datos.id_docente,
-      },
-      include: { docente: true },
-    });
+    try {
+      const result = await prisma.usuario.create({
+        data: {
+          email: datos.email.toLowerCase().trim(),
+          hash_contrasena: hash,
+          rol: datos.rol,
+          id_docente: datos.id_docente,
+        },
+        include: { docente: true },
+      });
+      console.log('[UsuariosService] Usuario creado exitosamente:', result.id);
+      return result;
+    } catch (err: any) {
+      console.error('[UsuariosService] Error en prisma.usuario.create:', err);
+      throw err;
+    }
   }
 
   static async actualizar(

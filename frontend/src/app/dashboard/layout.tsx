@@ -26,18 +26,29 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       const rutasAdmin = ['/admin', '/ambientes', '/configuracion', '/cursos', '/docentes', '/periodos', '/reportes', '/director'];
       const esRutaAdmin = rutasAdmin.some((ruta) => pathname.startsWith(`/dashboard${ruta}`));
       const esRutaDocente = pathname === '/dashboard/docente' || pathname.startsWith('/dashboard/docente/');
+      const esRutaSecretaria = pathname.startsWith('/dashboard/secretaria');
 
-      const esAdministrativo = usuario.rol === 'ADMINISTRADOR' || usuario.rol === 'DIRECTOR' || usuario.rol === 'SECRETARIA';
-
-      // Si es administrativo y está en ruta docente, mandarlo a admin
-      if (esAdministrativo && (esRutaDocente || pathname === '/dashboard')) {
-        router.replace('/dashboard/admin');
+      // Redirección inicial según rol
+      if (pathname === '/dashboard') {
+        if (usuario.rol === 'DOCENTE') {
+          router.replace('/dashboard/docente');
+        } else if (usuario.rol === 'SECRETARIA') {
+          router.replace('/dashboard/secretaria/ambientes');
+        } else {
+          router.replace('/dashboard/admin');
+        }
         return;
       }
 
-      // Si es docente y está en ruta admin, mandarlo a docente
-      if (usuario.rol === 'DOCENTE' && (esRutaAdmin || pathname === '/dashboard' || pathname === '/dashboard/admin')) {
+      // Protección: Docente no puede entrar a admin o secretaria
+      if (usuario.rol === 'DOCENTE' && (esRutaAdmin || esRutaSecretaria || pathname === '/dashboard/admin')) {
         router.replace('/dashboard/docente');
+        return;
+      }
+
+      // Protección: Secretaria no puede entrar a admin puro o director
+      if (usuario.rol === 'SECRETARIA' && (pathname.startsWith('/dashboard/admin') || pathname.startsWith('/dashboard/director'))) {
+        router.replace('/dashboard/secretaria/ambientes');
         return;
       }
     }

@@ -201,4 +201,51 @@ export class CargaHorariaService {
       return oferta;
     });
   }
+
+  /**
+   * Eliminar una asignación de carga horaria
+   */
+  static async eliminarAsignacion(id_asignacion: number) {
+    return prisma.asignacion_docente_componente.delete({
+      where: { id: id_asignacion }
+    });
+  }
+
+  /**
+   * Obtener ciclos de un período específico
+   */
+  static async obtenerCiclosPorPeriodo(id_periodo: number) {
+    return prisma.ciclo.findMany({
+      where: { id_periodo },
+      orderBy: { numero: 'asc' }
+    });
+  }
+
+  /**
+   * Obtener cursos con oferta por período y ciclo
+   */
+  static async obtenerCursosPorCiclo(id_periodo: number, id_ciclo?: number) {
+    const where: any = { id_periodo };
+    if (id_ciclo) {
+      where.id_ciclo = id_ciclo;
+    }
+    
+    return prisma.curso_oferta.findMany({
+      where,
+      include: {
+        curso: true,
+        ciclo: true,
+        componentes: {
+          include: {
+            asignaciones: {
+              include: {
+                docente: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: { curso: { nombre: 'asc' } }
+    });
+  }
 }

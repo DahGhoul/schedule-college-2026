@@ -1,7 +1,6 @@
 import { prisma } from '@/lib/prisma';
 
 export class VentanasService {
-<<<<<<< HEAD
   private static toMinutes(hora: string) {
     const [h, m] = hora.split(':').map((v) => parseInt(v, 10));
     return h * 60 + m;
@@ -97,7 +96,6 @@ export class VentanasService {
     return creadas;
   }
 
-<<<<<<< HEAD
   static async generarHorarioAtencion(
     idPeriodo: number,
     fechaInicio: string,
@@ -223,7 +221,8 @@ export class VentanasService {
     });
 
     return { mensaje: 'Ventanas desactivadas correctamente', total: ventanas.length };
-=======
+  }
+
   static async generarAutomaticamente(idPeriodo: number, fechaInicio: string) {
     const categorias = ['PRINCIPAL', 'ASOCIADO', 'AUXILIAR', 'JEFE_PRACTICA'];
     const modalidades = ['NOMBRADO', 'CONTRATADO'];
@@ -275,7 +274,6 @@ export class VentanasService {
       }
     }
     return creadas;
->>>>>>> 150c942decc96aa94eb3a938b9d70c27a776db78
   }
 
   static async listar(idPeriodo?: number) {
@@ -300,77 +298,50 @@ export class VentanasService {
   static async obtenerPorId(id: number) {
     return prisma.ventana_atencion.findUnique({
       where: { id },
-      include: { atenciones: { include: { docente: true }, orderBy: { orden_espera: 'asc' } } },
+      include: { atenciones: { include: { docente: true } } },
     });
   }
 
   static async iniciarVentana(id: number) {
-    const ventana = await prisma.ventana_atencion.findUnique({ where: { id } });
-    if (!ventana) throw new Error('Ventana no encontrada');
-    if (ventana.estado !== 'PENDIENTE') throw new Error('La ventana ya fue iniciada o completada');
-
-    const docentes = await prisma.docente.findMany({
-      where: { modalidad: ventana.modalidad, categoria: ventana.categoria, activo: true },
-      orderBy: { antiguedad: 'desc' },
+    return prisma.ventana_atencion.update({
+      where: { id },
+      data: { estado: 'EN_PROCESO' },
     });
-
-    const atenciones = await Promise.all(
-      docentes.map((docente, index) =>
-        prisma.atencion_docente.create({
-          data: {
-            id_ventana: id,
-            id_docente: docente.id,
-            orden_espera: index + 1,
-            estado: 'PENDIENTE',
-          },
-        })
-      )
-    );
-
-    await prisma.ventana_atencion.update({ where: { id }, data: { estado: 'EN_PROCESO' } });
-    return { ventana: { ...ventana, estado: 'EN_PROCESO' }, atenciones };
   }
 
-  static async obtenerCola(idVentana: number) {
+  static async obtenerCola(id: number) {
     return prisma.atencion_docente.findMany({
-      where: { id_ventana: idVentana },
-      orderBy: { orden_espera: 'asc' },
+      where: { id_ventana: id },
       include: { docente: true },
+      orderBy: { orden_espera: 'asc' },
     });
   }
 
-  static async siguienteDocente(idVentana: number) {
-    const actual = await prisma.atencion_docente.findFirst({
-      where: { id_ventana: idVentana, estado: 'EN_PROCESO' },
-      orderBy: { orden_espera: 'asc' },
-    });
-    if (actual) {
-      await prisma.atencion_docente.update({ where: { id: actual.id }, data: { estado: 'COMPLETADO' } });
-    }
+  static async siguienteDocente(id: number) {
     const siguiente = await prisma.atencion_docente.findFirst({
-      where: { id_ventana: idVentana, estado: 'PENDIENTE' },
-      orderBy: { orden_espera: 'asc' },
+      where: { id_ventana: id, estado: 'PENDIENTE' },
       include: { docente: true },
+      orderBy: { orden_espera: 'asc' },
     });
+
     if (siguiente) {
-      await prisma.atencion_docente.update({ where: { id: siguiente.id }, data: { estado: 'EN_PROCESO' } });
-    } else {
-      await prisma.ventana_atencion.update({ where: { id: idVentana }, data: { estado: 'COMPLETADO' } });
+      await prisma.atencion_docente.update({
+        where: { id: siguiente.id },
+        data: { estado: 'EN_PROCESO' },
+      });
     }
     return siguiente;
   }
 
   static async marcarAtendido(idVentana: number, idDocente: number) {
-    const atencion = await prisma.atencion_docente.findFirst({
-      where: { id_ventana: idVentana, id_docente: idDocente },
+    return prisma.atencion_docente.update({
+      where: {
+        id_ventana_id_docente: {
+          id_ventana: idVentana,
+          id_docente: idDocente,
+        },
+      },
+      data: { estado: 'COMPLETADO' },
     });
-    if (!atencion || atencion.estado !== 'EN_PROCESO') throw new Error('El docente no está en atención');
-    await prisma.atencion_docente.update({ where: { id: atencion.id }, data: { estado: 'COMPLETADO' } });
-    const pendientes = await prisma.atencion_docente.count({
-      where: { id_ventana: idVentana, estado: { in: ['PENDIENTE', 'EN_PROCESO'] } },
-    });
-    if (pendientes === 0) {
-      await prisma.ventana_atencion.update({ where: { id: idVentana }, data: { estado: 'COMPLETADO' } });
-    }
   }
 }

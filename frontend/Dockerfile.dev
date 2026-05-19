@@ -1,0 +1,18 @@
+FROM node:20-bullseye-slim
+
+WORKDIR /app
+
+# Install dependencies for node-gyp if needed
+RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
+
+COPY package.json ./
+# Remove pnpm lock if we are switching to npm for stability in dev
+# RUN rm -f pnpm-lock.yaml
+
+RUN npm install
+
+COPY . .
+
+EXPOSE 3000
+
+CMD ["npm", "run", "dev"]

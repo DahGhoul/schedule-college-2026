@@ -2,7 +2,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, Plus, Calendar, Info, Clock } from 'lucide-react';
-import { cn } from '@/lib/utilidades';
 import { periodosService } from '@/services/periodos.service';
 import { TablaDatos } from '@/components/ui/TablaDatos';
 import { Card, CardContent } from '@/components/ui/Card';
@@ -11,6 +10,7 @@ import { Modal } from '@/components/ui/Modal';
 import { CampoTexto } from '@/components/ui/CampoTexto';
 import { Selector } from '@/components/ui/Selector';
 import { NotificacionToast } from '@/components/ui/NotificacionToast';
+import { cn } from '@/lib/utilidades';
 
 export default function PeriodosPage() {
   const queryClient = useQueryClient();

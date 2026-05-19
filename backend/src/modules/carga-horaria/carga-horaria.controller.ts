@@ -24,7 +24,7 @@ export class CargaHorariaController {
   static async asignarCarga(req: Request, res: Response) {
     try {
       const datos = asignarCargaSchema.parse(req.body);
-      const resultado = await CargaHorariaService.asignarCarga(datos);
+      const resultado = await CargaHorariaService.asignarCarga(datos as any);
       res.json(resultado);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
@@ -56,6 +56,44 @@ export class CargaHorariaController {
         return res.status(400).json({ error: 'Datos inválidos', detalles: error.errors });
       }
       res.status(400).json({ error: error.message });
+    }
+  }
+
+  static async eliminarAsignacion(req: Request, res: Response) {
+    try {
+      const id_asignacion = parseInt(req.params.id_asignacion);
+      if (isNaN(id_asignacion)) return res.status(400).json({ error: 'ID de asignación inválido' });
+      
+      const resultado = await CargaHorariaService.eliminarAsignacion(id_asignacion);
+      res.json(resultado);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  static async obtenerCiclosPorPeriodo(req: Request, res: Response) {
+    try {
+      const id_periodo = parseInt(req.params.id_periodo);
+      if (isNaN(id_periodo)) return res.status(400).json({ error: 'ID de periodo inválido' });
+      
+      const ciclos = await CargaHorariaService.obtenerCiclosPorPeriodo(id_periodo);
+      res.json(ciclos);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  static async obtenerCursosPorCiclo(req: Request, res: Response) {
+    try {
+      const id_periodo = parseInt(req.params.id_periodo);
+      const id_ciclo = req.query.id_ciclo ? parseInt(req.query.id_ciclo as string) : undefined;
+      
+      if (isNaN(id_periodo)) return res.status(400).json({ error: 'ID de periodo inválido' });
+      
+      const cursos = await CargaHorariaService.obtenerCursosPorCiclo(id_periodo, id_ciclo);
+      res.json(cursos);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   }
 }

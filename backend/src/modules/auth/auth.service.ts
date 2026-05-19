@@ -10,19 +10,30 @@ export class AuthService {
    */
   static async validarCredenciales(credenciales: Credenciales): Promise<DatosUsuario> {
     const emailNormalizado = credenciales.email.toLowerCase().trim();
+    console.log(`[Auth] Intentando validar credenciales para: ${emailNormalizado}`);
+    
     const usuario = await prisma.usuario.findUnique({
       where: { email: emailNormalizado },
       include: { docente: true },
     });
 
-    if (!usuario || !usuario.activo) {
+    if (!usuario) {
+      console.warn(`[Auth] Usuario no encontrado: ${emailNormalizado}`);
+      throw new Error('Credenciales inválidas');
+    }
+
+    if (!usuario.activo) {
+      console.warn(`[Auth] Usuario inactivo: ${emailNormalizado}`);
       throw new Error('Credenciales inválidas');
     }
 
     const valida = await bcrypt.compare(credenciales.password, usuario.hash_contrasena);
     if (!valida) {
+      console.warn(`[Auth] Contraseña incorrecta para: ${emailNormalizado}`);
       throw new Error('Credenciales inválidas');
     }
+
+    console.log(`[Auth] Login exitoso: ${emailNormalizado} (Rol: ${usuario.rol})`);
 
     // Actualizar último acceso
     await prisma.usuario.update({

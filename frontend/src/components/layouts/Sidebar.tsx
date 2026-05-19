@@ -58,8 +58,7 @@ export function Sidebar() {
   ];
 
   const enlacesSecretaria = [
-    { href: '/dashboard/admin', etiqueta: 'Panel Secretaría', Icono: LayoutDashboard },
-    { href: '/dashboard/secretaria/ambientes', etiqueta: 'Ambientes', Icono: School },
+    { href: '/dashboard/secretaria/ambientes', etiqueta: 'Panel Secretaría', Icono: LayoutDashboard },
     { href: '/dashboard/secretaria/docentes', etiqueta: 'Docentes', Icono: Users },
     { href: '/dashboard/secretaria/cursos-asignados', etiqueta: 'Cursos asignados', Icono: BookOpen },
     { href: '/dashboard/secretaria/grupos', etiqueta: 'Grupos', Icono: Eye },

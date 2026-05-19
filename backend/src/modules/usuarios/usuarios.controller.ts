@@ -31,23 +31,19 @@ export class UsuariosController {
 
   static async crear(req: Request, res: Response) {
     try {
-      const datos = crearUsuarioSchema.parse(req.body) as {
-        email: string;
-        rol: string;
-        password: string;
-        id_docente?: number;
-      };
+      console.log('[UsuariosController] Intentando crear usuario:', req.body);
+      const datos = crearUsuarioSchema.parse(req.body) as any;
       const usuario = await UsuariosService.crear(datos);
       res.status(201).json(usuario);
     } catch (error: any) {
+      console.error('[UsuariosController] Error al crear usuario:', error);
       if (error.name === 'ZodError') {
         return res.status(400).json({ error: 'Datos inválidos', detalles: error.errors });
       }
       if (error.code === 'P2002') {
         return res.status(409).json({ error: 'Ya existe un usuario con ese email' });
       }
-      console.error('Error al crear usuario:', error);
-      res.status(500).json({ error: 'Error al crear usuario' });
+      res.status(500).json({ error: error.message || 'Error al crear usuario' });
     }
   }
 

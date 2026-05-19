@@ -11,11 +11,12 @@ export default function Dashboard() {
 
 	useEffect(() => {
 		if (!estaCargando && usuario) {
-			const esAdministrativo = usuario.rol === 'ADMINISTRADOR' || usuario.rol === 'DIRECTOR' || usuario.rol === 'SECRETARIA';
-			if (esAdministrativo) {
-				router.replace('/dashboard/admin');
-			} else {
+			if (usuario.rol === 'SECRETARIA') {
+				router.replace('/dashboard/secretaria/ambientes');
+			} else if (usuario.rol === 'DOCENTE') {
 				router.replace('/dashboard/docente');
+			} else {
+				router.replace('/dashboard/admin');
 			}
 		}
 	}, [estaCargando, router, usuario]);

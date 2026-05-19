@@ -4,19 +4,24 @@ import bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('Ejecutando semilla...');
-
-  const periodo = await prisma.periodo_academico.upsert({
-    where: { nombre: '2026-I' },
-    update: {},
-    create: {
-      nombre: '2026-I',
-      fecha_inicio: new Date('2026-06-08'),
-      fecha_fin: new Date('2026-10-30'),
-      estado: 'ACTIVO',
-      activo: true,
-    },
-  });
+  console.log('--- INICIO DE SEMILLA ---');
+  try {
+    const pExistente = await prisma.periodo_academico.findUnique({ where: { nombre: '2026-I' } });
+    let periodo;
+    if (pExistente) {
+      periodo = pExistente;
+    } else {
+      periodo = await prisma.periodo_academico.create({
+        data: {
+          nombre: '2026-I',
+          fecha_inicio: new Date('2026-06-08'),
+          fecha_fin: new Date('2026-10-30'),
+          estado: 'ACTIVO',
+          activo: true,
+        }
+      });
+    }
+    console.log('Período configurado ID:', periodo.id);
 
   const restricciones = [
     { clave: 'FRANJA_INICIO', valor: '07:00' },
@@ -308,42 +313,44 @@ async function main() {
     });
   }
 
-  // --- DIRECTOR ---
-  console.log('Configurando Director...');
-  // Limpiamos cualquier usuario previo con este email para asegurar que no tenga vínculos antiguos
-  await prisma.usuario.deleteMany({ where: { email: 'director@unt.edu.pe' } });
+  // --- USUARIOS ADMINISTRATIVOS ---
+  console.log('--- Iniciando creación de usuarios administrativos ---');
+  
+  const passHashDirector = await bcrypt.hash('Director123!', 12);
+  const passHashAdmin = await bcrypt.hash('Admin123!', 12);
+  const passHashSecretaria = await bcrypt.hash('Secretaria123!', 12);
 
-  const hashDirector = await bcrypt.hash('Director123!', 12);
-  await prisma.usuario.create({
-    data: { 
-      email: 'director@unt.edu.pe', 
-      hash_contrasena: hashDirector, 
-      rol: 'DIRECTOR', 
-      activo: true,
-      id_docente: null // El Director no es un docente, es un rol administrativo puro
-    },
-  });
-  console.log('Director configurado correctamente.');
+  const admins = [
+    { email: 'director@unt.edu.pe', hash: passHashDirector, rol: 'DIRECTOR' },
+    { email: 'admin@unt.edu.pe', hash: passHashAdmin, rol: 'ADMINISTRADOR' },
+    { email: 'secretaria@unt.edu.pe', hash: passHashSecretaria, rol: 'SECRETARIA' }
+  ];
 
-  // --- ADMINISTRADOR ---
-  console.log('Configurando Administrador...');
-  const hashAdmin = await bcrypt.hash('Admin123!', 12);
-  await prisma.usuario.upsert({
-    where: { email: 'admin@unt.edu.pe' },
-    update: { hash_contrasena: hashAdmin, rol: 'ADMINISTRADOR', activo: true },
-    create: { email: 'admin@unt.edu.pe', hash_contrasena: hashAdmin, rol: 'ADMINISTRADOR', activo: true },
-  });
-  console.log('Administrador configurado correctamente.');
+  for (const a of admins) {
+    const email = a.email.toLowerCase().trim();
+    console.log(`Intentando crear/actualizar ${a.rol}: ${email}`);
+    
+    // Usamos upsert para evitar borrar y crear si ya existe correctamente
+    const user = await prisma.usuario.upsert({
+      where: { email },
+      update: {
+        hash_contrasena: a.hash,
+        rol: a.rol,
+        activo: true,
+        id_docente: null
+      },
+      create: {
+        email,
+        hash_contrasena: a.hash,
+        rol: a.rol,
+        activo: true,
+        id_docente: null
+      }
+    });
+    
+    console.log(`VERIFICACIÓN: Usuario ${user.rol} configurado con email ${user.email}`);
+  }
 
-  // --- SECRETARIA ---
-  console.log('Configurando Secretaria...');
-  const hashSecretaria = await bcrypt.hash('Secretaria123!', 12);
-  await prisma.usuario.upsert({
-    where: { email: 'secretaria@unt.edu.pe' },
-    update: { hash_contrasena: hashSecretaria, rol: 'SECRETARIA', activo: true },
-    create: { email: 'secretaria@unt.edu.pe', hash_contrasena: hashSecretaria, rol: 'SECRETARIA', activo: true },
-  });
-  console.log('Secretaria configurada correctamente.');
 
   // --- DOCENTES ---
   console.log('Configurando Docentes...');
@@ -363,7 +370,12 @@ async function main() {
     });
   }
 
-  console.log('Semilla completada con éxito.');
+  console.log('--- FIN DE SEMILLA CON ÉXITO ---');
+  } catch (error: any) {
+    console.error('--- ERROR EN SEMILLA ---');
+    console.error(error);
+    throw error;
+  }
 }
 
 main()

@@ -20,7 +20,9 @@ export default function LoginPage() {
     const rol = useAuthStore.getState().usuario?.rol;
     if (rol === 'DOCENTE') {
       router.push('/dashboard/docente');
-    } else if (rol === 'DIRECTOR' || rol === 'ADMINISTRADOR' || rol === 'SECRETARIA') {
+    } else if (rol === 'SECRETARIA') {
+      router.push('/dashboard/secretaria/ambientes');
+    } else if (rol === 'DIRECTOR' || rol === 'ADMINISTRADOR') {
       router.push('/dashboard/admin');
     } else {
       router.push('/dashboard');
