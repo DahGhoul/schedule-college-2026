@@ -5,6 +5,7 @@ import { middlewareAutenticacion } from '@/middleware/autenticacion';
 const router: ExpressRouter = Router();
 router.use(middlewareAutenticacion);
 
+router.post('/generar-automatica', VentanasController.generarAutomatica);
 router.post('/configurar', VentanasController.configurar);
 router.get('/', VentanasController.listar);
 router.get('/activa', VentanasController.obtenerActiva);

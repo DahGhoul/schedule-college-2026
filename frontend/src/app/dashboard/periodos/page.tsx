@@ -1,54 +1,15 @@
 'use client';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Search, Plus, Calendar, Info, Clock } from 'lucide-react';
 import { periodosService } from '@/services/periodos.service';
 import { TablaDatos } from '@/components/ui/TablaDatos';
-import { SpinnerCarga } from '@/components/ui/SpinnerCarga';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Boton } from '@/components/ui/Boton';
 import { Modal } from '@/components/ui/Modal';
 import { CampoTexto } from '@/components/ui/CampoTexto';
 import { Selector } from '@/components/ui/Selector';
 import { NotificacionToast } from '@/components/ui/NotificacionToast';
-
-const columnas = [
-  { clave: 'nombre', titulo: 'Nombre' },
-  { 
-    clave: 'fecha_inicio', 
-    titulo: 'Fecha de Inicio',
-    render: (item: any) => new Date(item.fecha_inicio).toLocaleDateString('es-PE')
-  },
-  { 
-    clave: 'fecha_fin', 
-    titulo: 'Fecha de Fin',
-    render: (item: any) => new Date(item.fecha_fin).toLocaleDateString('es-PE')
-  },
-  {
-    clave: 'estado',
-    titulo: 'Estado',
-    render: (item: any) => {
-      let bg = 'bg-gray-100 text-gray-800';
-      if (item.estado === 'ACTIVO') bg = 'bg-emerald-100 text-emerald-800 border border-emerald-200';
-      if (item.estado === 'BORRADOR') bg = 'bg-amber-100 text-amber-800 border border-amber-200';
-      if (item.estado === 'CERRADO') bg = 'bg-rose-100 text-rose-800 border border-rose-200';
-      
-      return (
-        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold uppercase tracking-wider ${bg}`}>
-          {item.estado}
-        </span>
-      );
-    },
-  },
-  {
-    clave: 'activo',
-    titulo: 'Estado',
-    render: (item: any) => (
-      <span className={`px-2 py-0.5 rounded text-xs font-medium ${item.activo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-        {item.activo ? 'Activo' : 'Inactivo'}
-      </span>
-    ),
-  },
-];
 
 export default function PeriodosPage() {
   const queryClient = useQueryClient();
@@ -63,14 +24,16 @@ export default function PeriodosPage() {
     estado: 'BORRADOR',
   });
 
-  const { data: periodos, isLoading } = useQuery({
+  const { data: response, isLoading } = useQuery({
     queryKey: ['periodos'],
     queryFn: () => periodosService.listar().then((res) => res.data),
   });
 
-  const datosFiltrados = periodos?.filter((p: any) => 
+  const periodos = Array.isArray(response) ? response : response?.data || [];
+
+  const datosFiltrados = periodos.filter((p: any) => 
     p.nombre.toLowerCase().includes(buscar.toLowerCase())
-  ) || [];
+  );
 
   const crearMutation = useMutation({
     mutationFn: (datos: any) => periodosService.crear(datos),
@@ -80,8 +43,9 @@ export default function PeriodosPage() {
       setToast({ mensaje: 'Período creado exitosamente', tipo: 'exito' });
       resetFormulario();
     },
-    onError: () => {
-      setToast({ mensaje: 'Error al crear período', tipo: 'error' });
+    onError: (error: any) => {
+      const msg = error.response?.data?.error || 'Error al crear período';
+      setToast({ mensaje: msg, tipo: 'error' });
     },
   });
 
@@ -93,8 +57,9 @@ export default function PeriodosPage() {
       setToast({ mensaje: 'Período actualizado exitosamente', tipo: 'exito' });
       resetFormulario();
     },
-    onError: () => {
-      setToast({ mensaje: 'Error al actualizar período', tipo: 'error' });
+    onError: (error: any) => {
+      const msg = error.response?.data?.error || 'Error al actualizar período';
+      setToast({ mensaje: msg, tipo: 'error' });
     },
   });
 
@@ -144,59 +109,121 @@ export default function PeriodosPage() {
     }
   };
 
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800 tracking-tight">Períodos Académicos</h1>
-          <p className="text-sm text-gray-500">Gestione los períodos académicos activos y cerrados para la programación horaria.</p>
+  const columnas = [
+    { 
+      clave: 'nombre', 
+      titulo: 'Período Académico',
+      render: (item: any) => (
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-slate-100 rounded-lg">
+            <Calendar className="w-4 h-4 text-unt-primary" />
+          </div>
+          <span className="font-bold text-slate-900">{item.nombre}</span>
         </div>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            placeholder="Buscar período..."
-            value={buscar}
-            onChange={(e) => setBuscar(e.target.value)}
-            className="w-full sm:w-72 px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-unt-accent/30 focus:border-unt-accent transition-all bg-white shadow-sm"
-          />
-          <Boton onClick={abrirModalCrear}>
+      )
+    },
+    { 
+      clave: 'fecha_inicio', 
+      titulo: 'Inicio / Fin',
+      render: (item: any) => (
+        <div className="flex items-center gap-2 text-slate-600 text-sm">
+          <Clock className="w-4 h-4 text-slate-400" />
+          <span>{new Date(item.fecha_inicio).toLocaleDateString('es-PE')}</span>
+          <span className="text-slate-300">→</span>
+          <span>{new Date(item.fecha_fin).toLocaleDateString('es-PE')}</span>
+        </div>
+      )
+    },
+    {
+      clave: 'estado',
+      titulo: 'Estado Proceso',
+      render: (item: any) => {
+        let color = 'bg-slate-50 text-slate-600 border-slate-100';
+        if (item.estado === 'ACTIVO') color = 'bg-emerald-50 text-emerald-700 border-emerald-100';
+        if (item.estado === 'BORRADOR') color = 'bg-amber-50 text-amber-700 border-amber-100';
+        if (item.estado === 'CERRADO') color = 'bg-rose-50 text-rose-700 border-rose-100';
+        
+        return (
+          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border ${color}`}>
+            <span className={cn(
+              "w-1.5 h-1.5 rounded-full mr-2",
+              item.estado === 'ACTIVO' ? 'bg-emerald-500' : 
+              item.estado === 'BORRADOR' ? 'bg-amber-500' : 'bg-rose-500'
+            )} />
+            {item.estado}
+          </span>
+        );
+      },
+    },
+    {
+      clave: 'activo',
+      titulo: 'Visibilidad',
+      render: (item: any) => (
+        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
+          item.activo ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-red-50 text-red-700 border border-red-100'
+        }`}>
+          {item.activo ? 'Visible' : 'Oculto'}
+        </span>
+      ),
+    },
+  ];
+
+  return (
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
+        <div>
+          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Períodos Académicos</h1>
+          <p className="text-slate-500 mt-1">Configuración de ciclos y vigencia de la programación.</p>
+        </div>
+        <div className="flex w-full sm:w-auto gap-3">
+          <div className="relative flex-1 sm:w-72">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Buscar período..."
+              value={buscar}
+              onChange={(e) => setBuscar(e.target.value)}
+              className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-4 focus:ring-unt-primary/5 focus:border-unt-primary transition-all bg-white shadow-sm"
+            />
+          </div>
+          <Boton onClick={abrirModalCrear} className="rounded-2xl px-6 shadow-lg shadow-unt-primary/20">
+            <Plus className="w-4 h-4 mr-2" />
             Nuevo Período
           </Boton>
         </div>
       </div>
 
-      <Card>
+      <Card className="border-none shadow-xl shadow-slate-200/50 rounded-[2.5rem] overflow-hidden">
         <CardContent className="p-0">
-          {isLoading ? (
-            <div className="py-12"><SpinnerCarga /></div>
-          ) : (
-            <TablaDatos
-              columnas={columnas}
-              datos={datosFiltrados}
-              alEditar={abrirModalEditar}
-              alEliminar={(periodo) => {
-                if (confirm('¿Está seguro de desactivar este período?')) {
-                  eliminarMutation.mutate(periodo.id);
-                }
-              }}
-            />
-          )}
+          <TablaDatos
+            columnas={columnas}
+            datos={datosFiltrados}
+            loading={isLoading}
+            alEditar={abrirModalEditar}
+            alEliminar={(periodo) => {
+              if (confirm(`¿Está seguro de desactivar el período "${periodo.nombre}"?`)) {
+                eliminarMutation.mutate(periodo.id);
+              }
+            }}
+          />
         </CardContent>
       </Card>
 
-      {modalAbierto && (
-        <Modal cerrar={() => setModalAbierto(false)}>
-          <h2 className="text-xl font-bold mb-4">
-            {periodoEditando ? 'Editar Período' : 'Nuevo Período'}
-          </h2>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <CampoTexto
-              label="Nombre"
-              placeholder="ej: 2026-I"
-              value={formulario.nombre}
-              onChange={(e) => setFormulario({ ...formulario, nombre: e.target.value })}
-              required
-            />
+      <Modal 
+        isOpen={modalAbierto} 
+        onClose={() => setModalAbierto(false)}
+        titulo={periodoEditando ? 'Editar Período Académico' : 'Registrar Nuevo Período'}
+      >
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <CampoTexto
+            label="Nombre del Período"
+            placeholder="Ej: 2026-I"
+            value={formulario.nombre}
+            onChange={(e) => setFormulario({ ...formulario, nombre: e.target.value })}
+            required
+          />
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <CampoTexto
               label="Fecha de Inicio"
               type="date"
@@ -205,40 +232,41 @@ export default function PeriodosPage() {
               required
             />
             <CampoTexto
-              label="Fecha de Fin"
+              label="Fecha de Finalización"
               type="date"
               value={formulario.fecha_fin}
               onChange={(e) => setFormulario({ ...formulario, fecha_fin: e.target.value })}
               required
             />
-            <Selector
-              label="Estado"
-              opciones={[
-                { valor: 'BORRADOR', etiqueta: 'Borrador' },
-                { valor: 'ACTIVO', etiqueta: 'Activo' },
-                { valor: 'CERRADO', etiqueta: 'Cerrado' },
-              ]}
-              value={formulario.estado}
-              onChange={(e) => setFormulario({ ...formulario, estado: e.target.value })}
-              required
-            />
-            <div className="flex justify-end gap-2 pt-4">
-              <Boton type="button" onClick={() => setModalAbierto(false)} variante="secundario">
-                Cancelar
-              </Boton>
-              <Boton type="submit">
-                {periodoEditando ? 'Guardar Cambios' : 'Crear Período'}
-              </Boton>
-            </div>
-          </form>
-        </Modal>
-      )}
+          </div>
+
+          <Selector 
+            label="Estado Inicial" 
+            value={formulario.estado} 
+            onChange={(e) => setFormulario({ ...formulario, estado: e.target.value })}
+            opciones={[
+              { valor: 'BORRADOR', etiqueta: 'Borrador (Solo Admin)' },
+              { valor: 'ACTIVO', etiqueta: 'Activo (Vigente)' },
+              { valor: 'CERRADO', etiqueta: 'Cerrado (Histórico)' }
+            ]}
+          />
+
+          <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
+            <Boton type="button" variant="outline" onClick={() => setModalAbierto(false)} className="rounded-xl px-6">
+              Cancelar
+            </Boton>
+            <Boton type="submit" cargando={crearMutation.isPending || actualizarMutation.isPending} className="rounded-xl px-8 shadow-md shadow-unt-primary/10">
+              {periodoEditando ? 'Guardar Cambios' : 'Registrar Período'}
+            </Boton>
+          </div>
+        </form>
+      </Modal>
 
       {toast && (
-        <NotificacionToast
-          mensaje={toast.mensaje}
-          tipo={toast.tipo}
-          onClose={() => setToast(null)}
+        <NotificacionToast 
+          mensaje={toast.mensaje} 
+          tipo={toast.tipo === 'exito' ? 'exito' : 'error'} 
+          onClose={() => setToast(null)} 
         />
       )}
     </div>

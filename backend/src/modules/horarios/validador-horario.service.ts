@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { redis } from '@/lib/redis';
 import { ValidacionResultado } from './horarios.types';
+import { TipoCurso } from '@prisma/client';
 
 export class ValidadorHorario {
   static async validarSeleccionCompleta(
@@ -45,17 +46,22 @@ export class ValidadorHorario {
       }
     }
 
-    // 2. Validar cruces con horarios confirmados del docente
+    // 2. Validar cruces y reglas de negocio (REGULAR vs ELECTIVO)
     for (const sel of seleccionesDocente) {
-      const componente = await prisma.curso_componente.findUnique({
+      const componenteActual = await prisma.curso_componente.findUnique({
         where: { id: sel.idComponente },
-        include: { oferta: true },
+        include: { oferta: { include: { curso: true } } },
       });
-      if (!componente) {
+
+      if (!componenteActual) {
         conflictos.push(`Conflicto: Componente inválido (ID ${sel.idComponente})`);
         continue;
       }
-      const conflicto = await prisma.bloque_horario.findFirst({
+
+      const tipoCursoActual = componenteActual.oferta.tipo_curso;
+
+      // Cruce con otros bloques del MISMO docente (ya confirmados)
+      const cruceConfirmado = await prisma.bloque_horario.findFirst({
         where: {
           id_docente: idDocente,
           id_periodo: idPeriodo,
@@ -63,11 +69,44 @@ export class ValidadorHorario {
           hora_inicio: sel.horaInicio,
           estado: { in: ['CONFIRMADO', 'PUBLICADO'] },
         },
+        include: { componente: { include: { oferta: true } } }
       });
-      if (conflicto) {
-        conflictos.push(
-          `Conflicto: Ya tiene clase el ${sel.diaSemana} a las ${sel.horaInicio} (bloque ID ${conflicto.id})`
-        );
+
+      if (cruceConfirmado) {
+        const tipoCruce = cruceConfirmado.componente.oferta.tipo_curso;
+        
+        // Regla: No se puede cruzar REGULAR con nada.
+        if (tipoCursoActual === TipoCurso.REGULAR || tipoCruce === TipoCurso.REGULAR) {
+          conflictos.push(
+            `Conflicto: El curso OBLIGATORIO ${componenteActual.oferta.curso.nombre} se cruza el ${sel.diaSemana} a las ${sel.horaInicio}`
+          );
+        } else {
+          // Si ambos son ELECTIVO, se permite el cruce (según requerimiento)
+          advertencias.push(`Nota: Cruce de cursos ELECTIVOS el ${sel.diaSemana} a las ${sel.horaInicio}`);
+        }
+      }
+
+      // Regla: En REGULAR, Teoría no se cruza con Laboratorio del mismo docente (aunque sea otro curso)
+      if (tipoCursoActual === TipoCurso.REGULAR) {
+        const esLabActual = componenteActual.tipo === 'LABORATORIO';
+        const esTeoriaActual = componenteActual.tipo === 'TEORIA';
+
+        if (esLabActual || esTeoriaActual) {
+          const tipoBuscado = esLabActual ? 'TEORIA' : 'LABORATORIO';
+          const cruceLabTeoria = await prisma.bloque_horario.findFirst({
+            where: {
+              id_docente: idDocente,
+              id_periodo: idPeriodo,
+              dia_semana: sel.diaSemana,
+              hora_inicio: sel.horaInicio,
+              componente: { tipo: tipoBuscado, oferta: { tipo_curso: TipoCurso.REGULAR } },
+              estado: { in: ['CONFIRMADO', 'PUBLICADO'] },
+            }
+          });
+          if (cruceLabTeoria) {
+            conflictos.push(`Conflicto: No se permite cruce de Laboratorio y Teoría en cursos OBLIGATORIOS`);
+          }
+        }
       }
     }
 
@@ -91,6 +130,7 @@ export class ValidadorHorario {
 
     // 5. Validar disponibilidad del ambiente (cruces con otros docentes)
     for (const sel of seleccionesDocente) {
+      if (!sel.idAmbiente) continue;
       const conflictoAmbiente = await prisma.bloque_horario.findFirst({
         where: {
           id_periodo: idPeriodo,
@@ -103,21 +143,21 @@ export class ValidadorHorario {
       });
       if (conflictoAmbiente) {
         conflictos.push(
-          `Conflicto de ambiente ${sel.idAmbiente} el ${sel.diaSemana} a las ${sel.horaInicio}`
+          `Conflicto: El ambiente ya está ocupado el ${sel.diaSemana} a las ${sel.horaInicio}`
         );
       }
     }
 
-    // 6. Validar horas requeridas del curso vs horas seleccionadas
+    // 6. Validar horas requeridas
     const asignaciones = await prisma.asignacion_docente_componente.findMany({
       where: { id_docente: idDocente },
       include: { componente: { include: { oferta: { include: { curso: true } } } } },
     });
     for (const a of asignaciones) {
-      const selecciones = seleccionesDocente.filter((s) => s.idComponente === a.id_componente).length;
-      if (a.horas_asignadas > 0 && selecciones < a.horas_asignadas) {
+      const countSelecciones = seleccionesDocente.filter((s) => s.idComponente === a.id_componente).length;
+      if (a.horas_asignadas > 0 && countSelecciones < a.horas_asignadas) {
         advertencias.push(
-          `Faltan ${a.horas_asignadas - selecciones}h de ${a.componente.tipo} para ${a.componente.oferta.curso.nombre}`
+          `Faltan ${a.horas_asignadas - countSelecciones}h de ${a.componente.tipo} para ${a.componente.oferta.curso.nombre}`
         );
       }
     }

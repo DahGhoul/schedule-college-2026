@@ -3,6 +3,19 @@ import { VentanasService } from './ventanas.service';
 import { configurarVentanasSchema } from './ventanas.schema';
 
 export class VentanasController {
+  static async generarAutomatica(req: Request, res: Response) {
+    try {
+      const { idPeriodo, fechaInicio } = req.body;
+      if (!idPeriodo || !fechaInicio) {
+        return res.status(400).json({ error: 'idPeriodo y fechaInicio son requeridos' });
+      }
+      const ventanas = await VentanasService.generarAutomaticamente(idPeriodo, fechaInicio);
+      res.status(201).json(ventanas);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+
   static async configurar(req: Request, res: Response) {
     try {
       const datos = configurarVentanasSchema.parse(req.body);

@@ -19,6 +19,7 @@ import {
   Send,
   BellRing,
   MapPin,
+  FileDown,
 } from 'lucide-react';
 
 export function Sidebar() {
@@ -58,6 +59,8 @@ export function Sidebar() {
 
   const enlacesSecretaria = [
     { href: '/dashboard/admin', etiqueta: 'Panel Secretaría', Icono: LayoutDashboard },
+    { href: '/dashboard/horarios/ventanas/configurar', etiqueta: 'Turnos Atención', Icono: Clock },
+    { href: '/dashboard/secretaria/reportes', etiqueta: 'Generar Entregables', Icono: FileDown },
     { href: '/dashboard/ambientes', etiqueta: 'Gestión de Aulas', Icono: School },
     { href: '/dashboard/director/solicitudes-aula', etiqueta: 'Asignar Aulas', Icono: MapPin },
     { href: '/dashboard/horarios/vista-aula', etiqueta: 'Horario por Aulas', Icono: Eye },

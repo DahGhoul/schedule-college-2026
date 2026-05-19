@@ -1,7 +1,6 @@
 import { prisma } from '@/lib/prisma';
 
 export class VentanasService {
-  // Configurar ventanas para un período (sobrescribe existentes)
   static async configurar(
     idPeriodo: number,
     dias: Array<{
@@ -15,7 +14,6 @@ export class VentanasService {
       }>;
     }>
   ) {
-    // Eliminar ventanas anteriores del período
     const existentes = await prisma.ventana_atencion.findMany({ where: { id_periodo: idPeriodo } });
     const ids = existentes.map((v) => v.id);
     if (ids.length) {
@@ -39,6 +37,59 @@ export class VentanasService {
           },
         });
         creadas.push(ventana);
+      }
+    }
+    return creadas;
+  }
+
+  static async generarAutomaticamente(idPeriodo: number, fechaInicio: string) {
+    const categorias = ['PRINCIPAL', 'ASOCIADO', 'AUXILIAR', 'JEFE_PRACTICA'];
+    const modalidades = ['NOMBRADO', 'CONTRATADO'];
+    
+    const existentes = await prisma.ventana_atencion.findMany({ where: { id_periodo: idPeriodo } });
+    if (existentes.length > 0) {
+      await prisma.atencion_docente.deleteMany({ where: { id_ventana: { in: existentes.map(v => v.id) } } });
+      await prisma.ventana_atencion.deleteMany({ where: { id_periodo: idPeriodo } });
+    }
+
+    let fechaActual = new Date(fechaInicio);
+    let horaActual = 8;
+    let minutoActual = 0;
+    let ordenGlobal = 1;
+    const creadas = [];
+
+    for (const mod of modalidades) {
+      for (const cat of categorias) {
+        const count = await prisma.docente.count({ where: { modalidad: mod, categoria: cat, activo: true } });
+        if (count === 0) continue;
+
+        const h_inicio = `${String(horaActual).padStart(2, '0')}:${String(minutoActual).padStart(2, '0')}`;
+        minutoActual += 30;
+        if (minutoActual >= 60) {
+          horaActual += 1;
+          minutoActual = 0;
+        }
+        const h_fin = `${String(horaActual).padStart(2, '0')}:${String(minutoActual).padStart(2, '0')}`;
+
+        const ventana = await prisma.ventana_atencion.create({
+          data: {
+            id_periodo: idPeriodo,
+            fecha: fechaActual,
+            hora_inicio: h_inicio,
+            hora_fin: h_fin,
+            categoria: cat,
+            modalidad: mod,
+            orden: ordenGlobal++,
+            estado: 'PENDIENTE',
+          },
+        });
+        creadas.push(ventana);
+
+        if (horaActual >= 18) {
+          fechaActual.setDate(fechaActual.getDate() + 1);
+          horaActual = 8;
+          minutoActual = 0;
+        }
       }
     }
     return creadas;

@@ -1,17 +1,94 @@
-interface ModalProps {
+'use client';
+
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { X } from 'lucide-react';
+import { cn } from '@/lib/utilidades';
+
+export interface ModalProps {
   children: React.ReactNode;
-  cerrar: () => void;
+  isOpen?: boolean;
+  abierto?: boolean; // Alias
+  onClose?: () => void;
+  cerrar?: () => void; // Alias
+  titulo?: string;
+  title?: string; // Alias
+  className?: string;
 }
 
-export function Modal({ children, cerrar }: ModalProps) {
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
-        <button onClick={cerrar} className="float-right text-gray-500 hover:text-gray-700">
-          ✕
-        </button>
-        {children}
+export function Modal({ 
+  children, 
+  isOpen, 
+  abierto, 
+  onClose, 
+  cerrar, 
+  titulo, 
+  title,
+  className 
+}: ModalProps) {
+  const [montado, setMontado] = useState(false);
+
+  // Soporte para ambas formas de apertura y cierre
+  const show = isOpen !== undefined ? isOpen : (abierto !== undefined ? abierto : false);
+  const handleClose = onClose || cerrar || (() => {});
+  const displayTitle = titulo || title;
+
+  useEffect(() => {
+    setMontado(true);
+    
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') handleClose();
+    };
+
+    if (show) {
+      document.body.style.overflow = 'hidden';
+      window.addEventListener('keydown', handleEsc);
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+
+    return () => {
+      document.body.style.overflow = 'unset';
+      window.removeEventListener('keydown', handleEsc);
+    };
+  }, [show, handleClose]);
+
+  if (!montado || !show) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 overflow-hidden">
+      {/* Backdrop */}
+      <div 
+        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300"
+        onClick={handleClose}
+      />
+      
+      {/* Modal Content */}
+      <div 
+        className={cn(
+          "relative bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden transition-all duration-300",
+          className
+        )}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-8 py-6 border-b border-gray-100 bg-slate-50/50">
+          <h3 className="text-xl font-bold text-gray-900 tracking-tight">
+            {displayTitle}
+          </h3>
+          <button 
+            onClick={handleClose} 
+            className="group p-2 text-gray-400 hover:text-gray-600 hover:bg-white rounded-2xl transition-all shadow-sm hover:shadow-md border border-transparent hover:border-gray-100"
+          >
+            <X className="w-5 h-5 transition-transform group-hover:rotate-90" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-8 max-h-[75vh] overflow-y-auto custom-scrollbar">
+          {children}
+        </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
