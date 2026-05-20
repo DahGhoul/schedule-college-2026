@@ -49,7 +49,7 @@ export class GeneradorPDFService {
         bloques: {
           where: {
             id_periodo: idPeriodo,
-            estado: { in: ['CONFIRMADO', 'PUBLICADO'] },
+            estado: { in: ['BORRADOR', 'CONFIRMADO', 'PUBLICADO'] },
           },
           include: { componente: { include: { oferta: { include: { curso: true } } } }, docente: true, grupo: true },
           orderBy: [{ dia_semana: 'asc' }, { hora_inicio: 'asc' }],
@@ -93,7 +93,7 @@ export class GeneradorPDFService {
         bloques: {
           where: {
             id_periodo: idPeriodo,
-            estado: { in: ['CONFIRMADO', 'PUBLICADO'] },
+            estado: { in: ['BORRADOR', 'CONFIRMADO', 'PUBLICADO'] },
           },
           include: { componente: { include: { oferta: { include: { curso: true } } } }, ambiente: true, grupo: true },
           orderBy: [{ dia_semana: 'asc' }, { hora_inicio: 'asc' }],

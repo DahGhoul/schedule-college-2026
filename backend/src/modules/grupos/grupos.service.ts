@@ -198,8 +198,8 @@ export class GruposService {
         },
         bloques: {
           where: idPeriodo
-            ? { id_periodo: idPeriodo, estado: { in: ['CONFIRMADO', 'PUBLICADO'] } }
-            : { estado: { in: ['CONFIRMADO', 'PUBLICADO'] } },
+            ? { id_periodo: idPeriodo, estado: { in: ['BORRADOR', 'CONFIRMADO', 'PUBLICADO'] } }
+            : { estado: { in: ['BORRADOR', 'CONFIRMADO', 'PUBLICADO'] } },
           select: { id: true },
         },
       },

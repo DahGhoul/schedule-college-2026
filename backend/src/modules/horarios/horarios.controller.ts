@@ -31,7 +31,13 @@ export class HorariosController {
       const idPeriodo = parseInt(req.query.idPeriodo as string);
       if (!idPeriodo) return res.status(400).json({ error: 'idPeriodo requerido' });
 
-      const matriz = await HorariosService.obtenerMatrizDisponibilidad(idAmbiente, idPeriodo);
+      const usuario = (req as any).usuario;
+      let idDocente: number | undefined = req.query.idDocente ? parseInt(req.query.idDocente as string) : undefined;
+      if (usuario?.rol === 'DOCENTE') {
+        idDocente = usuario.idDocente ?? undefined;
+      }
+
+      const matriz = await HorariosService.obtenerMatrizDisponibilidad(idAmbiente, idPeriodo, idDocente);
       res.json(matriz);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -50,7 +56,7 @@ export class HorariosController {
         horaFin: string;
         sesionId: string;
       };
-      this.validarAccesoDocente(req, datos.idDocente);
+      HorariosController.validarAccesoDocente(req, datos.idDocente);
       const resultado = await HorariosService.seleccionarCelda(datos);
       res.status(201).json(resultado);
     } catch (error: any) {
@@ -69,7 +75,7 @@ export class HorariosController {
         diaSemana: string;
         horaInicio: string;
       };
-      this.validarAccesoDocente(req, datos.idDocente);
+      HorariosController.validarAccesoDocente(req, datos.idDocente);
       const resultado = await HorariosService.deseleccionarCelda(datos as any);
       res.json(resultado);
     } catch (error: any) {
@@ -83,10 +89,11 @@ export class HorariosController {
   static async obtenerSeleccionesTemporales(req: Request, res: Response) {
     try {
       const idDocente = parseInt(req.params.docenteId);
-      this.validarAccesoDocente(req, idDocente);
+      HorariosController.validarAccesoDocente(req, idDocente);
       const selecciones = await HorariosService.obtenerSeleccionesTemporales(idDocente);
       res.json(selecciones);
     } catch (error: any) {
+      console.error('Error en obtenerSeleccionesTemporales:', error);
       if (error.message?.includes('No autorizado')) {
         return res.status(403).json({ error: error.message });
       }
@@ -97,10 +104,11 @@ export class HorariosController {
   static async validarSeleccion(req: Request, res: Response) {
     try {
       const datos = validarSeleccionSchema.parse(req.body);
-      this.validarAccesoDocente(req, datos.idDocente);
+      HorariosController.validarAccesoDocente(req, datos.idDocente);
       const resultado = await HorariosService.validarSeleccion(datos.idDocente, datos.idPeriodo);
       res.json(resultado);
     } catch (error: any) {
+      console.error('Error en validarSeleccion:', error);
       if (error.name === 'ZodError') {
         res.status(400).json({ error: 'Datos inválidos', detalles: error.errors });
       } else {
@@ -111,10 +119,11 @@ export class HorariosController {
   static async obtenerProgreso(req: Request, res: Response) {
     try {
       const idDocente = parseInt(req.params.docenteId);
-      this.validarAccesoDocente(req, idDocente);
+      HorariosController.validarAccesoDocente(req, idDocente);
       const progreso = await HorariosService.obtenerProgreso(idDocente);
       res.json(progreso);
     } catch (error: any) {
+      console.error('Error en obtenerProgreso:', error);
       if (error.message?.includes('No autorizado')) {
         return res.status(403).json({ error: error.message });
       }
@@ -136,7 +145,7 @@ export class HorariosController {
     static async confirmarSeleccion(req: Request, res: Response) {
     try {
         const datos = confirmarSeleccionSchema.parse(req.body);
-      this.validarAccesoDocente(req, datos.idDocente);
+      HorariosController.validarAccesoDocente(req, datos.idDocente);
         const horarios = await PublicadorHorarios.confirmarSeleccion(datos.idDocente, datos.idPeriodo);
         res.status(201).json({ mensaje: 'Selección confirmada', horarios });
     } catch (error: any) {

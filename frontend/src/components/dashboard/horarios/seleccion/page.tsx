@@ -61,7 +61,7 @@ export default function SeleccionHorarioPage() {
     return lista.filter((a: any) => a.tipo === 'AULA');
   }, [ambientes, tipoComponenteSeleccionado]);
 
-  const { data: matriz, actualizarMatriz } = useDisponibilidad(ambienteId, idPeriodo);
+  const { data: matriz, actualizarMatriz } = useDisponibilidad(ambienteId, idPeriodo, docenteId);
 
   const { selecciones, seleccionarCelda, deseleccionarCelda } = useSeleccionHorario(docenteId);
 
@@ -98,21 +98,32 @@ export default function SeleccionHorarioPage() {
       return;
     }
 
-    if (!componenteSeleccionado) {
-      setMensaje({ texto: 'Selecciona primero un componente del curso.', tipo: 'error' });
-      return;
-    }
-
-    if (!grupoSeleccionado) {
-      setMensaje({ texto: 'Selecciona primero un grupo para el componente.', tipo: 'error' });
-      return;
-    }
-
     if (estado === 'LIBRE') {
+      if (!componenteSeleccionado) {
+        setMensaje({ texto: 'Selecciona primero un componente del curso.', tipo: 'error' });
+        return;
+      }
+
+      if (!grupoSeleccionado) {
+        setMensaje({ texto: 'Selecciona primero un grupo para el componente.', tipo: 'error' });
+        return;
+      }
+
       if (!ambienteId) {
         setMensaje({ texto: 'Selecciona un ambiente antes de elegir una celda.', tipo: 'error' });
         return;
       }
+
+      // Validar si ya se alcanzaron o excedieron las horas requeridas
+      const registroProgreso = (progreso || []).find((p: any) => p.idComponente === componenteSeleccionado);
+      if (registroProgreso && registroProgreso.horasAsignadas >= registroProgreso.horasRequeridas) {
+        setMensaje({
+          texto: `No puedes seleccionar más horas para ${registroProgreso.nombreCurso} (${registroProgreso.tipoComponente}). Límite alcanzado: ${registroProgreso.horasRequeridas}h.`,
+          tipo: 'error',
+        });
+        return;
+      }
+
       const horaFin = `${(parseInt(hora) + 1).toString().padStart(2, '0')}:00`;
       try {
         await seleccionarCelda({
@@ -127,9 +138,28 @@ export default function SeleccionHorarioPage() {
         });
         actualizarMatriz();
         queryClient.invalidateQueries({ queryKey: ['validacion-seleccion', docenteId, idPeriodo] });
+        queryClient.invalidateQueries({ queryKey: ['progreso', docenteId] });
+        queryClient.invalidateQueries({ queryKey: ['selecciones-temporales', docenteId] });
         setMensaje({ texto: 'Celda seleccionada correctamente.', tipo: 'success' });
       } catch (err: any) {
         setMensaje({ texto: err.response?.data?.error || 'Error al seleccionar la celda.', tipo: 'error' });
+      }
+    } else if (estado === 'SELECCION_TEMPORAL') {
+      try {
+        await deseleccionarCelda({
+          idDocente: docenteId,
+          idAmbiente: ambienteId || undefined,
+          diaSemana: dia,
+          horaInicio: hora,
+          sesionId,
+        });
+        actualizarMatriz();
+        queryClient.invalidateQueries({ queryKey: ['validacion-seleccion', docenteId, idPeriodo] });
+        queryClient.invalidateQueries({ queryKey: ['progreso', docenteId] });
+        queryClient.invalidateQueries({ queryKey: ['selecciones-temporales', docenteId] });
+        setMensaje({ texto: 'Celda liberada correctamente.', tipo: 'success' });
+      } catch (err: any) {
+        setMensaje({ texto: err.response?.data?.error || 'No se pudo liberar la celda.', tipo: 'error' });
       }
     }
   };
@@ -145,6 +175,8 @@ export default function SeleccionHorarioPage() {
       });
       actualizarMatriz();
       queryClient.invalidateQueries({ queryKey: ['validacion-seleccion', docenteId, idPeriodo] });
+      queryClient.invalidateQueries({ queryKey: ['progreso', docenteId] });
+      queryClient.invalidateQueries({ queryKey: ['selecciones-temporales', docenteId] });
       setMensaje({ texto: 'Celda liberada correctamente.', tipo: 'success' });
     } catch (err: any) {
       setMensaje({ texto: err.response?.data?.error || 'No se pudo liberar la celda.', tipo: 'error' });
@@ -152,82 +184,157 @@ export default function SeleccionHorarioPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Selección de Horarios</h1>
-
-      {/* Selección de ambiente */}
-      <div className="flex gap-4">
-        <div className="flex-1">
-          <Selector
-            label="Ambiente"
-            opciones={[
-              { valor: '', etiqueta: 'Seleccionar ambiente' },
-              ...ambientesFiltrados.map((a: any) => ({
-                valor: String(a.id),
-                etiqueta: `${a.codigo} (${a.tipo === 'AULA' ? 'Aula' : 'Laboratorio'}, Cap: ${a.capacidad})`,
-              })),
-            ]}
-            value={ambienteId?.toString() || ''}
-            onChange={(e) => setAmbienteId(e.target.value ? parseInt(e.target.value) : null)}
-          />
-        </div>
-        <div className="flex-1">
-          <Selector
-            label="Grupo"
-            opciones={[
-              { valor: '', etiqueta: componenteSeleccionado ? 'Seleccionar grupo' : 'Selecciona un componente' },
-              ...((gruposDisponibles || []).map((g: any) => ({
-                valor: String(g.id),
-                etiqueta: `G${g.codigo} (Cap: ${g.capacidad_maxima})`,
-              })) || []),
-            ]}
-            value={grupoSeleccionado?.toString() || ''}
-            onChange={(e) => setGrupoSeleccionado(e.target.value ? parseInt(e.target.value) : null)}
-            disabled={!componenteSeleccionado || gruposLoading}
-          />
-        </div>
-      </div>
-
-      {/* Panel de curso */}
-      <PanelSeleccionCurso
-        componentes={progreso || []}
-        componenteSeleccionado={componenteSeleccionado}
-        alCambiarComponente={(id) => setComponenteSeleccionado(id || null)}
-      />
-
-      {/* Matriz de disponibilidad */}
-      <MatrizDisponibilidad matriz={matriz || null} alHacerClickCelda={manejarClickCelda} />
-
-      {/* Progreso y validaciones */}
-      <div className="grid grid-cols-2 gap-6">
+    <div className="space-y-8 max-w-7xl mx-auto px-4 py-2 animate-fadeIn">
+      {/* Header section with premium look */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between border-b border-gray-150 pb-6 gap-4">
         <div>
-          <h2 className="font-semibold mb-2">Progreso</h2>
-          <IndicadorProgresoHoras progreso={progreso || []} />
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-800 flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-unt-primary text-white shadow-md">
+              <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </span>
+            Elegir mi Horario
+          </h1>
+          <p className="text-sm text-slate-500 mt-2">
+            Gestiona la asignación de tus cursos en los ambientes disponibles para el período académico activo.
+          </p>
         </div>
-        <div>
-          <h2 className="font-semibold mb-2">Validaciones</h2>
-          <PanelValidaciones validacion={validacion || null} />
-        </div>
+        {periodoActivo && (
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-600 shadow-sm">
+            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            Periodo Activo: {periodoActivo.nombre}
+          </div>
+        )}
       </div>
 
-      {/* Vista previa horario */}
-      <div>
-        <h2 className="font-semibold mb-2">Mi Horario Actual</h2>
-        <VistaHorarioDocente selecciones={selecciones} alQuitarCelda={quitarCeldaVistaPrevia} />
-      </div>
+      {/* Main Grid Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        {/* Left column: Courses and settings (1/3 width on desktop) */}
+        <div className="lg:col-span-1 space-y-6">
+          {/* Card: Course selection & groups */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-6">
+            <h2 className="text-lg font-bold text-slate-700 border-b border-gray-100 pb-3 flex items-center gap-2">
+              <span className="w-1 h-5 rounded-full bg-unt-primary"></span>
+              Cursos Asignados
+            </h2>
+            
+            <PanelSeleccionCurso
+              componentes={progreso || []}
+              componenteSeleccionado={componenteSeleccionado}
+              alCambiarComponente={(id) => setComponenteSeleccionado(id || null)}
+            />
 
-      {!!docenteId && !!idPeriodo && (
-        <ConfirmacionHorario
-          docenteId={docenteId}
-          idPeriodo={idPeriodo}
-          alConfirmar={() => {
-            queryClient.invalidateQueries({ queryKey: ['selecciones-temporales', docenteId] });
-            queryClient.invalidateQueries({ queryKey: ['validacion-seleccion', docenteId, idPeriodo] });
-            queryClient.invalidateQueries({ queryKey: ['horarios-general', idPeriodo] });
-            actualizarMatriz();
-          }}
-        />
-      )}
+            {componenteSeleccionado && (
+              <div className="space-y-4 pt-4 border-t border-gray-100 animate-fadeIn">
+                <h3 className="text-sm font-semibold text-slate-600">Configuración de Grupo y Aula</h3>
+                
+                <div className="space-y-4">
+                  <Selector
+                    label="Grupo Académico"
+                    opciones={[
+                      { valor: '', etiqueta: 'Seleccionar grupo' },
+                      ...((gruposDisponibles || []).map((g: any) => ({
+                        valor: String(g.id),
+                        etiqueta: `Grupo ${g.codigo} (Cap: ${g.capacidad_maxima})`,
+                      })) || []),
+                    ]}
+                    value={grupoSeleccionado?.toString() || ''}
+                    onChange={(e) => setGrupoSeleccionado(e.target.value ? parseInt(e.target.value) : null)}
+                    disabled={gruposLoading}
+                  />
+
+                  <Selector
+                    label="Ambiente (Aula/Lab)"
+                    opciones={[
+                      { valor: '', etiqueta: 'Seleccionar ambiente' },
+                      ...ambientesFiltrados.map((a: any) => ({
+                        valor: String(a.id),
+                        etiqueta: `${a.codigo} (${a.tipo === 'AULA' ? 'Aula' : 'Laboratorio'}, Cap: ${a.capacidad})`,
+                      })),
+                    ]}
+                    value={ambienteId?.toString() || ''}
+                    onChange={(e) => setAmbienteId(e.target.value ? parseInt(e.target.value) : null)}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Card: Progress */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+            <h2 className="text-lg font-bold text-slate-700 border-b border-gray-100 pb-3 mb-4 flex items-center gap-2">
+              <span className="w-1 h-5 rounded-full bg-indigo-500"></span>
+              Avance de Horas
+            </h2>
+            <IndicadorProgresoHoras progreso={progreso || []} />
+          </div>
+
+          {/* Card: Validations */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+            <h2 className="text-lg font-bold text-slate-700 border-b border-gray-100 pb-3 mb-4 flex items-center gap-2">
+              <span className="w-1 h-5 rounded-full bg-rose-500"></span>
+              Validaciones de Reglas
+            </h2>
+            <PanelValidaciones validacion={validacion || null} />
+          </div>
+        </div>
+
+        {/* Right column: Availability Matrix and Confirmation (2/3 width on desktop) */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Matrix Card */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
+              <h2 className="text-lg font-bold text-slate-700 flex items-center gap-2">
+                <span className="w-1 h-5 rounded-full bg-emerald-500"></span>
+                Horarios en Ambiente
+              </h2>
+              {ambienteId && (
+                <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                  Verificando Disponibilidad
+                </span>
+              )}
+            </div>
+            <MatrizDisponibilidad matriz={matriz || null} alHacerClickCelda={manejarClickCelda} />
+          </div>
+
+          {/* Schedule Preview Card */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+            <h2 className="text-lg font-bold text-slate-700 border-b border-gray-100 pb-3 mb-4 flex items-center gap-2">
+              <span className="w-1 h-5 rounded-full bg-amber-500"></span>
+              Mi Horario Actual (Borrador/Confirmado)
+            </h2>
+            <VistaHorarioDocente selecciones={selecciones} alQuitarCelda={quitarCeldaVistaPrevia} />
+          </div>
+
+          {/* Confirmation Box */}
+          {!!docenteId && !!idPeriodo && (
+            <div className="bg-gradient-to-r from-slate-50 to-slate-100 rounded-2xl border border-slate-200 p-6 flex flex-col items-center justify-between gap-4 md:flex-row shadow-sm">
+              <div className="text-center md:text-left">
+                <h3 className="font-bold text-slate-700 text-base">¿Listo con tus selecciones?</h3>
+                <p className="text-xs text-slate-500 mt-1 max-w-md">
+                  Confirma tus selecciones temporales. Al confirmar, tus bloques se guardarán en la base de datos como Borrador Oficial.
+                </p>
+              </div>
+              <ConfirmacionHorario
+                docenteId={docenteId}
+                idPeriodo={idPeriodo}
+                deshabilitado={validacion ? !validacion.valido : false}
+                alConfirmar={() => {
+                  queryClient.invalidateQueries({ queryKey: ['selecciones-temporales', docenteId] });
+                  queryClient.invalidateQueries({ queryKey: ['validacion-seleccion', docenteId, idPeriodo] });
+                  queryClient.invalidateQueries({ queryKey: ['horarios-general', idPeriodo] });
+                  queryClient.invalidateQueries({ queryKey: ['progreso', docenteId] });
+                  actualizarMatriz();
+                  setMensaje({ texto: '¡Horario confirmado correctamente en la base de datos!', tipo: 'success' });
+                }}
+              />
+            </div>
+          )}
+        </div>
+
+      </div>
 
       {mensaje && (
         <NotificacionToast

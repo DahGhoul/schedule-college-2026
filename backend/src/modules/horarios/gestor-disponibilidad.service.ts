@@ -9,7 +9,8 @@ export class GestorDisponibilidad {
    */
   static async construirMatriz(
     idAmbiente: number,
-    idPeriodo: number
+    idPeriodo: number,
+    idDocente?: number
   ): Promise<MatrizDisponibilidad> {
     const ambiente = await prisma.ambiente.findUnique({ where: { id: idAmbiente } });
     if (!ambiente) throw new Error('Ambiente no encontrado');
@@ -26,14 +27,14 @@ export class GestorDisponibilidad {
     const almuerzoInicio = mapaConfig['BLOQUEO_ALMUERZO_INICIO'] || '12:00';
     const almuerzoFin = mapaConfig['BLOQUEO_ALMUERZO_FIN'] || '13:00';
 
-    // Obtener horarios ya asignados (CONFIRMADO/PUBLICADO)
+    // Obtener horarios ya asignados (BORRADOR/CONFIRMADO/PUBLICADO)
     const horariosAsignados = await prisma.bloque_horario.findMany({
       where: {
         id_ambiente: idAmbiente,
         id_periodo: idPeriodo,
-        estado: { in: ['CONFIRMADO', 'PUBLICADO'] },
+        estado: { in: ['BORRADOR', 'CONFIRMADO', 'PUBLICADO'] },
       },
-      select: { dia_semana: true, hora_inicio: true, hora_fin: true },
+      select: { dia_semana: true, hora_inicio: true, hora_fin: true, id_docente: true },
     });
 
     // Obtener selecciones temporales desde Redis
@@ -66,16 +67,26 @@ export class GestorDisponibilidad {
         if (mantenimientos.length > 0) {
           return { diaSemana: dia, horaInicio: hora, estado: 'OCUPADO' };
         }
-        // Horario confirmado
-        const ocupado = horariosAsignados.some(
+        // Horario confirmado en BD
+        const bloqueBD = horariosAsignados.find(
           (h) => h.dia_semana === dia && h.hora_inicio === hora
         );
-        if (ocupado) return { diaSemana: dia, horaInicio: hora, estado: 'OCUPADO' };
-        // Selección temporal
-        const temporal = seleccionesTemporales.some(
+        if (bloqueBD) {
+          if (idDocente && bloqueBD.id_docente === idDocente) {
+            return { diaSemana: dia, horaInicio: hora, estado: 'SELECCION_TEMPORAL' };
+          }
+          return { diaSemana: dia, horaInicio: hora, estado: 'OCUPADO' };
+        }
+        // Selección temporal en Redis
+        const temporal = seleccionesTemporales.find(
           (s) => s.diaSemana === dia && s.horaInicio === hora
         );
-        if (temporal) return { diaSemana: dia, horaInicio: hora, estado: 'SELECCION_TEMPORAL' };
+        if (temporal) {
+          if (idDocente && temporal.idDocente === idDocente) {
+            return { diaSemana: dia, horaInicio: hora, estado: 'SELECCION_TEMPORAL' };
+          }
+          return { diaSemana: dia, horaInicio: hora, estado: 'OCUPADO' };
+        }
         return { diaSemana: dia, horaInicio: hora, estado: 'LIBRE' };
       });
       return { horaInicio: hora, celdas };

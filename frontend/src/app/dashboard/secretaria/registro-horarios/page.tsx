@@ -63,7 +63,7 @@ export default function RegistroManualHorariosPage() {
     return lista.filter((a: any) => a.tipo === 'AULA');
   }, [ambientes, tipoComponenteSeleccionado]);
 
-  const { data: matriz, actualizarMatriz } = useDisponibilidad(ambienteId, idPeriodo);
+  const { data: matriz, actualizarMatriz } = useDisponibilidad(ambienteId, idPeriodo, docenteId);
 
   const { selecciones, seleccionarCelda, deseleccionarCelda } = useSeleccionHorario(docenteId || 0);
 
@@ -92,8 +92,9 @@ export default function RegistroManualHorariosPage() {
   useWebSocket(manejarMensajeWS);
 
   const manejarClickCelda = async (dia: string, hora: string, estado: string) => {
-    if (!componenteSeleccionado || !grupoSeleccionado || !docenteId) return;
+    if (!docenteId) return;
     if (estado === 'LIBRE') {
+      if (!componenteSeleccionado || !grupoSeleccionado) return;
       if (!ambienteId) return;
       const horaFin = `${(parseInt(hora) + 1).toString().padStart(2, '0')}:00`;
       try {
@@ -108,8 +109,26 @@ export default function RegistroManualHorariosPage() {
           sesionId,
         });
         actualizarMatriz();
+        queryClient.invalidateQueries({ queryKey: ['validacion-seleccion', docenteId, idPeriodo] });
+        queryClient.invalidateQueries({ queryKey: ['progreso', docenteId] });
+        queryClient.invalidateQueries({ queryKey: ['selecciones-temporales', docenteId] });
       } catch (err: any) {
         alert(err.response?.data?.error || 'Error al seleccionar');
+      }
+    } else if (estado === 'SELECCION_TEMPORAL') {
+      try {
+        await deseleccionarCelda({
+          idDocente: docenteId,
+          idAmbiente: ambienteId || undefined,
+          diaSemana: dia,
+          horaInicio: hora,
+        });
+        actualizarMatriz();
+        queryClient.invalidateQueries({ queryKey: ['validacion-seleccion', docenteId, idPeriodo] });
+        queryClient.invalidateQueries({ queryKey: ['progreso', docenteId] });
+        queryClient.invalidateQueries({ queryKey: ['selecciones-temporales', docenteId] });
+      } catch (err: any) {
+        alert(err.response?.data?.error || 'Error al liberar celda');
       }
     }
   };
@@ -123,6 +142,9 @@ export default function RegistroManualHorariosPage() {
       sesionId: seleccion.sesionId,
     });
     actualizarMatriz();
+    queryClient.invalidateQueries({ queryKey: ['validacion-seleccion', docenteId, idPeriodo] });
+    queryClient.invalidateQueries({ queryKey: ['progreso', docenteId] });
+    queryClient.invalidateQueries({ queryKey: ['selecciones-temporales', docenteId] });
   };
 
   if (periodoLoading) return <SpinnerCarga />;

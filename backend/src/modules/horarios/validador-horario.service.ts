@@ -27,13 +27,39 @@ export class ValidadorHorario {
 
     // Obtener selecciones temporales del docente desde Redis
     const claves = await obtenerClavesPorPatron('seleccion_temporal:*');
-    const seleccionesDocente = [];
+    const seleccionesDocente: any[] = [];
     for (const clave of claves) {
       const valor = await redis.get(clave);
       if (valor) {
         const sel = JSON.parse(valor);
-        if (sel.idDocente === idDocente) seleccionesDocente.push(sel);
+        if (sel.idDocente === idDocente) {
+          seleccionesDocente.push({
+            ...sel,
+            confirmado: false,
+          });
+        }
       }
+    }
+
+    // Obtener bloques confirmados del docente desde la BD
+    const bloquesBD = await prisma.bloque_horario.findMany({
+      where: {
+        id_docente: idDocente,
+        id_periodo: idPeriodo,
+      },
+    });
+    for (const bloque of bloquesBD) {
+      seleccionesDocente.push({
+        idDocente: bloque.id_docente,
+        idComponente: bloque.id_componente,
+        idGrupo: bloque.id_grupo,
+        idAmbiente: bloque.id_ambiente || undefined,
+        diaSemana: bloque.dia_semana,
+        horaInicio: bloque.hora_inicio,
+        horaFin: bloque.hora_fin,
+        confirmado: true,
+        idBloqueHorario: bloque.id,
+      });
     }
 
     // 1. Validar horas máximas diarias
@@ -51,15 +77,21 @@ export class ValidadorHorario {
     for (const sel of seleccionesDocente) {
       const componenteActual = await prisma.curso_componente.findUnique({
         where: { id: sel.idComponente },
+        include: { oferta: { include: { ... (sel.confirmado ? {} : { curso: true }) } } } as any, // prevent TS warnings
+      });
+
+      // Let's query details manually to avoid Prisma includes issues if any
+      const componente = await prisma.curso_componente.findUnique({
+        where: { id: sel.idComponente },
         include: { oferta: { include: { curso: true } } },
       });
 
-      if (!componenteActual) {
+      if (!componente) {
         conflictos.push(`Conflicto: Componente inválido (ID ${sel.idComponente})`);
         continue;
       }
 
-      const tipoCursoActual = componenteActual.oferta.tipo_curso;
+      const tipoCursoActual = componente.oferta.tipo_curso;
 
       // Cruce con otros bloques del MISMO docente (ya confirmados)
       const cruceConfirmado = await prisma.bloque_horario.findFirst({
@@ -68,7 +100,8 @@ export class ValidadorHorario {
           id_periodo: idPeriodo,
           dia_semana: sel.diaSemana,
           hora_inicio: sel.horaInicio,
-          estado: { in: ['CONFIRMADO', 'PUBLICADO'] },
+          estado: { in: ['BORRADOR', 'CONFIRMADO', 'PUBLICADO'] },
+          ...(sel.confirmado && { NOT: { id: sel.idBloqueHorario } }),
         },
         include: { componente: { include: { oferta: true } } }
       });
@@ -79,7 +112,7 @@ export class ValidadorHorario {
         // Regla: No se puede cruzar REGULAR con nada.
         if (tipoCursoActual === TipoCurso.REGULAR || tipoCruce === TipoCurso.REGULAR) {
           conflictos.push(
-            `Conflicto: El curso OBLIGATORIO ${componenteActual.oferta.curso.nombre} se cruza el ${sel.diaSemana} a las ${sel.horaInicio}`
+            `Conflicto: El curso OBLIGATORIO ${componente.oferta.curso.nombre} se cruza el ${sel.diaSemana} a las ${sel.horaInicio}`
           );
         } else {
           // Si ambos son ELECTIVO, se permite el cruce (según requerimiento)
@@ -89,8 +122,8 @@ export class ValidadorHorario {
 
       // Regla: En REGULAR, Teoría no se cruza con Laboratorio del mismo docente (aunque sea otro curso)
       if (tipoCursoActual === TipoCurso.REGULAR) {
-        const esLabActual = componenteActual.tipo === 'LABORATORIO';
-        const esTeoriaActual = componenteActual.tipo === 'TEORIA';
+        const esLabActual = componente.tipo === 'LABORATORIO';
+        const esTeoriaActual = componente.tipo === 'TEORIA';
 
         if (esLabActual || esTeoriaActual) {
           const tipoBuscado = esLabActual ? 'TEORIA' : 'LABORATORIO';
@@ -101,7 +134,8 @@ export class ValidadorHorario {
               dia_semana: sel.diaSemana,
               hora_inicio: sel.horaInicio,
               componente: { tipo: tipoBuscado, oferta: { tipo_curso: TipoCurso.REGULAR } },
-              estado: { in: ['CONFIRMADO', 'PUBLICADO'] },
+              estado: { in: ['BORRADOR', 'CONFIRMADO', 'PUBLICADO'] },
+              ...(sel.confirmado && { NOT: { id: sel.idBloqueHorario } }),
             }
           });
           if (cruceLabTeoria) {
@@ -138,7 +172,7 @@ export class ValidadorHorario {
           id_ambiente: sel.idAmbiente,
           dia_semana: sel.diaSemana,
           hora_inicio: sel.horaInicio,
-          estado: { in: ['CONFIRMADO', 'PUBLICADO'] },
+          estado: { in: ['BORRADOR', 'CONFIRMADO', 'PUBLICADO'] },
           NOT: { id_docente: idDocente },
         },
       });
@@ -159,6 +193,11 @@ export class ValidadorHorario {
       if (a.horas_asignadas > 0 && countSelecciones < a.horas_asignadas) {
         advertencias.push(
           `Faltan ${a.horas_asignadas - countSelecciones}h de ${a.componente.tipo} para ${a.componente.oferta.curso.nombre}`
+        );
+      }
+      if (a.horas_asignadas > 0 && countSelecciones > a.horas_asignadas) {
+        conflictos.push(
+          `Conflicto: Se han asignado más horas de las requeridas para ${a.componente.oferta.curso.nombre} (${countSelecciones}/${a.horas_asignadas}h)`
         );
       }
     }

@@ -111,7 +111,7 @@ export class AmbientesService {
       include: {
         bloques: {
           where: {
-            estado: { in: ['CONFIRMADO', 'PUBLICADO'] },
+            estado: { in: ['BORRADOR', 'CONFIRMADO', 'PUBLICADO'] },
           },
           include: {
             componente: { include: { oferta: { include: { curso: true } } } },
@@ -175,7 +175,7 @@ export class AmbientesService {
         bloques: {
           where: {
             id_periodo: idPeriodo,
-            estado: { in: ['CONFIRMADO', 'PUBLICADO'] },
+            estado: { in: ['BORRADOR', 'CONFIRMADO', 'PUBLICADO'] },
           },
           select: {
             dia_semana: true,

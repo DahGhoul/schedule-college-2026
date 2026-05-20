@@ -17,7 +17,7 @@ export const deseleccionarCeldaSchema = z.object({
   idAmbiente: z.number().int().positive().optional(),
   diaSemana: z.enum(['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES']),
   horaInicio: z.string().regex(/^\d{2}:\d{2}$/),
-  sesionId: z.string().min(1),
+  sesionId: z.string().min(1).optional(),
 });
 
 export const validarSeleccionSchema = z.object({

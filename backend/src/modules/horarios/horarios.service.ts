@@ -8,8 +8,8 @@ export class HorariosService {
   /**
    * Obtener la matriz de disponibilidad para un ambiente
    */
-  static async obtenerMatrizDisponibilidad(idAmbiente: number, idPeriodo: number) {
-    return GestorDisponibilidad.construirMatriz(idAmbiente, idPeriodo);
+  static async obtenerMatrizDisponibilidad(idAmbiente: number, idPeriodo: number, idDocente?: number) {
+    return GestorDisponibilidad.construirMatriz(idAmbiente, idPeriodo, idDocente);
   }
 
   /**
@@ -93,6 +93,15 @@ export class HorariosService {
       throw new Error('El docente no tiene asignado este componente');
     }
 
+    // Validar que no exceda las horas asignadas
+    const seleccionesTemporales = await this.obtenerSeleccionesTemporales(datos.idDocente);
+    const horasSeleccionadas = seleccionesTemporales.filter((s) => s.idComponente === datos.idComponente).length;
+    if (horasSeleccionadas >= asignacion.horas_asignadas) {
+      throw new Error(
+        `No se pueden seleccionar más horas para este componente. Límite: ${asignacion.horas_asignadas}h (Ya seleccionadas: ${horasSeleccionadas}h).`
+      );
+    }
+
     const seleccionesTemporalesDocente = await GestorSeleccionTemporal.obtenerSeleccionesDocente(datos.idDocente);
     const tieneCruceTemporal = seleccionesTemporalesDocente.some(
       (sel) => sel.diaSemana === datos.diaSemana && sel.horaInicio === datos.horaInicio
@@ -150,12 +159,39 @@ export class HorariosService {
     horaInicio: string;
     idDocente: number;
   }) {
-    await GestorSeleccionTemporal.deseleccionarCelda(
+    const clave = GestorSeleccionTemporal.generarClave(
       datos.idAmbiente || 0,
       datos.diaSemana,
       datos.horaInicio,
       datos.idDocente
     );
+    const existeEnRedis = await redis.get(clave);
+
+    if (existeEnRedis) {
+      await GestorSeleccionTemporal.deseleccionarCelda(
+        datos.idAmbiente || 0,
+        datos.diaSemana,
+        datos.horaInicio,
+        datos.idDocente
+      );
+    } else {
+      const bloque = await prisma.bloque_horario.findFirst({
+        where: {
+          id_docente: datos.idDocente,
+          dia_semana: datos.diaSemana,
+          hora_inicio: datos.horaInicio,
+        },
+      });
+
+      if (bloque) {
+        if (bloque.estado === 'PUBLICADO') {
+          throw new Error('No se puede modificar un horario ya publicado');
+        }
+        await prisma.bloque_horario.delete({
+          where: { id: bloque.id },
+        });
+      }
+    }
 
     await redis.publish(
       'canal:disponibilidad',
@@ -169,11 +205,10 @@ export class HorariosService {
    * Obtener todas las selecciones temporales de un docente
    */
   static async obtenerSeleccionesTemporales(idDocente: number) {
-    const selecciones = await GestorSeleccionTemporal.obtenerSeleccionesDocente(idDocente);
+    const seleccionesRedis = await GestorSeleccionTemporal.obtenerSeleccionesDocente(idDocente);
 
-    // Enriquecer con nombres
-    const enriquecidas = await Promise.all(
-      selecciones.map(async (sel) => {
+    const enriquecidasRedis = await Promise.all(
+      seleccionesRedis.map(async (sel) => {
         const componente = await prisma.curso_componente.findUnique({
           where: { id: sel.idComponente },
           include: { oferta: { include: { curso: true } } },
@@ -182,6 +217,8 @@ export class HorariosService {
         const grupo = await prisma.grupo.findUnique({ where: { id: sel.idGrupo } });
         return {
           ...sel,
+          confirmado: false,
+          publicado: false,
           nombreCurso: componente?.oferta?.curso?.nombre || '',
           tipoComponente: componente?.tipo || '',
           codigoGrupo: grupo?.codigo || '',
@@ -190,7 +227,35 @@ export class HorariosService {
       })
     );
 
-    return enriquecidas;
+    const bloquesBD = await prisma.bloque_horario.findMany({
+      where: {
+        id_docente: idDocente,
+      },
+      include: {
+        componente: { include: { oferta: { include: { curso: true } } } },
+        ambiente: true,
+        grupo: true,
+      },
+    });
+
+    const enriquecidosBD = bloquesBD.map((bloque) => ({
+      idDocente: bloque.id_docente,
+      idComponente: bloque.id_componente,
+      idGrupo: bloque.id_grupo,
+      idAmbiente: bloque.id_ambiente || undefined,
+      diaSemana: bloque.dia_semana,
+      horaInicio: bloque.hora_inicio,
+      horaFin: bloque.hora_fin,
+      sesionId: 'db',
+      confirmado: true,
+      publicado: bloque.estado === 'PUBLICADO',
+      nombreCurso: bloque.componente.oferta.curso.nombre,
+      tipoComponente: bloque.componente.tipo,
+      codigoGrupo: bloque.grupo.codigo,
+      codigoAmbiente: bloque.ambiente?.codigo || '',
+    }));
+
+    return [...enriquecidasRedis, ...enriquecidosBD];
   }
 
   /**
@@ -209,7 +274,7 @@ export class HorariosService {
       include: { componente: { include: { oferta: { include: { curso: true } } } } },
     });
 
-    const selecciones = await GestorSeleccionTemporal.obtenerSeleccionesDocente(idDocente);
+    const selecciones = await this.obtenerSeleccionesTemporales(idDocente);
 
     return asignaciones.map((a) => {
       const horasAsignadas = selecciones.filter((s) => s.idComponente === a.id_componente).length;

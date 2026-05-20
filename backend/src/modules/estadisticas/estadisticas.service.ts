@@ -79,7 +79,7 @@ export class EstadisticasService {
         bloques: {
           where: {
             id_periodo: idPeriodo,
-            estado: { in: ['CONFIRMADO', 'PUBLICADO'] },
+            estado: { in: ['BORRADOR', 'CONFIRMADO', 'PUBLICADO'] },
           },
         },
       },
@@ -103,7 +103,7 @@ export class EstadisticasService {
     const horarios = await prisma.bloque_horario.findMany({
       where: {
         id_periodo: idPeriodo,
-        estado: { in: ['CONFIRMADO', 'PUBLICADO'] },
+        estado: { in: ['BORRADOR', 'CONFIRMADO', 'PUBLICADO'] },
       },
       select: { dia_semana: true, hora_inicio: true },
     });
@@ -125,7 +125,7 @@ export class EstadisticasService {
         bloques: {
           where: {
             id_periodo: idPeriodo,
-            estado: { in: ['CONFIRMADO', 'PUBLICADO'] },
+            estado: { in: ['BORRADOR', 'CONFIRMADO', 'PUBLICADO'] },
           },
           select: { hora_inicio: true, hora_fin: true },
         },

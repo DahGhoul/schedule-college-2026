@@ -3,6 +3,7 @@ import { redis } from '@/lib/redis';
 import { GestorSeleccionTemporal } from './gestor-seleccion-temporal.service';
 import { ConflictoGlobal } from './horarios.types';
 import { obtenerClavesPorPatron } from './redis-claves';
+import { ValidadorHorario } from './validador-horario.service';
 
 export class PublicadorHorarios {
   /**
@@ -13,6 +14,14 @@ export class PublicadorHorarios {
     const selecciones = await GestorSeleccionTemporal.obtenerSeleccionesDocente(idDocente);
     if (selecciones.length === 0) {
       throw new Error('No hay selecciones temporales para confirmar');
+    }
+
+    // Validar el conjunto de selecciones completas antes de confirmar
+    const validacion = await ValidadorHorario.validarSeleccionCompleta(idDocente, idPeriodo);
+    if (!validacion.valido) {
+      throw new Error(
+        `No se puede confirmar el horario debido a conflictos: ${validacion.conflictos.join(', ')}`
+      );
     }
 
     return prisma.$transaction(async (tx) => {

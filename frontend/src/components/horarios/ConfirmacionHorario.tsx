@@ -9,9 +9,10 @@ interface ConfirmacionHorarioProps {
   docenteId: number;
   idPeriodo: number;
   alConfirmar: () => void;
+  deshabilitado?: boolean;
 }
 
-export function ConfirmacionHorario({ docenteId, idPeriodo, alConfirmar }: ConfirmacionHorarioProps) {
+export function ConfirmacionHorario({ docenteId, idPeriodo, alConfirmar, deshabilitado }: ConfirmacionHorarioProps) {
   const [mensaje, setMensaje] = useState('');
   const [error, setError] = useState('');
 
@@ -28,7 +29,7 @@ export function ConfirmacionHorario({ docenteId, idPeriodo, alConfirmar }: Confi
 
   return (
     <div className="flex items-center gap-4">
-      <Boton onClick={() => mutation.mutate()} disabled={mutation.isPending}>
+      <Boton onClick={() => mutation.mutate()} disabled={mutation.isPending || deshabilitado}>
         {mutation.isPending ? 'Confirmando...' : 'Confirmar Horario'}
       </Boton>
       {mensaje && <NotificacionToast mensaje={mensaje} tipo="exito" />}

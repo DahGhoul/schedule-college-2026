@@ -70,7 +70,6 @@ export function Sidebar() {
 
   const enlacesDocente = [
     { href: '/dashboard/docente', etiqueta: 'Mi Dashboard', Icono: LayoutDashboard },
-    { href: '/dashboard/disponibilidad', etiqueta: 'Mi Disponibilidad', Icono: Calendar },
     { href: '/dashboard/horarios/seleccion', etiqueta: 'Elegir mi Horario', Icono: CheckSquare },
     { href: '/dashboard/horarios/vista-docente', etiqueta: 'Ver mi Horario', Icono: Eye },
     { href: '/dashboard/notificaciones/preferencias', etiqueta: 'Mis Notificaciones', Icono: BellRing },
