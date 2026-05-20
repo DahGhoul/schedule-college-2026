@@ -13,7 +13,7 @@ import { MatrizDisponibilidad } from '@/components/horarios/MatrizDisponibilidad
 import { PanelSeleccionCurso } from '@/components/horarios/PanelSeleccionCurso';
 import { IndicadorProgresoHoras } from '@/components/horarios/IndicadorProgresoHoras';
 import { PanelValidaciones } from '@/components/horarios/PanelValidaciones';
-import { VistaHorarioDocente } from '@/components/horarios/VistaHorarioDocente';
+
 import { Selector } from '@/components/ui/Selector';
 import { useQueryClient } from '@tanstack/react-query';
 import { gruposService } from '@/services/grupos.service';
@@ -92,7 +92,7 @@ export default function SeleccionHorarioPage() {
   }, [actualizarMatriz, queryClient, docenteId, idPeriodo]);
   useWebSocket(manejarMensajeWS);
 
-  const manejarClickCelda = async (dia: string, hora: string, estado: string) => {
+  const manejarClickCelda = async (dia: string, hora: string, estado: string, info?: any) => {
     if (!docenteId) {
       setMensaje({ texto: 'No se pudo identificar el docente autenticado.', tipo: 'error' });
       return;
@@ -144,14 +144,14 @@ export default function SeleccionHorarioPage() {
       } catch (err: any) {
         setMensaje({ texto: err.response?.data?.error || 'Error al seleccionar la celda.', tipo: 'error' });
       }
-    } else if (estado === 'SELECCION_TEMPORAL') {
+    } else if (estado === 'SELECCION_TEMPORAL' || estado === 'DOCENTE_OTRO_AMBIENTE') {
       try {
         await deseleccionarCelda({
           idDocente: docenteId,
-          idAmbiente: ambienteId || undefined,
+          idAmbiente: info?.idAmbiente || ambienteId || undefined,
           diaSemana: dia,
           horaInicio: hora,
-          sesionId,
+          sesionId: info?.sesionId || sesionId,
         });
         actualizarMatriz();
         queryClient.invalidateQueries({ queryKey: ['validacion-seleccion', docenteId, idPeriodo] });
@@ -161,25 +161,6 @@ export default function SeleccionHorarioPage() {
       } catch (err: any) {
         setMensaje({ texto: err.response?.data?.error || 'No se pudo liberar la celda.', tipo: 'error' });
       }
-    }
-  };
-
-  const quitarCeldaVistaPrevia = async (seleccion: any) => {
-    try {
-      await deseleccionarCelda({
-        idDocente: docenteId,
-        idAmbiente: seleccion.idAmbiente,
-        diaSemana: seleccion.diaSemana,
-        horaInicio: seleccion.horaInicio,
-        sesionId: seleccion.sesionId,
-      });
-      actualizarMatriz();
-      queryClient.invalidateQueries({ queryKey: ['validacion-seleccion', docenteId, idPeriodo] });
-      queryClient.invalidateQueries({ queryKey: ['progreso', docenteId] });
-      queryClient.invalidateQueries({ queryKey: ['selecciones-temporales', docenteId] });
-      setMensaje({ texto: 'Celda liberada correctamente.', tipo: 'success' });
-    } catch (err: any) {
-      setMensaje({ texto: err.response?.data?.error || 'No se pudo liberar la celda.', tipo: 'error' });
     }
   };
 
@@ -297,15 +278,6 @@ export default function SeleccionHorarioPage() {
               )}
             </div>
             <MatrizDisponibilidad matriz={matriz || null} alHacerClickCelda={manejarClickCelda} />
-          </div>
-
-          {/* Schedule Preview Card */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-            <h2 className="text-lg font-bold text-slate-700 border-b border-gray-100 pb-3 mb-4 flex items-center gap-2">
-              <span className="w-1 h-5 rounded-full bg-amber-500"></span>
-              Mi Horario Actual (Borrador/Confirmado)
-            </h2>
-            <VistaHorarioDocente selecciones={selecciones} alQuitarCelda={quitarCeldaVistaPrevia} />
           </div>
 
           {/* Confirmation Box */}

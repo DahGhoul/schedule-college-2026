@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { redis } from '@/lib/redis';
 import { MatrizDisponibilidad, DisponibilidadCelda, SeleccionTemporal } from './horarios.types';
 import { obtenerClavesPorPatron } from './redis-claves';
+import { GestorSeleccionTemporal } from './gestor-seleccion-temporal.service';
 
 export class GestorDisponibilidad {
   /**
@@ -27,23 +28,70 @@ export class GestorDisponibilidad {
     const almuerzoInicio = mapaConfig['BLOQUEO_ALMUERZO_INICIO'] || '12:00';
     const almuerzoFin = mapaConfig['BLOQUEO_ALMUERZO_FIN'] || '13:00';
 
-    // Obtener horarios ya asignados (BORRADOR/CONFIRMADO/PUBLICADO)
-    const horariosAsignados = await prisma.bloque_horario.findMany({
+    // 1. Horarios asignados al ambiente actual
+    const horariosAsignadosAmbiente = await prisma.bloque_horario.findMany({
       where: {
         id_ambiente: idAmbiente,
         id_periodo: idPeriodo,
         estado: { in: ['BORRADOR', 'CONFIRMADO', 'PUBLICADO'] },
       },
-      select: { dia_semana: true, hora_inicio: true, hora_fin: true, id_docente: true },
+      include: {
+        docente: true,
+        ambiente: true,
+        componente: { include: { oferta: { include: { curso: true } } } },
+        grupo: true,
+      },
     });
 
-    // Obtener selecciones temporales desde Redis
-    const clavesTemporales = await obtenerClavesPorPatron(`seleccion_temporal:${idAmbiente}:*`);
-    const seleccionesTemporales : SeleccionTemporal[] = [];
-    for (const clave of clavesTemporales) {
+    // 2. Horarios del docente actual (en cualquier ambiente)
+    const horariosDocente = idDocente
+      ? await prisma.bloque_horario.findMany({
+          where: {
+            id_docente: idDocente,
+            id_periodo: idPeriodo,
+            estado: { in: ['BORRADOR', 'CONFIRMADO', 'PUBLICADO'] },
+          },
+          include: {
+            docente: true,
+            ambiente: true,
+            componente: { include: { oferta: { include: { curso: true } } } },
+            grupo: true,
+          },
+        })
+      : [];
+
+    // 3. Selecciones temporales en el ambiente actual
+    const clavesTemporalesAmbiente = await obtenerClavesPorPatron(`seleccion_temporal:${idAmbiente}:*`);
+    const seleccionesTemporalesAmbiente: SeleccionTemporal[] = [];
+    for (const clave of clavesTemporalesAmbiente) {
       const valor = await redis.get(clave);
-      if (valor) seleccionesTemporales.push(JSON.parse(valor));
+      if (valor) seleccionesTemporalesAmbiente.push(JSON.parse(valor));
     }
+
+    // 4. Selecciones temporales del docente actual (en cualquier ambiente)
+    const seleccionesTemporalesDocenteRaw = idDocente
+      ? await GestorSeleccionTemporal.obtenerSeleccionesDocente(idDocente)
+      : [];
+
+    const seleccionesTemporalesDocente = await Promise.all(
+      seleccionesTemporalesDocenteRaw.map(async (sel) => {
+        const [comp, grp, amb] = await Promise.all([
+          prisma.curso_componente.findUnique({
+            where: { id: sel.idComponente },
+            include: { oferta: { include: { curso: true } } },
+          }),
+          prisma.grupo.findUnique({ where: { id: sel.idGrupo } }),
+          sel.idAmbiente ? prisma.ambiente.findUnique({ where: { id: sel.idAmbiente } }) : Promise.resolve(null),
+        ]);
+        return {
+          ...sel,
+          nombreCurso: comp?.oferta?.curso?.nombre || '',
+          tipoComponente: comp?.tipo || '',
+          codigoGrupo: grp?.codigo || '',
+          codigoAmbiente: amb?.codigo || '',
+        };
+      })
+    );
 
     // Obtener mantenimientos activos
     const mantenimientos = await prisma.mantenimiento.findMany({
@@ -65,28 +113,86 @@ export class GestorDisponibilidad {
         }
         // Mantenimiento
         if (mantenimientos.length > 0) {
-          return { diaSemana: dia, horaInicio: hora, estado: 'OCUPADO' };
+          return { diaSemana: dia, horaInicio: hora, estado: 'OCUPADO', info: { detalle: 'Mantenimiento de ambiente' } };
         }
-        // Horario confirmado en BD
-        const bloqueBD = horariosAsignados.find(
+
+        // B. ¿Tiene el docente actual alguna clase o selección temporal propia en este horario?
+        // B1. Buscar en bloques de BD del docente
+        const bloqueDocenteBD = horariosDocente.find(
           (h) => h.dia_semana === dia && h.hora_inicio === hora
         );
-        if (bloqueBD) {
-          if (idDocente && bloqueBD.id_docente === idDocente) {
-            return { diaSemana: dia, horaInicio: hora, estado: 'SELECCION_TEMPORAL' };
-          }
-          return { diaSemana: dia, horaInicio: hora, estado: 'OCUPADO' };
+        if (bloqueDocenteBD) {
+          const esAqui = bloqueDocenteBD.id_ambiente === idAmbiente;
+          return {
+            diaSemana: dia,
+            horaInicio: hora,
+            estado: esAqui ? 'SELECCION_TEMPORAL' : 'DOCENTE_OTRO_AMBIENTE',
+            info: {
+              idAmbiente: bloqueDocenteBD.id_ambiente || undefined,
+              ambienteCodigo: bloqueDocenteBD.ambiente?.codigo || 'Pendiente',
+              curso: bloqueDocenteBD.componente.oferta.curso.nombre,
+              tipoComponente: bloqueDocenteBD.componente.tipo,
+              grupo: bloqueDocenteBD.grupo.codigo,
+              confirmado: true,
+              estadoBloque: bloqueDocenteBD.estado,
+            },
+          };
         }
-        // Selección temporal en Redis
-        const temporal = seleccionesTemporales.find(
+
+        // B2. Buscar en selecciones temporales del docente (Redis)
+        const temporalDocente = seleccionesTemporalesDocente.find(
           (s) => s.diaSemana === dia && s.horaInicio === hora
         );
-        if (temporal) {
-          if (idDocente && temporal.idDocente === idDocente) {
-            return { diaSemana: dia, horaInicio: hora, estado: 'SELECCION_TEMPORAL' };
-          }
-          return { diaSemana: dia, horaInicio: hora, estado: 'OCUPADO' };
+        if (temporalDocente) {
+          const esAqui = temporalDocente.idAmbiente === idAmbiente;
+          return {
+            diaSemana: dia,
+            horaInicio: hora,
+            estado: esAqui ? 'SELECCION_TEMPORAL' : 'DOCENTE_OTRO_AMBIENTE',
+            info: {
+              idAmbiente: temporalDocente.idAmbiente || undefined,
+              ambienteCodigo: temporalDocente.codigoAmbiente || 'Pendiente',
+              curso: temporalDocente.nombreCurso,
+              tipoComponente: temporalDocente.tipoComponente,
+              grupo: temporalDocente.codigoGrupo,
+              confirmado: false,
+              estadoBloque: 'TEMPORAL',
+            },
+          };
         }
+
+        // C. ¿Está ocupado el ambiente actual por OTRO docente?
+        // C1. Bloques en la BD en el ambiente actual
+        const bloqueAmbienteBD = horariosAsignadosAmbiente.find(
+          (h) => h.dia_semana === dia && h.hora_inicio === hora
+        );
+        if (bloqueAmbienteBD) {
+          return {
+            diaSemana: dia,
+            horaInicio: hora,
+            estado: 'OCUPADO',
+            info: {
+              detalle: `Ocupado por ${bloqueAmbienteBD.componente.oferta.curso.nombre} (${bloqueAmbienteBD.docente?.nombres} ${bloqueAmbienteBD.docente?.apellidos})`,
+            },
+          };
+        }
+
+        // C2. Selecciones temporales en Redis para este ambiente
+        const temporalAmbiente = seleccionesTemporalesAmbiente.find(
+          (s) => s.diaSemana === dia && s.horaInicio === hora
+        );
+        if (temporalAmbiente) {
+          return {
+            diaSemana: dia,
+            horaInicio: hora,
+            estado: 'OCUPADO',
+            info: {
+              detalle: 'Ocupado temporalmente por otro docente',
+            },
+          };
+        }
+
+        // D. Celda libre
         return { diaSemana: dia, horaInicio: hora, estado: 'LIBRE' };
       });
       return { horaInicio: hora, celdas };

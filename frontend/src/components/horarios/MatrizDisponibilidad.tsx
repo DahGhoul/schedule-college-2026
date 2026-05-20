@@ -11,10 +11,20 @@ interface MatrizProps {
         diaSemana: string;
         horaInicio: string;
         estado: string;
+        info?: {
+          idAmbiente?: number;
+          ambienteCodigo?: string;
+          curso?: string;
+          tipoComponente?: string;
+          grupo?: string;
+          confirmado?: boolean;
+          estadoBloque?: string;
+          detalle?: string;
+        };
       }[];
     }[];
   } | null;
-  alHacerClickCelda: (dia: string, hora: string, estado: string) => void;
+  alHacerClickCelda: (dia: string, hora: string, estado: string, info?: any) => void;
 }
 
 const colores: Record<string, string> = {
@@ -22,6 +32,7 @@ const colores: Record<string, string> = {
   OCUPADO: 'bg-rose-50/60 border border-rose-100/80 text-rose-500/80 cursor-not-allowed',
   SELECCION_TEMPORAL: 'bg-amber-50 border-2 border-amber-300 text-amber-800 transition-all duration-150 cursor-pointer hover:scale-[1.02] hover:shadow-sm relative shadow-sm',
   BLOQUEO_INSTITUCIONAL: 'bg-slate-50 border border-slate-200/60 text-slate-400/80 cursor-not-allowed',
+  DOCENTE_OTRO_AMBIENTE: 'bg-indigo-50 border-2 border-indigo-200 text-indigo-800 transition-all duration-150 cursor-pointer hover:scale-[1.02] hover:shadow-sm relative shadow-sm opacity-90',
 };
 
 export function MatrizDisponibilidad({ matriz, alHacerClickCelda }: MatrizProps) {
@@ -65,31 +76,62 @@ export function MatrizDisponibilidad({ matriz, alHacerClickCelda }: MatrizProps)
                   <td
                     key={idx}
                     className={cn(
-                      'border-r border-gray-200 px-2 py-3 text-center min-h-[44px]',
+                      'border-r border-gray-200 px-1 py-1.5 text-center min-w-[130px] min-h-[55px] transition-all',
                       colores[celda.estado]
                     )}
-                    onClick={() => alHacerClickCelda(celda.diaSemana, celda.horaInicio, celda.estado)}
-                    title={`${celda.diaSemana} ${celda.horaInicio} - ${celda.estado}`}
+                    onClick={() => alHacerClickCelda(celda.diaSemana, celda.horaInicio, celda.estado, celda.info)}
+                    title={`${celda.diaSemana} ${celda.horaInicio} - ${
+                      celda.estado === 'DOCENTE_OTRO_AMBIENTE' ? 'Ocupado en otro ambiente' : celda.estado
+                    }`}
                   >
-                    <div className="flex items-center justify-center min-h-[20px] transition-all duration-150">
+                    <div className="flex items-center justify-center min-h-[36px] transition-all duration-150">
                       {celda.estado === 'LIBRE' && (
                         <span className="text-emerald-500 font-bold text-sm opacity-0 group-hover:opacity-100 transition-opacity duration-150">
                           +
                         </span>
                       )}
                       {celda.estado === 'OCUPADO' && (
-                        <span className="text-[10px] font-semibold text-rose-500 tracking-tight">
-                          Ocupado
-                        </span>
+                        <div className="flex flex-col items-center justify-center p-0.5">
+                          <span className="text-[10px] font-semibold text-rose-500 tracking-tight">
+                            Ocupado
+                          </span>
+                          {celda.info?.detalle && (
+                            <span className="text-[8px] text-rose-400/90 font-medium truncate max-w-[110px]" title={celda.info.detalle}>
+                              {celda.info.detalle}
+                            </span>
+                          )}
+                        </div>
                       )}
                       {celda.estado === 'SELECCION_TEMPORAL' && (
-                        <span className="text-[10px] font-bold text-amber-800 tracking-tight flex items-center gap-1.5">
-                          <span className="relative flex h-2 w-2">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                        <div className="flex flex-col items-center justify-center p-1 text-center w-full min-h-[40px]">
+                          <span className="text-[10px] font-bold text-amber-900 leading-tight truncate max-w-[110px]" title={celda.info?.curso}>
+                            {celda.info?.curso}
                           </span>
-                          Elegido
-                        </span>
+                          <span className="text-[8.5px] font-semibold text-amber-700 mt-0.5 leading-none">
+                            {celda.info?.tipoComponente} • Gr. {celda.info?.grupo}
+                          </span>
+                          <span className={cn(
+                            "text-[8px] font-bold px-2 py-0.5 rounded-full mt-1.5 leading-none shadow-sm",
+                            celda.info?.confirmado
+                              ? "bg-emerald-100 text-emerald-800 border border-emerald-250"
+                              : "bg-amber-105 text-amber-800 border border-amber-250"
+                          )}>
+                            {celda.info?.confirmado ? 'Confirmado' : 'Borrador'}
+                          </span>
+                        </div>
+                      )}
+                      {celda.estado === 'DOCENTE_OTRO_AMBIENTE' && (
+                        <div className="flex flex-col items-center justify-center p-1 text-center w-full min-h-[40px]">
+                          <span className="text-[10px] font-bold text-indigo-900 leading-tight truncate max-w-[110px]" title={celda.info?.curso}>
+                            {celda.info?.curso}
+                          </span>
+                          <span className="text-[8.5px] font-semibold text-indigo-600 mt-0.5 leading-none">
+                            {celda.info?.tipoComponente} • Gr. {celda.info?.grupo}
+                          </span>
+                          <span className="text-[8px] font-bold px-2 py-0.5 rounded-full mt-1.5 bg-indigo-100 text-indigo-800 border border-indigo-250 leading-none shadow-sm">
+                            Aula: {celda.info?.ambienteCodigo}
+                          </span>
+                        </div>
                       )}
                       {celda.estado === 'BLOQUEO_INSTITUCIONAL' && (
                         <span className="text-[10px] font-medium text-slate-400">
@@ -104,7 +146,7 @@ export function MatrizDisponibilidad({ matriz, alHacerClickCelda }: MatrizProps)
           </tbody>
         </table>
       </div>
-      <div className="flex flex-wrap gap-4 px-2 py-1 text-xs font-medium text-gray-500 bg-gray-50/50 rounded-lg border border-gray-100">
+      <div className="flex flex-wrap gap-4 px-3 py-2 text-xs font-medium text-gray-500 bg-gray-50/50 rounded-xl border border-gray-150">
         <span className="flex items-center gap-2">
           <span className="w-4 h-4 rounded bg-emerald-50 border border-emerald-200"></span>
           <span>Libre (Click para elegir)</span>
@@ -117,8 +159,12 @@ export function MatrizDisponibilidad({ matriz, alHacerClickCelda }: MatrizProps)
           <span className="w-4 h-4 rounded bg-amber-50 border-2 border-amber-300"></span>
           <span className="flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-            Mi Selección (Click para quitar)
+            Mi Selección en Aula actual (Click para quitar)
           </span>
+        </span>
+        <span className="flex items-center gap-2">
+          <span className="w-4 h-4 rounded bg-indigo-50 border-2 border-indigo-200"></span>
+          <span>Mi Horario en otra Aula (Click para quitar)</span>
         </span>
         <span className="flex items-center gap-2">
           <span className="w-4 h-4 rounded bg-slate-50 border border-slate-200"></span>

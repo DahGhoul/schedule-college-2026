@@ -19,7 +19,17 @@ export interface SeleccionTemporal {
 export interface DisponibilidadCelda {
   diaSemana: string;
   horaInicio: string;
-  estado: 'LIBRE' | 'OCUPADO' | 'SELECCION_TEMPORAL' | 'BLOQUEO_INSTITUCIONAL';
+  estado: 'LIBRE' | 'OCUPADO' | 'SELECCION_TEMPORAL' | 'BLOQUEO_INSTITUCIONAL' | 'DOCENTE_OTRO_AMBIENTE';
+  info?: {
+    idAmbiente?: number;
+    ambienteCodigo?: string;
+    curso?: string;
+    tipoComponente?: string;
+    grupo?: string;
+    confirmado?: boolean;
+    estadoBloque?: string;
+    detalle?: string;
+  };
 }
 
 export interface MatrizDisponibilidad {
