@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { redis } from '@/lib/redis';
 import { MatrizDisponibilidad, DisponibilidadCelda, SeleccionTemporal } from './horarios.types';
+import { obtenerClavesPorPatron } from './redis-claves';
 
 export class GestorDisponibilidad {
   /**
@@ -36,7 +37,7 @@ export class GestorDisponibilidad {
     });
 
     // Obtener selecciones temporales desde Redis
-    const clavesTemporales = await redis.keys(`seleccion_temporal:${idAmbiente}:*`);
+    const clavesTemporales = await obtenerClavesPorPatron(`seleccion_temporal:${idAmbiente}:*`);
     const seleccionesTemporales : SeleccionTemporal[] = [];
     for (const clave of clavesTemporales) {
       const valor = await redis.get(clave);

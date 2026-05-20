@@ -23,8 +23,12 @@ const configurarOfertaSchema = z.object({
 export class CargaHorariaController {
   static async asignarCarga(req: Request, res: Response) {
     try {
-      const datos = asignarCargaSchema.parse(req.body);
-      const resultado = await CargaHorariaService.asignarCarga(datos as any);
+      const datos = asignarCargaSchema.parse(req.body) as {
+        id_componente: number;
+        id_docente: number;
+        horas_asignadas: number;
+      };
+      const resultado = await CargaHorariaService.asignarCarga(datos);
       res.json(resultado);
     } catch (error: any) {
       if (error instanceof z.ZodError) {

@@ -8,6 +8,8 @@ export function useValidacionTiempoReal(docenteId: number, idPeriodo: number) {
     queryFn: () =>
       horariosService.validarSeleccion({ idDocente: docenteId, idPeriodo }).then((res) => res.data),
     enabled: !!docenteId && !!idPeriodo,
-    refetchInterval: 2000, // Refrescar cada 2 segundos
+    refetchInterval: 5000,
+    refetchIntervalInBackground: false,
+    staleTime: 3000,
   });
 }

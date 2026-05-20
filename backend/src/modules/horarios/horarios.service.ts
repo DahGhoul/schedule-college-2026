@@ -93,6 +93,14 @@ export class HorariosService {
       throw new Error('El docente no tiene asignado este componente');
     }
 
+    const seleccionesTemporalesDocente = await GestorSeleccionTemporal.obtenerSeleccionesDocente(datos.idDocente);
+    const tieneCruceTemporal = seleccionesTemporalesDocente.some(
+      (sel) => sel.diaSemana === datos.diaSemana && sel.horaInicio === datos.horaInicio
+    );
+    if (tieneCruceTemporal) {
+      throw new Error('El docente ya tiene una selección temporal en ese bloque horario');
+    }
+
     if (datos.idAmbiente && ambiente) {
       const tipoRequerido = componente.tipo === 'LABORATORIO' ? 'LABORATORIO' : 'AULA';
       if (componente.tipo === 'PRACTICA' && ambiente.tipo === 'LABORATORIO') {

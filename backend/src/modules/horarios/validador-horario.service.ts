@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { redis } from '@/lib/redis';
 import { ValidacionResultado } from './horarios.types';
 import { TipoCurso } from '@prisma/client';
+import { obtenerClavesPorPatron } from './redis-claves';
 
 export class ValidadorHorario {
   static async validarSeleccionCompleta(
@@ -25,7 +26,7 @@ export class ValidadorHorario {
     const almuerzoFin = mapaConfig['BLOQUEO_ALMUERZO_FIN'] || '13:00';
 
     // Obtener selecciones temporales del docente desde Redis
-    const claves = await redis.keys('seleccion_temporal:*');
+    const claves = await obtenerClavesPorPatron('seleccion_temporal:*');
     const seleccionesDocente = [];
     for (const clave of claves) {
       const valor = await redis.get(clave);

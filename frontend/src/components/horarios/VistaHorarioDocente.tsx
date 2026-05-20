@@ -13,7 +13,7 @@ interface SeleccionTemporal {
 
 interface VistaHorarioDocenteProps {
   selecciones: SeleccionTemporal[];
-  alQuitarCelda: (dia: string, hora: string) => void;
+  alQuitarCelda: (seleccion: SeleccionTemporal) => void;
 }
 
 const diasOrden = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES'];
@@ -23,8 +23,19 @@ export function VistaHorarioDocente({ selecciones, alQuitarCelda }: VistaHorario
   const obtenerSeleccion = (dia: string, hora: string) =>
     selecciones.find((s) => s.diaSemana === dia && s.horaInicio === hora);
 
+  if (!selecciones.length) {
+    return (
+      <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-sm text-gray-600">
+        Aún no tienes selecciones temporales registradas.
+      </div>
+    );
+  }
+
   return (
-    <div className="overflow-x-auto">
+    <div className="space-y-2 overflow-x-auto">
+      <div className="text-sm text-gray-600">
+        {selecciones.length} bloque{selecciones.length === 1 ? '' : 's'} seleccionado{selecciones.length === 1 ? '' : 's'}.
+      </div>
       <table className="min-w-full border text-xs">
         <thead>
           <tr>
@@ -47,7 +58,7 @@ export function VistaHorarioDocente({ selecciones, alQuitarCelda }: VistaHorario
                       'border px-2 py-1 text-center',
                       sel ? 'bg-yellow-200 cursor-pointer' : ''
                     )}
-                    onClick={() => sel && alQuitarCelda(dia, hora)}
+                    onClick={() => sel && alQuitarCelda(sel)}
                   >
                     {sel ? `${sel.nombreCurso} (${sel.tipoComponente[0]}) G${sel.codigoGrupo} ${sel.codigoAmbiente}` : ''}
                   </td>

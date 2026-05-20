@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { redis } from '@/lib/redis';
 import { GestorSeleccionTemporal } from './gestor-seleccion-temporal.service';
 import { ConflictoGlobal } from './horarios.types';
+import { obtenerClavesPorPatron } from './redis-claves';
 
 export class PublicadorHorarios {
   /**
@@ -71,7 +72,7 @@ export class PublicadorHorarios {
       }
 
       // Limpiar selecciones temporales de Redis
-      const claves = await redis.keys('seleccion_temporal:*');
+      const claves = await obtenerClavesPorPatron('seleccion_temporal:*');
       for (const clave of claves) {
         const valor = await redis.get(clave);
         if (valor) {

@@ -14,6 +14,17 @@ import { PublicadorHorarios } from './publicador-horarios.service';
 import { GeneradorHorariosService } from './generador-horarios.service';
 
 export class HorariosController {
+  private static validarAccesoDocente(req: Request, idDocente: number) {
+    const usuario = (req as any).usuario;
+    if (!usuario) {
+      throw new Error('Usuario no autenticado');
+    }
+
+    if (usuario.rol === 'DOCENTE' && usuario.idDocente !== idDocente) {
+      throw new Error('No autorizado para gestionar horarios de otro docente');
+    }
+  }
+
   static async obtenerMatrizDisponibilidad(req: Request, res: Response) {
     try {
       const idAmbiente = parseInt(req.params.ambienteId);
@@ -39,6 +50,7 @@ export class HorariosController {
         horaFin: string;
         sesionId: string;
       };
+      this.validarAccesoDocente(req, datos.idDocente);
       const resultado = await HorariosService.seleccionarCelda(datos);
       res.status(201).json(resultado);
     } catch (error: any) {
@@ -49,10 +61,15 @@ export class HorariosController {
       }
     }
   }
-
   static async deseleccionarCelda(req: Request, res: Response) {
     try {
-      const datos = deseleccionarCeldaSchema.parse(req.body);
+      const datos = deseleccionarCeldaSchema.parse(req.body) as {
+        idDocente: number;
+        idAmbiente?: number;
+        diaSemana: string;
+        horaInicio: string;
+      };
+      this.validarAccesoDocente(req, datos.idDocente);
       const resultado = await HorariosService.deseleccionarCelda(datos as any);
       res.json(resultado);
     } catch (error: any) {
@@ -63,13 +80,16 @@ export class HorariosController {
       }
     }
   }
-
   static async obtenerSeleccionesTemporales(req: Request, res: Response) {
     try {
       const idDocente = parseInt(req.params.docenteId);
+      this.validarAccesoDocente(req, idDocente);
       const selecciones = await HorariosService.obtenerSeleccionesTemporales(idDocente);
       res.json(selecciones);
-    } catch (error) {
+    } catch (error: any) {
+      if (error.message?.includes('No autorizado')) {
+        return res.status(403).json({ error: error.message });
+      }
       res.status(500).json({ error: 'Error al obtener selecciones' });
     }
   }
@@ -77,6 +97,7 @@ export class HorariosController {
   static async validarSeleccion(req: Request, res: Response) {
     try {
       const datos = validarSeleccionSchema.parse(req.body);
+      this.validarAccesoDocente(req, datos.idDocente);
       const resultado = await HorariosService.validarSeleccion(datos.idDocente, datos.idPeriodo);
       res.json(resultado);
     } catch (error: any) {
@@ -87,13 +108,16 @@ export class HorariosController {
       }
     }
   }
-
   static async obtenerProgreso(req: Request, res: Response) {
     try {
       const idDocente = parseInt(req.params.docenteId);
+      this.validarAccesoDocente(req, idDocente);
       const progreso = await HorariosService.obtenerProgreso(idDocente);
       res.json(progreso);
-    } catch (error) {
+    } catch (error: any) {
+      if (error.message?.includes('No autorizado')) {
+        return res.status(403).json({ error: error.message });
+      }
       res.status(500).json({ error: 'Error al obtener progreso' });
     }
   }
@@ -112,11 +136,14 @@ export class HorariosController {
     static async confirmarSeleccion(req: Request, res: Response) {
     try {
         const datos = confirmarSeleccionSchema.parse(req.body);
+      this.validarAccesoDocente(req, datos.idDocente);
         const horarios = await PublicadorHorarios.confirmarSeleccion(datos.idDocente, datos.idPeriodo);
         res.status(201).json({ mensaje: 'Selección confirmada', horarios });
     } catch (error: any) {
         if (error.name === 'ZodError') {
         res.status(400).json({ error: 'Datos inválidos', detalles: error.errors });
+        } else if (error.message?.includes('No autorizado')) {
+        res.status(403).json({ error: error.message });
         } else {
         res.status(400).json({ error: error.message });
         }

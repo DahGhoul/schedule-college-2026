@@ -18,6 +18,7 @@ import { Selector } from '@/components/ui/Selector';
 import { useQueryClient } from '@tanstack/react-query';
 import { gruposService } from '@/services/grupos.service';
 import { ConfirmacionHorario } from '@/components/horarios/ConfirmacionHorario';
+import { NotificacionToast } from '@/components/ui/NotificacionToast';
 
 export default function SeleccionHorarioPage() {
   const { usuario } = useAuthStore();
@@ -28,6 +29,7 @@ export default function SeleccionHorarioPage() {
   const [componenteSeleccionado, setComponenteSeleccionado] = useState<number | null>(null);
   const [grupoSeleccionado, setGrupoSeleccionado] = useState<number | null>(null);
   const [sesionId] = useState(crypto.randomUUID());
+  const [mensaje, setMensaje] = useState<{ texto: string; tipo: 'success' | 'error' } | null>(null);
 
   const { data: periodoActivo } = useQuery({
     queryKey: ['periodo-activo'],
@@ -84,15 +86,33 @@ export default function SeleccionHorarioPage() {
   const manejarMensajeWS = useCallback((data: any) => {
     if (data.tipo === 'celda_seleccionada' || data.tipo === 'celda_deseleccionada') {
       actualizarMatriz();
+      queryClient.invalidateQueries({ queryKey: ['selecciones-temporales', docenteId] });
+      queryClient.invalidateQueries({ queryKey: ['validacion-seleccion', docenteId, idPeriodo] });
     }
-  }, [actualizarMatriz]);
+  }, [actualizarMatriz, queryClient, docenteId, idPeriodo]);
   useWebSocket(manejarMensajeWS);
 
   const manejarClickCelda = async (dia: string, hora: string, estado: string) => {
-    if (!componenteSeleccionado || !grupoSeleccionado || !docenteId) return;
+    if (!docenteId) {
+      setMensaje({ texto: 'No se pudo identificar el docente autenticado.', tipo: 'error' });
+      return;
+    }
+
+    if (!componenteSeleccionado) {
+      setMensaje({ texto: 'Selecciona primero un componente del curso.', tipo: 'error' });
+      return;
+    }
+
+    if (!grupoSeleccionado) {
+      setMensaje({ texto: 'Selecciona primero un grupo para el componente.', tipo: 'error' });
+      return;
+    }
 
     if (estado === 'LIBRE') {
-      if (!ambienteId) return;
+      if (!ambienteId) {
+        setMensaje({ texto: 'Selecciona un ambiente antes de elegir una celda.', tipo: 'error' });
+        return;
+      }
       const horaFin = `${(parseInt(hora) + 1).toString().padStart(2, '0')}:00`;
       try {
         await seleccionarCelda({
@@ -106,21 +126,29 @@ export default function SeleccionHorarioPage() {
           sesionId,
         });
         actualizarMatriz();
+        queryClient.invalidateQueries({ queryKey: ['validacion-seleccion', docenteId, idPeriodo] });
+        setMensaje({ texto: 'Celda seleccionada correctamente.', tipo: 'success' });
       } catch (err: any) {
-        alert(err.response?.data?.error || 'Error al seleccionar');
+        setMensaje({ texto: err.response?.data?.error || 'Error al seleccionar la celda.', tipo: 'error' });
       }
     }
   };
 
   const quitarCeldaVistaPrevia = async (seleccion: any) => {
-    await deseleccionarCelda({
-      idDocente: docenteId,
-      idAmbiente: seleccion.idAmbiente,
-      diaSemana: seleccion.diaSemana,
-      horaInicio: seleccion.horaInicio,
-      sesionId: seleccion.sesionId,
-    });
-    actualizarMatriz();
+    try {
+      await deseleccionarCelda({
+        idDocente: docenteId,
+        idAmbiente: seleccion.idAmbiente,
+        diaSemana: seleccion.diaSemana,
+        horaInicio: seleccion.horaInicio,
+        sesionId: seleccion.sesionId,
+      });
+      actualizarMatriz();
+      queryClient.invalidateQueries({ queryKey: ['validacion-seleccion', docenteId, idPeriodo] });
+      setMensaje({ texto: 'Celda liberada correctamente.', tipo: 'success' });
+    } catch (err: any) {
+      setMensaje({ texto: err.response?.data?.error || 'No se pudo liberar la celda.', tipo: 'error' });
+    }
   };
 
   return (
@@ -194,9 +222,18 @@ export default function SeleccionHorarioPage() {
           idPeriodo={idPeriodo}
           alConfirmar={() => {
             queryClient.invalidateQueries({ queryKey: ['selecciones-temporales', docenteId] });
+            queryClient.invalidateQueries({ queryKey: ['validacion-seleccion', docenteId, idPeriodo] });
             queryClient.invalidateQueries({ queryKey: ['horarios-general', idPeriodo] });
             actualizarMatriz();
           }}
+        />
+      )}
+
+      {mensaje && (
+        <NotificacionToast
+          mensaje={mensaje.texto}
+          tipo={mensaje.tipo}
+          onClose={() => setMensaje(null)}
         />
       )}
     </div>

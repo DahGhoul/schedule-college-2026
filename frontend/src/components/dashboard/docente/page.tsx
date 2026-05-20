@@ -17,6 +17,13 @@ export default function DashboardDocentePage() {
   const router = useRouter();
   const { usuario } = useAuthStore();
 
+  useEffect(() => {
+    router.prefetch('/dashboard/horarios/seleccion');
+    router.prefetch('/dashboard/horarios/vista-docente');
+    router.prefetch('/dashboard/reportes');
+    router.prefetch('/dashboard/notificaciones/preferencias');
+  }, [router]);
+
   // Si el usuario no es docente, redirigir al dashboard administrativo
   useEffect(() => {
     if (usuario && usuario.rol !== 'DOCENTE') {
@@ -178,10 +185,10 @@ export default function DashboardDocentePage() {
             </CardHeader>
             <CardContent>
               <div className="grid gap-3 sm:grid-cols-2">
-                <Boton onClick={() => router.push('/dashboard/horarios/seleccion')}>Ir a selección de horario</Boton>
-                <Boton onClick={() => router.push('/dashboard/horarios/vista-docente')}>Ver mi horario completo</Boton>
-                <Boton onClick={() => router.push('/dashboard/reportes')}>Descargar reporte PDF de mi horario</Boton>
-                <Boton onClick={() => router.push('/dashboard/notificaciones/preferencias')}>Gestionar preferencias de notificación</Boton>
+                  <Boton onClick={() => router.push('/dashboard/horarios/seleccion')}>Ir a selección de horario</Boton>
+                  <Boton onClick={() => router.push('/dashboard/horarios/vista-docente')}>Ver mi horario completo</Boton>
+                  <Boton onClick={() => router.push('/dashboard/reportes')}>Descargar reporte PDF de mi horario</Boton>
+                  <Boton onClick={() => router.push('/dashboard/notificaciones/preferencias')}>Gestionar preferencias de notificación</Boton>
               </div>
             </CardContent>
           </Card>

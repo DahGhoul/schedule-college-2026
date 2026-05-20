@@ -1,5 +1,6 @@
 import { redis } from '@/lib/redis';
 import { SeleccionTemporal } from './horarios.types';
+import { obtenerClavesPorPatron } from './redis-claves';
 
 const TTL_SEGUNDOS = 600; // 10 minutos de expiración para selecciones temporales
 
@@ -51,7 +52,7 @@ export class GestorSeleccionTemporal {
   }
 
   static async obtenerSeleccionesDocente(idDocente: number): Promise<SeleccionTemporal[]> {
-    const claves = await redis.keys('seleccion_temporal:*');
+    const claves = await obtenerClavesPorPatron('seleccion_temporal:*');
     const selecciones: SeleccionTemporal[] = [];
     for (const clave of claves) {
       const valor = await redis.get(clave);
@@ -67,7 +68,7 @@ export class GestorSeleccionTemporal {
 
   static async limpiarSeleccionesExpiradas(): Promise<void> {
     // Redis elimina automáticamente al expirar TTL, pero podemos forzar limpieza
-    const claves = await redis.keys('seleccion_temporal:*');
+    const claves = await obtenerClavesPorPatron('seleccion_temporal:*');
     for (const clave of claves) {
       const ttl = await redis.ttl(clave);
       if (ttl <= 0) await redis.del(clave);

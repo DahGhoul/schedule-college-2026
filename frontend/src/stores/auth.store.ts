@@ -31,9 +31,9 @@ interface AuthState {
 export const useAuthStore = create<AuthState>((set, get) => ({
   token: typeof window !== 'undefined' ? localStorage.getItem('token') : null,
   refreshToken: typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null,
-  usuario: null,
+  usuario: typeof window !== 'undefined' ? (() => { try { const u = localStorage.getItem('usuario'); return u ? JSON.parse(u) : null; } catch { return null; } })() : null,
   estaCargando: false,
-  estaAutenticado: false,
+  estaAutenticado: typeof window !== 'undefined' ? (() => { const u = localStorage.getItem('usuario'); return u !== null; })() : false,
 
   iniciarSesion: async (email, password) => {
     set({ estaCargando: true });
@@ -42,6 +42,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { token, refreshToken, usuario } = response.data;
       localStorage.setItem('token', token);
       localStorage.setItem('refreshToken', refreshToken);
+      localStorage.setItem('usuario', JSON.stringify(usuario));
       set({ token, refreshToken, usuario, estaAutenticado: true, estaCargando: false });
     } catch (error: any) {
       set({ estaCargando: false });
@@ -52,6 +53,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   cerrarSesion: () => {
     localStorage.removeItem('token');
     localStorage.removeItem('refreshToken');
+    localStorage.removeItem('usuario');
     set({ token: null, refreshToken: null, usuario: null, estaAutenticado: false });
   },
 

@@ -1,4 +1,5 @@
 'use client';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 export function SelectorTipoReporte() {
@@ -10,6 +11,10 @@ export function SelectorTipoReporte() {
     { tipo: 'docente', etiqueta: 'Horario por Docente', icono: '👨‍🏫' },
     { tipo: 'gestion', etiqueta: 'Reporte de Gestión', icono: '📊' },
   ];
+
+  useEffect(() => {
+    tipos.forEach((tipo) => router.prefetch(`/dashboard/reportes/${tipo.tipo}`));
+  }, [router]);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
