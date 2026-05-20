@@ -30,6 +30,7 @@ export default function SeleccionHorarioPage() {
   const [grupoSeleccionado, setGrupoSeleccionado] = useState<number | null>(null);
   const [sesionId] = useState(crypto.randomUUID());
   const [mensaje, setMensaje] = useState<{ texto: string; tipo: 'success' | 'error' } | null>(null);
+  const [initialPreselectDone, setInitialPreselectDone] = useState(false);
 
   // Persistence across navigation transitions
   useEffect(() => {
@@ -96,6 +97,27 @@ export default function SeleccionHorarioPage() {
     if (tipoComponenteSeleccionado === 'PRACTICA') return lista.filter((a: any) => a.tipo === 'AULA' || a.tipo === 'LABORATORIO');
     return lista.filter((a: any) => a.tipo === 'AULA');
   }, [ambientes, tipoComponenteSeleccionado]);
+
+  // Pre-selección inicial del primer ambiente disponible si no hay guardado en localStorage
+  useEffect(() => {
+    if (!initialPreselectDone && ambientesFiltrados && ambientesFiltrados.length > 0) {
+      setInitialPreselectDone(true);
+      const saved = localStorage.getItem('seleccion_ambienteId');
+      if (!saved) {
+        setAmbienteId(ambientesFiltrados[0].id);
+      }
+    }
+  }, [ambientesFiltrados, initialPreselectDone]);
+
+  // Si el ambiente seleccionado no es compatible con el componente elegido, auto-seleccionar uno compatible
+  useEffect(() => {
+    if (ambienteId && ambientesFiltrados && ambientesFiltrados.length > 0) {
+      const existe = ambientesFiltrados.some((a: any) => a.id === ambienteId);
+      if (!existe) {
+        setAmbienteId(ambientesFiltrados[0].id);
+      }
+    }
+  }, [ambientesFiltrados, ambienteId]);
 
   const { data: matriz, actualizarMatriz } = useDisponibilidad(ambienteId, idPeriodo, docenteId);
 
@@ -243,9 +265,25 @@ export default function SeleccionHorarioPage() {
               alCambiarComponente={(id) => setComponenteSeleccionado(id || null)}
             />
 
+            {/* Selector de ambiente siempre visible para no obligar a seleccionar un componente primero */}
+            <div className="space-y-4 pt-4 border-t border-gray-100">
+              <Selector
+                label="Ambiente (Aula/Lab)"
+                opciones={[
+                  { valor: '', etiqueta: 'Seleccionar ambiente' },
+                  ...ambientesFiltrados.map((a: any) => ({
+                    valor: String(a.id),
+                    etiqueta: `${a.codigo} (${a.tipo === 'AULA' ? 'Aula' : 'Laboratorio'}, Cap: ${a.capacidad})`,
+                  })),
+                ]}
+                value={ambienteId?.toString() || ''}
+                onChange={(e) => setAmbienteId(e.target.value ? parseInt(e.target.value) : null)}
+              />
+            </div>
+
             {componenteSeleccionado && (
               <div className="space-y-4 pt-4 border-t border-gray-100 animate-fadeIn">
-                <h3 className="text-sm font-semibold text-slate-600">Configuración de Grupo y Aula</h3>
+                <h3 className="text-sm font-semibold text-slate-600">Configuración de Grupo Académico</h3>
                 
                 <div className="space-y-4">
                   <Selector
@@ -260,19 +298,6 @@ export default function SeleccionHorarioPage() {
                     value={grupoSeleccionado?.toString() || ''}
                     onChange={(e) => setGrupoSeleccionado(e.target.value ? parseInt(e.target.value) : null)}
                     disabled={gruposLoading}
-                  />
-
-                  <Selector
-                    label="Ambiente (Aula/Lab)"
-                    opciones={[
-                      { valor: '', etiqueta: 'Seleccionar ambiente' },
-                      ...ambientesFiltrados.map((a: any) => ({
-                        valor: String(a.id),
-                        etiqueta: `${a.codigo} (${a.tipo === 'AULA' ? 'Aula' : 'Laboratorio'}, Cap: ${a.capacidad})`,
-                      })),
-                    ]}
-                    value={ambienteId?.toString() || ''}
-                    onChange={(e) => setAmbienteId(e.target.value ? parseInt(e.target.value) : null)}
                   />
                 </div>
               </div>
