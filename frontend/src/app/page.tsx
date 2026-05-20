@@ -86,8 +86,8 @@ export default function LandingPage() {
             <div className="absolute -inset-4 bg-gradient-to-tr from-[#FFD700]/20 to-transparent rounded-[3rem] blur-2xl"></div>
             <div className="relative bg-white border border-gray-100 rounded-[3rem] shadow-2xl overflow-hidden aspect-[4/5] lg:aspect-square flex items-center justify-center p-8 group">
               <img 
-                src="https://images.unsplash.com/photo-1523050853063-bd80e295c213?q=80&w=2070&auto=format&fit=crop" 
-                alt="University Building" 
+                src="/IMG_2293.jpeg" 
+                alt="Escuela de Ingeniería de Sistemas" 
                 className="absolute inset-0 w-full h-full object-cover grayscale group-hover:grayscale-0 group-hover:scale-105 transition-all duration-700"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-[#003366] via-transparent to-transparent opacity-60"></div>

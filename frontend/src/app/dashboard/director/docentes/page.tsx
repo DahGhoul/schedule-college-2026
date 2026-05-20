@@ -214,51 +214,13 @@ export default function GestionDocentesPage() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {docentes?.map((docente: any) => (
-          <Card key={docente.id} className="hover:shadow-md transition-shadow">
-            <CardContent className="p-5">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-bold text-lg text-slate-800">{docente.apellidos}, {docente.nombres}</h3>
-                  <p className="text-sm text-slate-500">{docente.email}</p>
-                </div>
-                <div className="flex gap-1">
-                  <button className="p-1 text-blue-600 hover:bg-blue-50 rounded"><Edit2 className="h-4 w-4" /></button>
-                </div>
-              </div>
-              
-              <div className="mt-4 grid grid-cols-2 gap-4 text-xs">
-                <div className="p-2 bg-slate-50 rounded">
-                  <p className="text-gray-500 uppercase font-bold">Modalidad</p>
-                  <p className="font-medium">{docente.modalidad}</p>
-                </div>
-                <div className="p-2 bg-slate-50 rounded">
-                  <p className="text-gray-500 uppercase font-bold">Categoría</p>
-                  <p className="font-medium">{docente.categoria}</p>
-                </div>
-                <div className="p-2 bg-slate-50 rounded">
-                  <p className="text-gray-500 uppercase font-bold">Máx. Horas</p>
-                  <p className="font-medium">{docente.horas_max_semana}h / semana</p>
-                </div>
-                <div className="p-2 bg-slate-50 rounded">
-                  <p className="text-gray-500 uppercase font-bold">Antigüedad</p>
-                  <p className="font-medium">{docente.antiguedad} años</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
       {modalAbierto && (
-        <Modal cerrar={() => setModalAbierto(false)}>
-          
-          <h2 className="text-xl font-semibold mb-4">
-            Registrar Nuevo Docente
-          </h2>
-
-          <form onSubmit={manejarSubmit} className="space-y-4">
+        <Modal 
+          isOpen={true} 
+          cerrar={() => setModalAbierto(false)}
+          titulo={docenteSeleccionado ? 'Editar Docente' : 'Registrar Nuevo Docente'}
+        >
+          <form onSubmit={manejarSubmit} className="space-y-6">
 
             <div className="grid grid-cols-2 gap-4">
               <CampoTexto
@@ -310,10 +272,11 @@ export default function GestionDocentesPage() {
                     modalidad: e.target.value
                   })
                 }
-              >
-                <option value="NOMBRADO">Nombrado</option>
-                <option value="CONTRATADO">Contratado</option>
-              </Selector>
+                opciones={[
+                  { valor: 'NOMBRADO', etiqueta: 'Nombrado' },
+                  { valor: 'CONTRATADO', etiqueta: 'Contratado' },
+                ]}
+              />
 
               <Selector
                 label="Categoría"
@@ -324,12 +287,13 @@ export default function GestionDocentesPage() {
                     categoria: e.target.value
                   })
                 }
-              >
-                <option value="PRINCIPAL">Principal</option>
-                <option value="ASOCIADO">Asociado</option>
-                <option value="AUXILIAR">Auxiliar</option>
-                <option value="JEFE_PRACTICA">Jefe de Práctica</option>
-              </Selector>
+                opciones={[
+                  { valor: 'PRINCIPAL', etiqueta: 'Principal' },
+                  { valor: 'ASOCIADO', etiqueta: 'Asociado' },
+                  { valor: 'AUXILIAR', etiqueta: 'Auxiliar' },
+                  { valor: 'JEFE_PRACTICA', etiqueta: 'Jefe de Práctica' },
+                ]}
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -359,41 +323,43 @@ export default function GestionDocentesPage() {
               />
             </div>
 
-            <div className="flex items-center gap-2 py-2">
-              <input
-                type="checkbox"
-                checked={formData.crear_usuario}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    crear_usuario: e.target.checked
-                  })
-                }
-              />
+            {!docenteSeleccionado && (
+              <div className="flex items-center gap-2 py-2">
+                <input
+                  type="checkbox"
+                  id="crear_usuario"
+                  checked={formData.crear_usuario}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      crear_usuario: e.target.checked
+                    })
+                  }
+                  className="w-4 h-4 text-unt-primary border-slate-300 rounded focus:ring-unt-primary"
+                />
+                <label htmlFor="crear_usuario" className="text-sm font-medium text-slate-600 cursor-pointer">
+                  Crear cuenta de acceso automáticamente (Contraseña: 123)
+                </label>
+              </div>
+            )}
 
-              <span className="text-sm text-gray-600">
-                Crear cuenta de acceso automáticamente
-              </span>
-            </div>
-
-            <div className="flex justify-end gap-3 pt-4">
-
+            <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
               <Boton
-                variante="borde"
+                variante="secundario"
                 type="button"
                 onClick={() => setModalAbierto(false)}
+                className="rounded-xl"
               >
                 Cancelar
               </Boton>
 
               <Boton
-                onClick={() => setModalAbierto(true)}
-                variante="borde"
-                className="px-3 py-1.5 text-sm"
+                type="submit"
+                disabled={mutationCrear.isPending || mutationEditar.isPending}
+                className="rounded-xl px-8"
               >
-                Agregar Componente
+                {mutationCrear.isPending || mutationEditar.isPending ? 'Guardando...' : docenteSeleccionado ? 'Actualizar' : 'Guardar Docente'}
               </Boton>
-
             </div>
           </form>
         </Modal>
