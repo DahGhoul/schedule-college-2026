@@ -8,7 +8,7 @@ import { GripVertical, AlertTriangle } from 'lucide-react';
 
 interface Props {
   idPeriodo: number;
-  filtroTipo: 'AULA' | 'DOCENTE';
+  filtroTipo: 'AULA' | 'DOCENTE' | 'CICLO';
   filtroId: number | null;
   ambienteAsignacionId?: number | null;
   modo?: 'EDICION' | 'LECTURA';
@@ -35,10 +35,11 @@ export function CalendarioGeneral({ idPeriodo, filtroTipo, filtroId, ambienteAsi
       if (filtroId) {
         if (filtroTipo === 'AULA') params.idAmbiente = filtroId;
         if (filtroTipo === 'DOCENTE') params.idDocente = filtroId;
+        if (filtroTipo === 'CICLO') params.idCiclo = filtroId;
       }
       return horariosService.listarHorarios(params).then((res) => res.data);
     },
-    enabled: !!idPeriodo,
+    enabled: !!idPeriodo && !!filtroId,
   });
 
   const { data: configuracion } = useQuery({

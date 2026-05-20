@@ -243,12 +243,21 @@ export class HorariosController {
 
     static async listarHorarios(req: Request, res: Response) {
     try {
-        const { idPeriodo, idDocente, idAmbiente, idGrupo } = req.query;
+        const { idPeriodo, idDocente, idAmbiente, idGrupo, idCiclo } = req.query;
         const where: any = {};
         if (idPeriodo) where.id_periodo = parseInt(idPeriodo as string);
         if (idDocente) where.id_docente = parseInt(idDocente as string);
         if (idAmbiente) where.id_ambiente = parseInt(idAmbiente as string);
         if (idGrupo) where.id_grupo = parseInt(idGrupo as string);
+        
+        // Filtro por ciclo académico
+        if (idCiclo) {
+          where.componente = {
+            oferta: {
+              id_ciclo: parseInt(idCiclo as string)
+            }
+          };
+        }
 
         const horarios = await prisma.bloque_horario.findMany({
         where,
