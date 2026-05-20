@@ -29,3 +29,16 @@ export const generarHorarioVentanasSchema = z.object({
 export const desactivarVentanasSchema = z.object({
   idPeriodo: z.number().int().positive(),
 });
+
+export const actualizarTurnoSchema = z.object({
+  idVentana: z.number().int().positive(),
+  idDocente: z.number().int().positive(),
+  fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  horaInicio: z.string().regex(/^\d{2}:\d{2}$/),
+  horaFin: z.string().regex(/^\d{2}:\d{2}$/),
+});
+
+export const desactivarTurnoSchema = z.object({
+  idVentana: z.number().int().positive(),
+  idDocente: z.number().int().positive(),
+});

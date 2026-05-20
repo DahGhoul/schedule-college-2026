@@ -85,18 +85,34 @@ export default function DashboardDocentePage() {
   let bannerElement = null;
 
   if (proximaVentana) {
+    // Obtenemos la fecha y hora actual en Lima usando Intl.DateTimeFormat para máxima robustez
+    const getLimaParts = (date: Date) => {
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Lima',
+        year: 'numeric', month: 'numeric', day: 'numeric',
+        hour: 'numeric', minute: 'numeric', second: 'numeric',
+        hour12: false
+      }).formatToParts(date);
+      const find = (type: string) => Number(parts.find(p => p.type === type)?.value);
+      return { y: find('year'), m: find('month') - 1, d: find('day'), h: find('hour'), min: find('minute') };
+    };
+
+    const lp = getLimaParts(new Date());
+    const ahoraLima = new Date(lp.y, lp.m, lp.d, lp.h, lp.min, 0);
+    
     const pFecha = new Date(proximaVentana.fecha);
-    const y = pFecha.getFullYear();
-    const m = pFecha.getMonth();
-    const d = pFecha.getDate();
+    const y = pFecha.getUTCFullYear();
+    const m = pFecha.getUTCMonth();
+    const d = pFecha.getUTCDate();
     const [hIni, mIni] = proximaVentana.horaInicio.split(':').map(Number);
     const [hFin, mFin] = proximaVentana.horaFin.split(':').map(Number);
+    
+    // Comparamos en el mismo espacio "local" del navegador
     const fechaInicio = new Date(y, m, d, hIni, mIni, 0);
     const fechaFin = new Date(y, m, d, hFin, mFin, 0);
-    const ahora = new Date();
 
-    const activa = ahora >= fechaInicio && ahora <= fechaFin;
-    const futura = ahora < fechaInicio;
+    const activa = ahoraLima >= fechaInicio && ahoraLima <= fechaFin;
+    const futura = ahoraLima < fechaInicio;
 
     if (activa) {
       bannerElement = (

@@ -9,6 +9,8 @@ router.post('/generar-automatica', VentanasController.generarAutomatica);
 router.post('/configurar', VentanasController.configurar);
 router.post('/generar-horario', VentanasController.generarHorario);
 router.post('/actualizar-horario', VentanasController.actualizarHorario);
+router.post('/actualizar-turno', VentanasController.actualizarTurno);
+router.post('/desactivar-turno', VentanasController.desactivarTurno);
 router.post('/desactivar', VentanasController.desactivar);
 router.get('/', VentanasController.listar);
 router.get('/activa', VentanasController.obtenerActiva);

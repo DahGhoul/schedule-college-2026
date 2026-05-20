@@ -11,6 +11,27 @@ const duracionHoras = (inicio: string, fin: string) => {
 };
 
 export class EstadisticasService {
+  private static getLimaParts(date: Date) {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Lima',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+      second: 'numeric',
+      hour12: false,
+    }).formatToParts(date);
+    const find = (type: string) => Number(parts.find((p) => p.type === type)?.value);
+    return {
+      y: find('year'),
+      m: find('month') - 1,
+      d: find('day'),
+      h: find('hour'),
+      min: find('minute'),
+    };
+  }
+
   // ──────────────────────────────────────────
   // Existing methods
   // ──────────────────────────────────────────
@@ -222,12 +243,8 @@ export class EstadisticasService {
     const horasDisponibles = totalAmbientes * 65;
 
     // Calcular estado de la ventana activa de atencion
-    const ahora = new Date();
-    const anio = ahora.getFullYear();
-    const mes = String(ahora.getMonth() + 1).padStart(2, '0');
-    const dia = String(ahora.getDate()).padStart(2, '0');
-    const fechaHoyStr = `${anio}-${mes}-${dia}`;
-    const horaActualMinutos = ahora.getHours() * 60 + ahora.getMinutes();
+    const lp = this.getLimaParts(new Date());
+    const ahoraLima = new Date(lp.y, lp.m, lp.d, lp.h, lp.min, 0);
 
     const ventanas = await prisma.ventana_atencion.findMany({
       where: { id_periodo: idPeriodo },
@@ -236,26 +253,33 @@ export class EstadisticasService {
 
     let ventanaActiva = null;
     for (const v of ventanas) {
-      const vFechaStr = v.fecha.toISOString().split('T')[0];
-      if (vFechaStr === fechaHoyStr) {
-        const [hIni, mIni] = v.hora_inicio.split(':').map(Number);
-        const [hFin, mFin] = v.hora_fin.split(':').map(Number);
-        const iniMin = hIni * 60 + mIni;
-        const finMin = hFin * 60 + mFin;
-        if (horaActualMinutos >= iniMin && horaActualMinutos < finMin) {
-          ventanaActiva = v;
-          break;
-        }
+      const vFecha = new Date(v.fecha);
+      const y = vFecha.getUTCFullYear();
+      const m = vFecha.getUTCMonth();
+      const d = vFecha.getUTCDate();
+      
+      const [hIni, mIni] = v.hora_inicio.split(':').map(Number);
+      const [hFin, mFin] = v.hora_fin.split(':').map(Number);
+      
+      const fechaHoraInicio = new Date(y, m, d, hIni, mIni, 0);
+      const fechaHoraFin = new Date(y, m, d, hFin, mFin, 0);
+
+      if (ahoraLima >= fechaHoraInicio && ahoraLima < fechaHoraFin) {
+        ventanaActiva = v;
+        break;
       }
     }
 
     let ventanaInfo = null;
     if (ventanaActiva) {
+      const vFecha = new Date(ventanaActiva.fecha);
+      const y = vFecha.getUTCFullYear();
+      const m = vFecha.getUTCMonth();
+      const d = vFecha.getUTCDate();
       const [hFin, mFin] = ventanaActiva.hora_fin.split(':').map(Number);
-      const fechaFin = new Date(ventanaActiva.fecha);
-      fechaFin.setHours(hFin, mFin, 0, 0);
+      const fechaHoraFin = new Date(y, m, d, hFin, mFin, 0);
 
-      const msRestantes = fechaFin.getTime() - ahora.getTime();
+      const msRestantes = fechaHoraFin.getTime() - ahoraLima.getTime();
       const totalMinutosRestantes = Math.max(0, Math.floor(msRestantes / (1000 * 60)));
       
       const dias = Math.floor(totalMinutosRestantes / (24 * 60));
@@ -366,10 +390,21 @@ export class EstadisticasService {
     });
 
     // Next ventana
-    const ahora = new Date();
-    const proximaAtencion = atenciones.find(
-      (at) => at.ventana && new Date(at.ventana.fecha) >= ahora
-    );
+    const lp2 = this.getLimaParts(new Date());
+    const ahoraLimaNext = new Date(lp2.y, lp2.m, lp2.d, lp2.h, lp2.min, 0);
+
+    const proximaAtencion = atenciones.find((at) => {
+      if (!at.ventana) return false;
+      const vFecha = new Date(at.ventana.fecha);
+      const y = vFecha.getUTCFullYear();
+      const m = vFecha.getUTCMonth();
+      const d = vFecha.getUTCDate();
+      const [hFin, mFin] = at.ventana.hora_fin.split(':').map(Number);
+      
+      const fechaHoraFin = new Date(y, m, d, hFin, mFin, 0);
+      return fechaHoraFin >= ahoraLimaNext;
+    });
+
     const proximaVentana = proximaAtencion?.ventana
       ? {
           fecha: proximaAtencion.ventana.fecha,

@@ -14,9 +14,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 const formatearFecha = (fecha?: string | Date) => {
   if (!fecha) return '';
   const f = new Date(fecha);
-  const y = f.getFullYear();
-  const m = String(f.getMonth() + 1).padStart(2, '0');
-  const d = String(f.getDate()).padStart(2, '0');
+  // Usamos métodos UTC para evitar desfases de zona horaria en fechas de solo día
+  const y = f.getUTCFullYear();
+  const m = String(f.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(f.getUTCDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
 };
 

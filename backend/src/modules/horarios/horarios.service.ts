@@ -79,6 +79,7 @@ export class HorariosService {
 
     if (!docente || !docente.activo) throw new Error('Docente inválido o inactivo');
     if (!componente) throw new Error('Componente inválido');
+
     if (datos.idAmbiente && (!ambiente || !ambiente.activo)) throw new Error('Ambiente inválido o inactivo');
     if (!grupo || !grupo.activo) throw new Error('Grupo inválido o inactivo');
     if (grupo.id_componente !== datos.idComponente) throw new Error('El grupo no corresponde al componente seleccionado');

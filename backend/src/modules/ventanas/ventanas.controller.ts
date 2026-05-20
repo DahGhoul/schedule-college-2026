@@ -1,6 +1,12 @@
 import { Request, Response } from 'express';
 import { VentanasService } from './ventanas.service';
-import { configurarVentanasSchema, generarHorarioVentanasSchema, desactivarVentanasSchema } from './ventanas.schema';
+import {
+  configurarVentanasSchema,
+  generarHorarioVentanasSchema,
+  desactivarVentanasSchema,
+  actualizarTurnoSchema,
+  desactivarTurnoSchema,
+} from './ventanas.schema';
 
 export class VentanasController {
   static async generarAutomatica(req: Request, res: Response) {
@@ -81,6 +87,40 @@ export class VentanasController {
     try {
       const datos = desactivarVentanasSchema.parse(req.body);
       const resultado = await VentanasService.desactivarVentanas(datos.idPeriodo);
+      res.json(resultado);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Datos inválidos', detalles: error.errors });
+      } else {
+        res.status(400).json({ error: error.message });
+      }
+    }
+  }
+
+  static async actualizarTurno(req: Request, res: Response) {
+    try {
+      const datos = actualizarTurnoSchema.parse(req.body);
+      const resultado = await VentanasService.actualizarTurno(
+        datos.idVentana,
+        datos.idDocente,
+        datos.fecha,
+        datos.horaInicio,
+        datos.horaFin
+      );
+      res.json(resultado);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Datos inválidos', detalles: error.errors });
+      } else {
+        res.status(400).json({ error: error.message });
+      }
+    }
+  }
+
+  static async desactivarTurno(req: Request, res: Response) {
+    try {
+      const datos = desactivarTurnoSchema.parse(req.body);
+      const resultado = await VentanasService.desactivarTurno(datos.idVentana, datos.idDocente);
       res.json(resultado);
     } catch (error: any) {
       if (error.name === 'ZodError') {

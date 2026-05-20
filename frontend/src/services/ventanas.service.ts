@@ -8,6 +8,10 @@ export const ventanasService = {
     apiClient.post('/ventanas/generar-horario', datos),
   actualizarHorario: (datos: { idPeriodo: number; fechaInicio: string; fechaFin: string; horaInicio: string; horaFin: string }) =>
     apiClient.post('/ventanas/actualizar-horario', datos),
+  actualizarTurno: (datos: { idVentana: number; idDocente: number; fecha: string; horaInicio: string; horaFin: string }) =>
+    apiClient.post('/ventanas/actualizar-turno', datos),
+  desactivarTurno: (datos: { idVentana: number; idDocente: number }) =>
+    apiClient.post('/ventanas/desactivar-turno', datos),
   desactivar: (idPeriodo: number) => apiClient.post('/ventanas/desactivar', { idPeriodo }),
   listar: (periodo?: number) => apiClient.get('/ventanas', { params: { periodo } }),
   obtenerActiva: (periodo?: number) => apiClient.get('/ventanas/activa', { params: { periodo } }),

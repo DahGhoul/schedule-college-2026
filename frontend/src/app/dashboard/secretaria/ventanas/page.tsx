@@ -9,14 +9,17 @@ import { Boton } from '@/components/ui/Boton';
 import { Selector } from '@/components/ui/Selector';
 import { SpinnerCarga } from '@/components/ui/SpinnerCarga';
 import { NotificacionToast } from '@/components/ui/NotificacionToast';
+import { Modal } from '@/components/ui/Modal';
 import { cn } from '@/lib/utilidades';
+import { Edit2, Check, Clock, Calendar as CalendarIcon, X, AlertCircle, Trash2 } from 'lucide-react';
 
 const formatearFecha = (fecha?: string | Date) => {
   if (!fecha) return '';
   const f = new Date(fecha);
-  const y = f.getFullYear();
-  const m = String(f.getMonth() + 1).padStart(2, '0');
-  const d = String(f.getDate()).padStart(2, '0');
+  // Usamos métodos UTC para evitar desfases de zona horaria en fechas de solo día
+  const y = f.getUTCFullYear();
+  const m = String(f.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(f.getUTCDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
 };
 
@@ -63,6 +66,12 @@ export default function VentanasSecretariaPage() {
   const [horaFin, setHoraFin] = useState('13:00');
   const [toast, setToast] = useState<{ mensaje: string; tipo: 'exito' | 'error' } | null>(null);
   const [mostrarEdicion, setMostrarEdicion] = useState(false);
+  const [turnoAEditar, setTurnoAEditar] = useState<any>(null);
+  const [edicionTurno, setEdicionTurno] = useState({
+    fecha: '',
+    horaInicio: '',
+    horaFin: '',
+  });
 
   const { data: periodos, isLoading: periodosLoading } = useQuery({
     queryKey: ['periodos-ventanas'],
@@ -109,14 +118,50 @@ export default function VentanasSecretariaPage() {
     onError: (error: any) => setToast({ mensaje: error.response?.data?.error || 'Error al desactivar', tipo: 'error' }),
   });
 
+  const actualizarTurnoMutation = useMutation({
+    mutationFn: () =>
+      ventanasService.actualizarTurno({
+        idVentana: turnoAEditar.idVentana,
+        idDocente: turnoAEditar.idDocente,
+        ...edicionTurno,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ventanas-secretaria', idPeriodo] });
+      setToast({ mensaje: 'Turno de docente actualizado correctamente', tipo: 'exito' });
+      setTurnoAEditar(null);
+    },
+    onError: (error: any) =>
+      setToast({ mensaje: error.response?.data?.error || 'Error al actualizar turno', tipo: 'error' }),
+  });
+
+  const desactivarTurnoMutation = useMutation({
+    mutationFn: (datos: { idVentana: number; idDocente: number }) =>
+      ventanasService.desactivarTurno(datos),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ventanas-secretaria', idPeriodo] });
+      setToast({ mensaje: 'Turno desactivado correctamente', tipo: 'exito' });
+    },
+    onError: (error: any) =>
+      setToast({ mensaje: error.response?.data?.error || 'Error al desactivar turno', tipo: 'error' }),
+  });
+
   // Flatten ventanas → filas de docente con estado de tiempo real calculado
   const filas = useMemo(() => {
     const now = new Date();
     const lista: any[] = [];
     (ventanas || []).forEach((ventana: any) => {
-      const fechaStr: string = new Date(ventana.fecha).toISOString().slice(0, 10);
-      const fechaHoraInicio = new Date(`${fechaStr}T${ventana.hora_inicio}:00`);
-      const fechaHoraFin = new Date(`${fechaStr}T${ventana.hora_fin}:00`);
+      const vFecha = new Date(ventana.fecha);
+      const y = vFecha.getUTCFullYear();
+      const m = vFecha.getUTCMonth();
+      const d = vFecha.getUTCDate();
+      
+      const [hIni, mIni] = ventana.hora_inicio.split(':').map(Number);
+      const [hFin, mFin] = ventana.hora_fin.split(':').map(Number);
+      
+      const fechaHoraInicio = new Date(y, m, d, hIni, mIni, 0);
+      const fechaHoraFin = new Date(y, m, d, hFin, mFin, 0);
+
+      const fechaStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 
       let razonTiempo: string;
       if (now < fechaHoraInicio) razonTiempo = 'AUN_NO_ES_SU_TURNO';
@@ -126,14 +171,19 @@ export default function VentanasSecretariaPage() {
       (ventana.atenciones || []).forEach((atencion: any) => {
         lista.push({
           id: `${ventana.id}-${atencion.id_docente}`,
+          idVentana: ventana.id,
+          idDocente: atencion.id_docente,
           orden: ventana.orden,
           docente: `${atencion.docente.nombres} ${atencion.docente.apellidos}`,
           categoria: ventana.categoria,
           modalidad: ventana.modalidad,
           fecha: fechaStr,
           hora: `${ventana.hora_inicio} – ${ventana.hora_fin}`,
+          horaInicio: ventana.hora_inicio,
+          horaFin: ventana.hora_fin,
           estadoAtencion: atencion.estado,
           razonTiempo,
+          cargoHorario: atencion.cargoHorario,
         });
       });
     });
@@ -332,6 +382,8 @@ export default function VentanasSecretariaPage() {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Fecha</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Horario de turno</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Estado tiempo</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Estado Horario</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
@@ -357,6 +409,50 @@ export default function VentanasSecretariaPage() {
                     <td className="px-4 py-3">
                       <EstadoBadge razon={fila.razonTiempo} />
                     </td>
+                    <td className="px-4 py-3">
+                      {fila.cargoHorario ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                          <Check className="w-3 h-3" /> CARGADO
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-100">
+                          <Clock className="w-3 h-3" /> PENDIENTE
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={() => {
+                            setTurnoAEditar(fila);
+                            setEdicionTurno({
+                              fecha: fila.fecha,
+                              horaInicio: fila.horaInicio,
+                              horaFin: fila.horaFin,
+                            });
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                          title="Editar turno"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (confirm(`¿Desactivar turno de ${fila.docente}?`)) {
+                              desactivarTurnoMutation.mutate({
+                                idVentana: fila.idVentana,
+                                idDocente: fila.idDocente,
+                              });
+                            }
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                          title="Desactivar turno"
+                          disabled={desactivarTurnoMutation.isPending}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -364,6 +460,92 @@ export default function VentanasSecretariaPage() {
           </div>
         )}
       </div>
+
+      <Modal
+        isOpen={!!turnoAEditar}
+        onClose={() => setTurnoAEditar(null)}
+        titulo="Reasignar Turno de Docente"
+        className="max-w-md"
+      >
+        {turnoAEditar && (
+          <div className="space-y-6">
+            <div className="p-4 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-indigo-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-bold text-indigo-900">{turnoAEditar.docente}</p>
+                <p className="text-xs text-indigo-700">
+                  {turnoAEditar.modalidad} — {turnoAEditar.categoria}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1">
+                  Nueva Fecha
+                </label>
+                <div className="relative">
+                  <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="date"
+                    value={edicionTurno.fecha}
+                    onChange={(e) => setEdicionTurno({ ...edicionTurno, fecha: e.target.value })}
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1">
+                    Hora Inicio
+                  </label>
+                  <div className="relative">
+                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="time"
+                      value={edicionTurno.horaInicio}
+                      onChange={(e) => setEdicionTurno({ ...edicionTurno, horaInicio: e.target.value })}
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1">
+                    Hora Fin
+                  </label>
+                  <div className="relative">
+                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="time"
+                      value={edicionTurno.horaFin}
+                      onChange={(e) => setEdicionTurno({ ...edicionTurno, horaFin: e.target.value })}
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Boton
+                variante="borde"
+                onClick={() => setTurnoAEditar(null)}
+                className="flex-1 rounded-xl"
+              >
+                Cancelar
+              </Boton>
+              <Boton
+                onClick={() => actualizarTurnoMutation.mutate()}
+                disabled={actualizarTurnoMutation.isPending}
+                className="flex-1 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200"
+              >
+                {actualizarTurnoMutation.isPending ? 'Guardando...' : 'Confirmar'}
+              </Boton>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {toast && <NotificacionToast mensaje={toast.mensaje} tipo={toast.tipo} onClose={() => setToast(null)} />}
     </div>

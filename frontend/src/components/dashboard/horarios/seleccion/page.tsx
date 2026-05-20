@@ -325,6 +325,8 @@ export default function SeleccionHorarioPage() {
                 ? 'Tu turno aún no ha comenzado'
                 : turnoData.razon === 'TURNO_VENCIDO'
                 ? 'Tu ventana de atención venció'
+                : turnoData.razon === 'SIN_CONFIGURACION'
+                ? 'Selección no habilitada'
                 : 'No tienes ventana de atención asignada'}
             </p>
             <p className="text-xs mt-0.5 opacity-80">
@@ -332,6 +334,8 @@ export default function SeleccionHorarioPage() {
                 ? turnoData.razon === 'EN_TURNO'
                   ? `Acceso activo hasta las ${turnoData.turnoAsignado?.horaFin}`
                   : 'Las ventanas de tiempo no están configuradas para este periodo'
+                : turnoData.razon === 'SIN_CONFIGURACION'
+                ? 'No hay ventanas configuradas para este periodo académico.'
                 : turnoData.turnoAsignado
                 ? `Tu ventana: ${turnoData.turnoAsignado.fecha} de ${turnoData.turnoAsignado.horaInicio} a ${turnoData.turnoAsignado.horaFin}`
                 : 'Consulta con la secretaría para conocer tu turno'}
