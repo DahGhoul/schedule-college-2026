@@ -51,8 +51,9 @@ export class HorariosController {
       if (usuario?.rol === 'DOCENTE') {
         idDocente = usuario.idDocente ?? undefined;
       }
+      const idComponente = req.query.idComponente ? parseInt(req.query.idComponente as string) : undefined;
 
-      const matriz = await HorariosService.obtenerMatrizDisponibilidad(idAmbiente, idPeriodo, idDocente);
+      const matriz = await HorariosService.obtenerMatrizDisponibilidad(idAmbiente, idPeriodo, idDocente, idComponente);
       res.json(matriz);
     } catch (error: any) {
       res.status(500).json({ error: error.message });

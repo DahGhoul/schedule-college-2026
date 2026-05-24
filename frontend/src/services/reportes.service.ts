@@ -15,6 +15,20 @@ export const reportesService = {
       responseType: 'blob',
     }),
 
+  // Download Excel report for a specific cycle
+  excelCiclo: (idCiclo: number, idPeriodo: number) =>
+    apiClient.get(`/reportes/ciclo/${idCiclo}/excel`, {
+      params: { idPeriodo },
+      responseType: 'blob',
+    }),
+
+  // Download Excel report for all cycles
+  excelTodosLosCiclos: (idPeriodo: number) =>
+    apiClient.get('/reportes/todos-los-ciclos/excel', {
+      params: { idPeriodo },
+      responseType: 'blob',
+    }),
+
   // Download global PDF for all teachers
   pdfGlobal: (idPeriodo: number) =>
     apiClient.get('/reportes/global/pdf', {

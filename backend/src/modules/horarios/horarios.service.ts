@@ -8,8 +8,8 @@ export class HorariosService {
   /**
    * Obtener la matriz de disponibilidad para un ambiente
    */
-  static async obtenerMatrizDisponibilidad(idAmbiente: number, idPeriodo: number, idDocente?: number) {
-    return GestorDisponibilidad.construirMatriz(idAmbiente, idPeriodo, idDocente);
+  static async obtenerMatrizDisponibilidad(idAmbiente: number, idPeriodo: number, idDocente?: number, idComponente?: number) {
+    return GestorDisponibilidad.construirMatriz(idAmbiente, idPeriodo, idDocente, idComponente);
   }
 
   /**
@@ -71,7 +71,7 @@ export class HorariosService {
       prisma.docente.findUnique({ where: { id: datos.idDocente } }),
       prisma.curso_componente.findUnique({
         where: { id: datos.idComponente },
-        include: { oferta: true },
+        include: { oferta: { include: { ciclo: true } } },
       }),
       datos.idAmbiente ? prisma.ambiente.findUnique({ where: { id: datos.idAmbiente } }) : Promise.resolve(null),
       prisma.grupo.findUnique({ where: { id: datos.idGrupo } }),
@@ -79,6 +79,7 @@ export class HorariosService {
 
     if (!docente || !docente.activo) throw new Error('Docente inválido o inactivo');
     if (!componente) throw new Error('Componente inválido');
+    const idCiclo = componente.oferta.id_ciclo;
 
     if (datos.idAmbiente && (!ambiente || !ambiente.activo)) throw new Error('Ambiente inválido o inactivo');
     if (!grupo || !grupo.activo) throw new Error('Grupo inválido o inactivo');
@@ -103,14 +104,69 @@ export class HorariosService {
       );
     }
 
+    // 1. Validar cruce del docente
     const seleccionesTemporalesDocente = await GestorSeleccionTemporal.obtenerSeleccionesDocente(datos.idDocente);
-    const tieneCruceTemporal = seleccionesTemporalesDocente.some(
+    const tieneCruceTemporalDocente = seleccionesTemporalesDocente.some(
       (sel) => sel.diaSemana === datos.diaSemana && sel.horaInicio === datos.horaInicio
     );
-    if (tieneCruceTemporal) {
+    if (tieneCruceTemporalDocente) {
       throw new Error('El docente ya tiene una selección temporal en ese bloque horario');
     }
 
+    const conflictoDocente = await prisma.bloque_horario.findFirst({
+      where: {
+        id_periodo: componente.oferta.id_periodo,
+        id_docente: datos.idDocente,
+        dia_semana: datos.diaSemana,
+        hora_inicio: datos.horaInicio,
+        estado: { in: ['BORRADOR', 'CONFIRMADO', 'PUBLICADO'] },
+      },
+    });
+    if (conflictoDocente) {
+      throw new Error('El docente ya tiene una clase en ese bloque horario');
+    }
+
+    // 2. Validar cruce del CICLO (Promoción)
+    // 2.1 En la Base de Datos
+    const conflictoCiclo = await prisma.bloque_horario.findFirst({
+      where: {
+        id_periodo: componente.oferta.id_periodo,
+        dia_semana: datos.diaSemana,
+        hora_inicio: datos.horaInicio,
+        componente: {
+          oferta: {
+            id_ciclo: idCiclo,
+          },
+        },
+        estado: { in: ['BORRADOR', 'CONFIRMADO', 'PUBLICADO'] },
+      },
+      include: {
+        componente: { include: { oferta: { include: { curso: true } } } },
+      },
+    });
+
+    if (conflictoCiclo) {
+      throw new Error(
+        `El ciclo ${componente.oferta.id_ciclo} ya tiene asignado el curso "${conflictoCiclo.componente.oferta.curso.nombre}" en este horario.`
+      );
+    }
+
+    // 2.2 En selecciones temporales (Redis)
+    const todasLasSelecciones = await GestorSeleccionTemporal.obtenerTodasLasSelecciones();
+    for (const sel of todasLasSelecciones) {
+      if (sel.diaSemana === datos.diaSemana && sel.horaInicio === datos.horaInicio) {
+        // Obtenemos el ciclo de esta selección temporal
+        const compSel = await prisma.curso_componente.findUnique({
+          where: { id: sel.idComponente },
+          include: { oferta: true },
+        });
+        if (compSel?.oferta.id_ciclo === idCiclo && sel.idDocente !== datos.idDocente) {
+          throw new Error('Este ciclo ya tiene una selección temporal en este horario por otro docente.');
+        }
+      }
+    }
+
+    // 3. Validar cruce del AMBIENTE
     if (datos.idAmbiente && ambiente) {
       const tipoRequerido = componente.tipo === 'LABORATORIO' ? 'LABORATORIO' : 'AULA';
       if (componente.tipo === 'PRACTICA' && ambiente.tipo === 'LABORATORIO') {
@@ -135,19 +191,6 @@ export class HorariosService {
       if (conflictoAmbiente) {
         throw new Error('El ambiente ya está ocupado en ese bloque horario');
       }
-    }
-
-    const conflictoDocente = await prisma.bloque_horario.findFirst({
-      where: {
-        id_periodo: componente.oferta.id_periodo,
-        id_docente: datos.idDocente,
-        dia_semana: datos.diaSemana,
-        hora_inicio: datos.horaInicio,
-        estado: { in: ['BORRADOR', 'CONFIRMADO', 'PUBLICADO'] },
-      },
-    });
-    if (conflictoDocente) {
-      throw new Error('El docente ya tiene una clase en ese bloque horario');
     }
   }
 

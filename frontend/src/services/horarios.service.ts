@@ -1,8 +1,8 @@
 import { apiClient } from '@/lib/api-client';
 
 export const horariosService = {
-  obtenerMatriz: (ambienteId: number, idPeriodo: number, idDocente?: number) =>
-    apiClient.get(`/horarios/disponibilidad-matriz/${ambienteId}`, { params: { idPeriodo, idDocente } }),
+  obtenerMatriz: (ambienteId: number, idPeriodo: number, idDocente?: number, idComponente?: number) =>
+    apiClient.get(`/horarios/disponibilidad-matriz/${ambienteId}`, { params: { idPeriodo, idDocente, idComponente } }),
 
   seleccionarCelda: (datos: any) => apiClient.post('/horarios/seleccionar-celda', datos),
 

@@ -18,9 +18,7 @@ export default function OfertaAcademicaPage() {
   const [idCurso, setIdCurso] = useState<number>(0);
   const [idCiclo, setIdCiclo] = useState<number>(0);
   const [tipoCurso, setTipoCurso] = useState<'REGULAR' | 'ELECTIVO'>('REGULAR');
-  const [componentes, setComponentes] = useState<any[]>([
-    { tipo: 'TEORIA', horas_requeridas: 4, n_grupos: 1 }
-  ]);
+  const [componentes, setComponentes] = useState<any[]>([]);
   
   const [mensaje, setMensaje] = useState<{
     texto: string;
@@ -55,7 +53,10 @@ export default function OfertaAcademicaPage() {
   });
 
   const agregarComponente = () => {
-    setComponentes([...componentes, { tipo: 'PRACTICA', horas_requeridas: 2, n_grupos: 1 }]);
+    // Si no hay teoría, agregamos teoría por defecto, si no, laboratorio
+    const tieneTeoria = componentes.some(c => c.tipo === 'TEORIA');
+    const nuevoTipo = tieneTeoria ? 'LABORATORIO' : 'TEORIA';
+    setComponentes([...componentes, { tipo: nuevoTipo, horas_requeridas: 2, n_grupos: 1 }]);
   };
 
   const eliminarComponente = (index: number) => {
@@ -165,14 +166,14 @@ export default function OfertaAcademicaPage() {
                 </button>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <Selector
-                    label="Tipo"
+                    label="Tipo de Componente"
                     value={comp.tipo}
                     onChange={(e: any) => actualizarComponente(index, 'tipo', e.target.value)}
-                  >
-                    <option value="TEORIA">Teoría</option>
-                    <option value="PRACTICA">Práctica</option>
-                    <option value="LABORATORIO">Laboratorio</option>
-                  </Selector>
+                    opciones={[
+                      { valor: 'TEORIA', etiqueta: 'Teoría-Práctica' },
+                      { valor: 'LABORATORIO', etiqueta: 'Laboratorio' },
+                    ]}
+                  />
                   <CampoTexto
                     label="Horas Semanales"
                     type="number"

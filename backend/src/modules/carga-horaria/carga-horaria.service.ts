@@ -122,9 +122,6 @@ export class CargaHorariaService {
     });
   }
 
-  /**
-   * Configurar oferta académica (crear oferta, componentes y grupos iniciales)
-   */
   static async configurarOferta(datos: {
     id_periodo: number;
     id_curso: number;
@@ -137,7 +134,22 @@ export class CargaHorariaService {
     }>;
   }) {
     return prisma.$transaction(async (tx) => {
-      // 1. Crear o encontrar la oferta
+      // 1. Validar que no se dupliquen los tipos de componentes en la solicitud
+      const tiposEnSolicitud = datos.componentes.map(c => c.tipo);
+      const tieneDuplicados = new Set(tiposEnSolicitud).size !== tiposEnSolicitud.length;
+      if (tieneDuplicados) {
+        throw new Error('No se pueden incluir componentes duplicados en la misma solicitud.');
+      }
+
+      // Validar tipos permitidos (TEORIA para TEORIA-PRACTICA y LABORATORIO)
+      const tiposPermitidos = ['TEORIA', 'LABORATORIO'];
+      for (const t of tiposEnSolicitud) {
+        if (!tiposPermitidos.includes(t)) {
+          throw new Error(`El tipo de componente "${t}" ya no está permitido. Use TEORÍA-PRÁCTICA o LABORATORIO.`);
+        }
+      }
+
+      // 2. Crear o encontrar la oferta
       const oferta = await tx.curso_oferta.upsert({
         where: {
           id_periodo_id_curso_id_ciclo: {
@@ -154,17 +166,29 @@ export class CargaHorariaService {
           id_curso: datos.id_curso,
           id_ciclo: datos.id_ciclo,
           tipo_curso: datos.tipo_curso
+        },
+        include: {
+          componentes: true
         }
       });
 
-      // 2. Procesar componentes y grupos
+      // 3. Validar contra componentes ya existentes en la base de datos para esta oferta
+      const tiposExistentes = oferta.componentes.map(c => c.tipo);
+      for (const comp of datos.componentes) {
+        if (tiposExistentes.includes(comp.tipo)) {
+          const curso = await tx.curso.findUnique({ where: { id: datos.id_curso } });
+          throw new Error(`El curso "${curso?.nombre}" ya tiene configurado el componente de ${comp.tipo} para este ciclo.`);
+        }
+      }
+
+      // 4. Procesar nuevos componentes y grupos
       for (const comp of datos.componentes) {
         const componente = await tx.curso_componente.create({
           data: {
             id_oferta: oferta.id,
             tipo: comp.tipo,
             horas_requeridas: comp.horas_requeridas,
-            permite_multi_docente: comp.n_grupos > 1 || comp.tipo === 'TEORIA' ? false : true // Ejemplo de lógica
+            permite_multi_docente: comp.n_grupos > 1 || comp.tipo === 'TEORIA' ? false : true 
           }
         });
 
@@ -191,7 +215,7 @@ export class CargaHorariaService {
               data: {
                 id_componente: componente.id,
                 codigo: String.fromCharCode(65 + i), // A, B, C...
-                capacidad_maxima: 20 // Labs suelen tener menos aforo
+                capacidad_maxima: 20 
               }
             });
           }

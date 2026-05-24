@@ -8,6 +8,8 @@ router.use(middlewareAutenticacion);
 // ---- New direct-download endpoints ----
 router.get('/docente/:idDocente/pdf', ReportesController.pdfDocente);
 router.get('/docente/:idDocente/excel', ReportesController.excelDocente);
+router.get('/ciclo/:idCiclo/excel', ReportesController.excelCiclo);
+router.get('/todos-los-ciclos/excel', ReportesController.excelTodosLosCiclos);
 router.get('/global/pdf', ReportesController.pdfGlobal);
 router.get('/global/excel', ReportesController.excelGlobal);
 

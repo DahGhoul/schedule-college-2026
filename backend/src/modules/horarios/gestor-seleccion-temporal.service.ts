@@ -66,6 +66,19 @@ export class GestorSeleccionTemporal {
     return selecciones;
   }
 
+  static async obtenerTodasLasSelecciones(): Promise<SeleccionTemporal[]> {
+    const claves = await obtenerClavesPorPatron('seleccion_temporal:*');
+    const selecciones: SeleccionTemporal[] = [];
+    for (const clave of claves) {
+      const valor = await redis.get(clave);
+      if (valor) {
+        const seleccion = JSON.parse(valor) as SeleccionTemporal;
+        selecciones.push(seleccion);
+      }
+    }
+    return selecciones;
+  }
+
   static async limpiarSeleccionesExpiradas(): Promise<void> {
     // Redis elimina automáticamente al expirar TTL, pero podemos forzar limpieza
     const claves = await obtenerClavesPorPatron('seleccion_temporal:*');

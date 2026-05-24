@@ -138,7 +138,7 @@ export default function SeleccionHorarioPage() {
     }
   }, [ambientesFiltrados, ambienteId]);
 
-  const { data: matriz, actualizarMatriz } = useDisponibilidad(ambienteId, idPeriodo, docenteId);
+  const { data: matriz, actualizarMatriz } = useDisponibilidad(ambienteId, idPeriodo, docenteId, componenteSeleccionado);
 
   const { selecciones, seleccionarCelda, deseleccionarCelda } = useSeleccionHorario(docenteId);
 

@@ -20,6 +20,8 @@ import {
   BellRing,
   MapPin,
   FileDown,
+  GraduationCap,
+  LayoutGrid,
 } from 'lucide-react';
 
 export function Sidebar() {
@@ -50,7 +52,8 @@ export function Sidebar() {
   const enlacesDirector = [
     { href: '/dashboard/admin', etiqueta: 'Dashboard Gestión', Icono: LayoutDashboard },
     { href: '/dashboard/director/docentes', etiqueta: 'Gestión de Docentes', Icono: Users },
-    { href: '/dashboard/director/oferta-academica', etiqueta: 'Oferta Académica', Icono: BookOpen },
+    { href: '/dashboard/director/oferta-academica', etiqueta: 'Oferta Académica', Icono: GraduationCap },
+    { href: '/dashboard/director/oferta-ciclos', etiqueta: 'Oferta por Ciclos', Icono: LayoutGrid },
     { href: '/dashboard/director/carga-horaria', etiqueta: 'Asignación de Carga', Icono: Clock },
     { href: '/dashboard/director/solicitudes-aula', etiqueta: 'Solicitudes de Aula', Icono: MapPin },
     { href: '/dashboard/horarios', etiqueta: 'Generador Horarios', Icono: Calendar },

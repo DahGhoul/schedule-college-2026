@@ -70,6 +70,39 @@ export class ReportesController {
     }
   }
 
+  // ---- Excel: per cycle ----
+  static async excelCiclo(req: Request, res: Response) {
+    try {
+      const idCiclo = parseInt(req.params.idCiclo);
+      const idPeriodo = parseInt(req.query.idPeriodo as string);
+      if (isNaN(idCiclo) || isNaN(idPeriodo)) {
+        return res.status(400).json({ error: 'idCiclo e idPeriodo son requeridos' });
+      }
+      const buffer = await GeneradorExcelService.generarHorarioExcel(idPeriodo, idCiclo);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="horario-ciclo-${idCiclo}.xlsx"`);
+      res.send(buffer);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  // ---- Excel: all cycles ----
+  static async excelTodosLosCiclos(req: Request, res: Response) {
+    try {
+      const idPeriodo = parseInt(req.query.idPeriodo as string);
+      if (isNaN(idPeriodo)) {
+        return res.status(400).json({ error: 'idPeriodo es requerido' });
+      }
+      const buffer = await GeneradorExcelService.generarTodosLosCiclosExcel(idPeriodo);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', 'attachment; filename="horarios-todos-los-ciclos.xlsx"');
+      res.send(buffer);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+
   // ---- Email: single teacher ----
   static async enviarCorreoDocente(req: Request, res: Response) {
     try {
