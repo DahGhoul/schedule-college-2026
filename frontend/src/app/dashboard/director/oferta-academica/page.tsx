@@ -10,7 +10,7 @@ import { Selector } from '@/components/ui/Selector';
 import { Boton } from '@/components/ui/Boton';
 import { CampoTexto } from '@/components/ui/CampoTexto';
 import { NotificacionToast } from '@/components/ui/NotificacionToast';
-import { Plus, Trash2, Save } from 'lucide-react';
+import { Plus, Trash2, Save, Clock } from 'lucide-react';
 
 export default function OfertaAcademicaPage() {
   const queryClient = useQueryClient();
