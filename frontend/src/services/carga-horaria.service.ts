@@ -16,6 +16,9 @@ export const cargaHorariaService = {
   eliminarAsignacion: (idAsignacion: number) =>
     apiClient.delete(`/carga-horaria/asignacion/${idAsignacion}`),
 
+  eliminarOferta: (id: number) =>
+    apiClient.delete(`/carga-horaria/oferta/${id}`),
+
   actualizarAsignacion: (idAsignacion: number, datos: any) =>
     apiClient.put(`/carga-horaria/asignacion/${idAsignacion}`, datos),
 

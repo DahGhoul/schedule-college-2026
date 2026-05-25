@@ -1,16 +1,19 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Selector } from '@/components/ui/Selector';
 import { periodosService } from '@/services/periodos.service';
 import { cargaHorariaService } from '@/services/carga-horaria.service';
 import { SpinnerCarga } from '@/components/ui/SpinnerCarga';
-import { LayoutGrid, Filter, BookOpen, Clock, Users, GraduationCap } from 'lucide-react';
+import { NotificacionToast } from '@/components/ui/NotificacionToast';
+import { LayoutGrid, Filter, BookOpen, Clock, Users, GraduationCap, Trash2 } from 'lucide-react';
 
 export default function OfertaPorCiclosPage() {
+  const queryClient = useQueryClient();
   const [cicloSeleccionado, setCicloSeleccionado] = useState<number | null>(null);
+  const [toast, setToast] = useState<{ mensaje: string; tipo: 'exito' | 'error' } | null>(null);
 
   // Obtener periodo activo
   const { data: periodos } = useQuery({
@@ -26,6 +29,23 @@ export default function OfertaPorCiclosPage() {
     queryFn: () => cargaHorariaService.obtenerCursosPorCiclo(periodoActivo.id, cicloSeleccionado!).then(res => res.data),
     enabled: !!periodoActivo && !!cicloSeleccionado,
   });
+
+  const mutationEliminar = useMutation({
+    mutationFn: (id: number) => cargaHorariaService.eliminarOferta(id),
+    onSuccess: () => {
+      setToast({ mensaje: 'Oferta de curso eliminada correctamente', tipo: 'exito' });
+      queryClient.invalidateQueries({ queryKey: ['cursos-oferta-ciclo'] });
+    },
+    onError: (error: any) => {
+      setToast({ mensaje: error.response?.data?.error || 'Error al eliminar oferta', tipo: 'error' });
+    }
+  });
+
+  const alEliminar = (curso: any) => {
+    if (confirm(`¿Está seguro de eliminar la oferta del curso "${curso.curso?.nombre}" para este ciclo? Esta acción no se puede deshacer si no hay horarios asociados.`)) {
+      mutationEliminar.mutate(curso.id);
+    }
+  };
 
   // Ciclos del 1 al 10
   const ciclos = Array.from({ length: 10 }, (_, i) => ({
@@ -92,8 +112,17 @@ export default function OfertaPorCiclosPage() {
               <div className="h-2 bg-unt-primary w-full opacity-80 group-hover:opacity-100 transition-opacity" />
               <CardContent className="p-6">
                 <div className="flex justify-between items-start mb-4">
-                  <div className="bg-unt-primary/10 text-unt-primary text-[10px] font-bold px-2.5 py-1 rounded-full border border-unt-primary/20 uppercase">
-                    {curso.curso?.codigo}
+                  <div className="flex items-center gap-2">
+                    <div className="bg-unt-primary/10 text-unt-primary text-[10px] font-bold px-2.5 py-1 rounded-full border border-unt-primary/20 uppercase">
+                      {curso.curso?.codigo}
+                    </div>
+                    <button
+                      onClick={() => alEliminar(curso)}
+                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Eliminar oferta"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                   <div className="flex items-center gap-1.5 text-slate-500 bg-slate-100 px-2 py-1 rounded-lg text-[10px] font-bold">
                     <GraduationCap className="w-3 h-3" />
@@ -142,6 +171,14 @@ export default function OfertaPorCiclosPage() {
           </div>
           <p className="text-slate-500 font-medium">No se encontraron cursos asignados a este ciclo.</p>
         </div>
+      )}
+
+      {toast && (
+        <NotificacionToast
+          mensaje={toast.mensaje}
+          tipo={toast.tipo}
+          onClose={() => setToast(null)}
+        />
       )}
     </div>
   );

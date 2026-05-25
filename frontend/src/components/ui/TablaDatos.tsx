@@ -29,7 +29,7 @@ export function TablaDatos({
   loading 
 }: TablaDatosProps) {
   const usuario = useAuthStore(state => state.usuario);
-  const esAdmin = usuario?.rol === 'ADMINISTRADOR';
+  const puedeEditar = usuario?.rol === 'ADMINISTRADOR' || usuario?.rol === 'DIRECTOR';
 
   if (loading) {
     return (
@@ -61,7 +61,7 @@ export function TablaDatos({
                   {col.titulo}
                 </th>
               ))}
-              {(esAdmin && (alEditar || alEliminar)) && (
+              {(puedeEditar && (alEditar || alEliminar)) && (
                 <th className="px-8 py-5 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">
                   Acciones
                 </th>
@@ -83,7 +83,7 @@ export function TablaDatos({
                     {col.render ? col.render(item) : item[col.clave]}
                   </td>
                 ))}
-                {(esAdmin && (alEditar || alEliminar)) && (
+                {(puedeEditar && (alEditar || alEliminar)) && (
                   <td className="px-8 py-5 text-right">
                     <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
                       {alEditar && (

@@ -75,6 +75,18 @@ export class CargaHorariaController {
     }
   }
 
+  static async eliminarOferta(req: Request, res: Response) {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: 'ID de oferta inválido' });
+      
+      const resultado = await CargaHorariaService.eliminarOferta(id);
+      res.json(resultado);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  }
+
   static async obtenerCiclosPorPeriodo(req: Request, res: Response) {
     try {
       const id_periodo = parseInt(req.params.id_periodo);

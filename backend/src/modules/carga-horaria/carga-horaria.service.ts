@@ -159,13 +159,15 @@ export class CargaHorariaService {
           }
         },
         update: {
-          tipo_curso: datos.tipo_curso
+          tipo_curso: datos.tipo_curso,
+          estado: 'BORRADOR' // Reactivar si estaba ELIMINADO
         },
         create: {
           id_periodo: datos.id_periodo,
           id_curso: datos.id_curso,
           id_ciclo: datos.id_ciclo,
-          tipo_curso: datos.tipo_curso
+          tipo_curso: datos.tipo_curso,
+          estado: 'BORRADOR'
         },
         include: {
           componentes: true
@@ -236,6 +238,26 @@ export class CargaHorariaService {
   }
 
   /**
+   * Eliminar una oferta de curso (de manera lógica)
+   */
+  static async eliminarOferta(id_oferta: number) {
+    // 1. Verificar si tiene bloques horarios (clases programadas)
+    const tieneHorarios = await prisma.bloque_horario.findFirst({
+      where: { id_componente: { in: (await prisma.curso_componente.findMany({ where: { id_oferta }, select: { id: true } })).map(c => c.id) } }
+    });
+
+    if (tieneHorarios) {
+      throw new Error('No se puede eliminar la oferta porque ya tiene horarios programados. Elimine primero los bloques horarios.');
+    }
+
+    // 2. Eliminación lógica: cambiar estado a ELIMINADO
+    return prisma.curso_oferta.update({
+      where: { id: id_oferta },
+      data: { estado: 'ELIMINADO' }
+    });
+  }
+
+  /**
    * Obtener ciclos de un período específico
    */
   static async obtenerCiclosPorPeriodo(id_periodo: number) {
@@ -249,7 +271,10 @@ export class CargaHorariaService {
    * Obtener cursos con oferta por período y ciclo
    */
   static async obtenerCursosPorCiclo(id_periodo: number, id_ciclo?: number) {
-    const where: any = { id_periodo };
+    const where: any = { 
+      id_periodo,
+      estado: { not: 'ELIMINADO' }
+    };
     if (id_ciclo) {
       where.id_ciclo = id_ciclo;
     }

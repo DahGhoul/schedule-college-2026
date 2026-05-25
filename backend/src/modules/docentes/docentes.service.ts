@@ -94,7 +94,9 @@ export class DocentesService {
   }
 
   static async actualizar(id: number, datos: any) {
-    return prisma.docente.update({ where: { id }, data: datos });
+    // Filtrar campos que no pertenecen al modelo docente
+    const { crear_usuario, password, ...datosLimpios } = datos;
+    return prisma.docente.update({ where: { id }, data: datosLimpios });
   }
 
   static async eliminar(id: number) {
