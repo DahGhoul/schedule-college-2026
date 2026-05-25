@@ -5,7 +5,7 @@ import { z } from 'zod';
 const asignarCargaSchema = z.object({
   id_componente: z.number().int().positive(),
   id_docente: z.number().int().positive(),
-  horas_asignadas: z.number().int().positive(),
+  horas_asignadas: z.number().positive(), // Permitir decimales
 });
 
 const configurarOfertaSchema = z.object({
@@ -15,7 +15,7 @@ const configurarOfertaSchema = z.object({
   tipo_curso: z.enum(['REGULAR', 'ELECTIVO']),
   componentes: z.array(z.object({
     tipo: z.enum(['TEORIA', 'PRACTICA', 'LABORATORIO']),
-    horas_requeridas: z.number().int().positive(),
+    horas_requeridas: z.number().positive(), // Permitir decimales (horas por grupo)
     n_grupos: z.number().int().min(1),
   })),
 });

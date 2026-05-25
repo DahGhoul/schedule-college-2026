@@ -74,12 +74,23 @@ export default function OfertaAcademicaPage() {
       setMensaje({ texto: 'Debe completar todos los campos obligatorios', tipo: 'error' });
       return;
     }
+    
+    // Validar que no haya horas en 0
+    if (componentes.some(c => c.horas_requeridas <= 0 || c.n_grupos <= 0)) {
+      setMensaje({ texto: 'Las horas y grupos deben ser mayores a 0', tipo: 'error' });
+      return;
+    }
+
     mutation.mutate({
       id_periodo: idPeriodo,
       id_curso: idCurso,
       id_ciclo: idCiclo,
       tipo_curso: tipoCurso,
-      componentes
+      componentes: componentes.map(c => ({
+        ...c,
+        horas_requeridas: Number(c.horas_requeridas),
+        n_grupos: Number(c.n_grupos)
+      }))
     });
   };
 

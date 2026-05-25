@@ -34,7 +34,7 @@ model docente {
   modalidad         String   @db.VarChar(20)   // NOMBRADO, CONTRATADO
   categoria         String   @db.VarChar(30)   // PRINCIPAL, ASOCIADO, AUXILIAR, JEFE_PRACTICA
   antiguedad        Int      @default(0)
-  horas_max_semana  Int?                        // Límite legal (ej. 20, 24, 30). Null = sin límite
+  horas_max_semana  Float?                       // Límite legal (ej. 20, 24, 30). Null = sin límite
   activo            Boolean  @default(true)
   usuario           usuario?
   preferencias      preferencia_notificacion?
@@ -129,7 +129,7 @@ model curso_componente {
   oferta              curso_oferta       @relation(fields: [id_oferta], references: [id])
   id_oferta           Int
   tipo                TipoComponente
-  horas_requeridas    Int                // Total de horas a dictar en el periodo
+  horas_requeridas    Float              // Total de horas a dictar en el periodo (ahora Float para decimales)
   permite_multi_docente Boolean           @default(false) // true = repartible entre varios docentes
   grupos              grupo[]            // Grupos de este componente
   asignaciones        asignacion_docente_componente[]
@@ -148,7 +148,7 @@ model asignacion_docente_componente {
   id_componente   Int
   docente         docente        @relation(fields: [id_docente], references: [id])
   id_docente      Int
-  horas_asignadas Int            // Horas que este docente cubrirá de este componente
+  horas_asignadas Float          // Horas que este docente cubrirá de este componente (Float para decimales)
 
   @@unique([id_componente, id_docente])
   @@map("asignacion_docente_componente")
