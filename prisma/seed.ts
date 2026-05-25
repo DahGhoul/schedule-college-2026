@@ -1,0 +1,1 @@
+import '../backend/prisma/seed.ts';

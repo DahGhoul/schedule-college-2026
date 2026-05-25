@@ -129,7 +129,7 @@ model curso_componente {
   oferta              curso_oferta       @relation(fields: [id_oferta], references: [id])
   id_oferta           Int
   tipo                TipoComponente
-  horas_requeridas    Float              // Total de horas a dictar en el periodo (ahora Float para decimales)
+  horas_requeridas    Int                // Total de horas a dictar en el periodo (enteras)
   permite_multi_docente Boolean           @default(false) // true = repartible entre varios docentes
   grupos              grupo[]            // Grupos de este componente
   asignaciones        asignacion_docente_componente[]

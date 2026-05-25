@@ -1,5 +1,22 @@
+import fs from 'fs';
+import path from 'path';
+import dotenv from 'dotenv';
 import { PrismaClient, TipoComponente, TipoCurso } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+
+for (const envPath of [
+  path.join(__dirname, '..', '.env'),
+  path.join(process.cwd(), '.env'),
+]) {
+  if (fs.existsSync(envPath)) {
+    dotenv.config({ path: envPath });
+    break;
+  }
+}
+
+if (!process.env.DATABASE_URL) {
+  console.warn('Aviso: DATABASE_URL no está definida. Define backend/.env o la variable de entorno antes de ejecutar el seed.');
+}
 
 const prisma = new PrismaClient();
 
@@ -519,14 +536,21 @@ async function main() {
       }
 
       for (const comp of componentes) {
-        const componente = await prisma.curso_componente.create({
-          data: {
-            id_oferta: oferta.id,
-            tipo: comp.tipo,
-            horas_requeridas: comp.horas,
-            permite_multi_docente: false,
-          },
-        });
+        console.log('Creando componente (debug):', { id_oferta: oferta.id, tipo: comp.tipo, horas: comp.horas });
+        let componente;
+        try {
+          componente = await prisma.curso_componente.create({
+            data: {
+              id_oferta: oferta.id,
+              tipo: comp.tipo,
+              horas_requeridas: comp.horas,
+              permite_multi_docente: false,
+            },
+          });
+        } catch (err) {
+          console.error('Error creando curso_componente. Valores:', { id_oferta: oferta.id, tipo: comp.tipo, horas: comp.horas });
+          throw err;
+        }
 
         for (const codigo of comp.grupos) {
           await prisma.grupo.create({
