@@ -165,7 +165,8 @@ export default function CargaHorariaPage() {
                     <div className="grid gap-4">
                       {curso.oferta.componentes.map((comp: any) => {
                         const horasAsignadasActual = comp.asignaciones.reduce((acc: number, a: any) => acc + a.horas_asignadas, 0);
-                        const faltan = comp.horas_requeridas - horasAsignadasActual;
+                        const totalRequerido = comp.horas_requeridas;
+                        const faltan = totalRequerido - horasAsignadasActual;
                         const nGrupos = comp.grupos?.length || 1;
                         
                         return (
@@ -176,10 +177,10 @@ export default function CargaHorariaPage() {
                                   {comp.tipo}
                                 </span>
                                 <span className="text-sm font-bold text-slate-700">
-                                  Carga Total: {comp.horas_requeridas}h
+                                  Carga Total: {totalRequerido}h
                                   {nGrupos > 1 && (
                                     <span className="text-[10px] text-slate-500 font-medium ml-2 bg-slate-100 px-2 py-0.5 rounded-full">
-                                      ({nGrupos} grupos repartibles de {comp.horas_requeridas / nGrupos}h)
+                                      {nGrupos} grupos (Total {totalRequerido}h)
                                     </span>
                                   )}
                                 </span>
