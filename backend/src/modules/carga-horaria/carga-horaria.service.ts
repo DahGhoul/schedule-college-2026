@@ -174,62 +174,98 @@ export class CargaHorariaService {
         }
       });
 
-      // 3. Validar contra componentes ya existentes en la base de datos para esta oferta
-      const tiposExistentes = oferta.componentes.map(c => c.tipo);
-      for (const comp of datos.componentes) {
-        if (tiposExistentes.includes(comp.tipo)) {
-          const curso = await tx.curso.findUnique({ where: { id: datos.id_curso } });
-          throw new Error(`El curso "${curso?.nombre}" ya tiene configurado el componente de ${comp.tipo} para este ciclo.`);
-        }
-      }
-
-      // 4. Procesar nuevos componentes y grupos
+      // 3. Procesar componentes (actualizar o crear)
+      const resultados = [];
       for (const comp of datos.componentes) {
         // Para laboratorios, las horas totales son (horas por grupo * numero de grupos)
         const totalHoras = comp.tipo === 'LABORATORIO' 
           ? comp.horas_requeridas * comp.n_grupos 
           : comp.horas_requeridas;
 
-        const componente = await tx.curso_componente.create({
-          data: {
-            id_oferta: oferta.id,
-            tipo: comp.tipo,
-            horas_requeridas: totalHoras,
-            permite_multi_docente: comp.n_grupos > 1 || comp.tipo === 'TEORIA' ? true : false
-          }
-        });
+        // Buscar si ya existe el componente en esta oferta
+        const componenteExistente = oferta.componentes.find(c => c.tipo === comp.tipo);
 
-        // Generar grupos
-        if (comp.tipo === 'TEORIA') {
-          await tx.grupo.create({
+        let componente;
+        if (componenteExistente) {
+          // Si existe, actualizar horas y multi-docente
+          componente = await tx.curso_componente.update({
+            where: { id: componenteExistente.id },
             data: {
-              id_componente: componente.id,
-              codigo: 'UNICO',
-              capacidad_maxima: 40
+              horas_requeridas: totalHoras,
+              permite_multi_docente: comp.n_grupos > 1 || comp.tipo === 'TEORIA' ? true : false
             }
           });
-        } else if (comp.tipo === 'PRACTICA') {
-          await tx.grupo.create({
+
+          // Actualizar grupos: para simplificar, si el número de grupos cambió, 
+          // podríamos tener que gestionar bloques existentes. 
+          // Por ahora, si es LABORATORIO, aseguramos que tenga N grupos.
+          if (comp.tipo === 'LABORATORIO') {
+            const gruposActuales = await tx.grupo.findMany({ where: { id_componente: componente.id } });
+            if (gruposActuales.length !== comp.n_grupos) {
+              // Si el número de grupos cambia, primero verificamos si hay bloques horarios
+              const tieneHorarios = await tx.bloque_horario.findFirst({ where: { id_componente: componente.id } });
+              if (tieneHorarios) {
+                const curso = await tx.curso.findUnique({ where: { id: datos.id_curso } });
+                throw new Error(`No se puede cambiar el número de grupos del componente ${comp.tipo} del curso "${curso?.nombre}" porque ya tiene horarios programados.`);
+              }
+
+              // Si no hay horarios, recreamos grupos
+              await tx.grupo.deleteMany({ where: { id_componente: componente.id } });
+              for (let i = 0; i < comp.n_grupos; i++) {
+                await tx.grupo.create({
+                  data: {
+                    id_componente: componente.id,
+                    codigo: String.fromCharCode(65 + i),
+                    capacidad_maxima: 20
+                  }
+                });
+              }
+            }
+          }
+        } else {
+          // Si no existe, crear nuevo componente
+          componente = await tx.curso_componente.create({
             data: {
-              id_componente: componente.id,
-              codigo: 'A',
-              capacidad_maxima: 40
+              id_oferta: oferta.id,
+              tipo: comp.tipo,
+              horas_requeridas: totalHoras,
+              permite_multi_docente: comp.n_grupos > 1 || comp.tipo === 'TEORIA' ? true : false
             }
           });
-        } else if (comp.tipo === 'LABORATORIO') {
-          for (let i = 0; i < comp.n_grupos; i++) {
+
+          // Generar grupos iniciales
+          if (comp.tipo === 'TEORIA') {
             await tx.grupo.create({
               data: {
                 id_componente: componente.id,
-                codigo: String.fromCharCode(65 + i), // A, B, C...
-                capacidad_maxima: 20 
+                codigo: 'UNICO',
+                capacidad_maxima: 40
               }
             });
+          } else if (comp.tipo === 'PRACTICA') {
+            await tx.grupo.create({
+              data: {
+                id_componente: componente.id,
+                codigo: 'A',
+                capacidad_maxima: 40
+              }
+            });
+          } else if (comp.tipo === 'LABORATORIO') {
+            for (let i = 0; i < comp.n_grupos; i++) {
+              await tx.grupo.create({
+                data: {
+                  id_componente: componente.id,
+                  codigo: String.fromCharCode(65 + i),
+                  capacidad_maxima: 20 
+                }
+              });
+            }
           }
         }
+        resultados.push(componente);
       }
 
-      return oferta;
+      return { ...oferta, componentes: resultados };
     });
   }
 

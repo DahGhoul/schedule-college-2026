@@ -177,10 +177,10 @@ export default function CargaHorariaPage() {
                                   {comp.tipo}
                                 </span>
                                 <span className="text-sm font-bold text-slate-700">
-                                  {comp.horas_requeridas}h 
+                                  Total: {comp.horas_requeridas}h 
                                   {nGrupos > 1 && (
-                                    <span className="text-[10px] text-slate-400 font-medium ml-1">
-                                      ({horasPorGrupo}h x {nGrupos} grupos)
+                                    <span className="text-[10px] text-slate-500 font-medium ml-2 bg-slate-100 px-2 py-0.5 rounded-full">
+                                      {nGrupos} grupos de {horasPorGrupo}h
                                     </span>
                                   )}
                                 </span>
