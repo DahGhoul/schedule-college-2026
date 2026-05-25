@@ -97,7 +97,7 @@ export default function VistaHorarioCicloPage() {
                   variante="borde"
                 >
                   {exportandoTodo ? (
-                    <SpinnerCarga className="w-4 h-4" />
+                    <SpinnerCarga />
                   ) : (
                     <Download className="w-4 h-4" />
                   )}
