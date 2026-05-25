@@ -175,7 +175,7 @@ export default function OfertaAcademicaPage() {
                     ]}
                   />
                   <CampoTexto
-                    label="Horas Semanales"
+                    label={comp.tipo === 'LABORATORIO' ? "Horas/Semana (por grupo)" : "Horas/Semana"}
                     type="number"
                     value={comp.horas_requeridas}
                     onChange={(e: any) => actualizarComponente(index, 'horas_requeridas', Number(e.target.value))}
@@ -188,6 +188,12 @@ export default function OfertaAcademicaPage() {
                     disabled={comp.tipo === 'TEORIA'} // Teoría suele ser único
                   />
                 </div>
+                {comp.tipo === 'LABORATORIO' && comp.n_grupos > 1 && (
+                  <p className="text-[10px] font-bold text-unt-primary mt-1 flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    Total Carga Horaria: {comp.horas_requeridas * comp.n_grupos} horas (repartibles entre docentes)
+                  </p>
+                )}
               </div>
             ))}
 

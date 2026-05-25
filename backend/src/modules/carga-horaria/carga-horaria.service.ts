@@ -185,12 +185,17 @@ export class CargaHorariaService {
 
       // 4. Procesar nuevos componentes y grupos
       for (const comp of datos.componentes) {
+        // Para laboratorios, las horas totales son (horas por grupo * numero de grupos)
+        const totalHoras = comp.tipo === 'LABORATORIO' 
+          ? comp.horas_requeridas * comp.n_grupos 
+          : comp.horas_requeridas;
+
         const componente = await tx.curso_componente.create({
           data: {
             id_oferta: oferta.id,
             tipo: comp.tipo,
-            horas_requeridas: comp.horas_requeridas,
-            permite_multi_docente: comp.n_grupos > 1 || comp.tipo === 'TEORIA' ? false : true 
+            horas_requeridas: totalHoras,
+            permite_multi_docente: comp.n_grupos > 1 || comp.tipo === 'TEORIA' ? true : false
           }
         });
 
