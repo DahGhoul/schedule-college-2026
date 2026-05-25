@@ -126,7 +126,7 @@ export class GeneradorHorariosService {
           noAsignados.push({
             curso: oferta.curso.nombre,
             componente: componente.tipo,
-            horas: componente.horas_requeridas * grupos.length,
+            horas: componente.horas_requeridas,
             motivo: 'Sin docentes asignados',
           });
           continue;
@@ -136,15 +136,18 @@ export class GeneradorHorariosService {
           .flatMap((a) => Array.from({ length: Math.max(0, a.horas_asignadas) }, () => a.id_docente))
           .slice();
 
+        const nGrupos = grupos.length || 1;
+        const horasPorGrupo = componente.horas_requeridas / nGrupos;
+
         for (const grupo of grupos) {
-          for (let i = 0; i < componente.horas_requeridas; i++) {
+          for (let i = 0; i < horasPorGrupo; i++) {
             const docenteId = cuposDocentes.shift();
             if (!docenteId) {
               noAsignados.push({
                 curso: oferta.curso.nombre,
                 componente: componente.tipo,
                 grupo: grupo.codigo,
-                horas: componente.horas_requeridas - i,
+                horas: horasPorGrupo - i,
                 motivo: 'Horas docentes insuficientes',
               });
               break;

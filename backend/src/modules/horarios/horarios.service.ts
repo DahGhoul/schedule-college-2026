@@ -71,7 +71,7 @@ export class HorariosService {
       prisma.docente.findUnique({ where: { id: datos.idDocente } }),
       prisma.curso_componente.findUnique({
         where: { id: datos.idComponente },
-        include: { oferta: { include: { ciclo: true } } },
+        include: { oferta: { include: { ciclo: true } }, grupos: true },
       }),
       datos.idAmbiente ? prisma.ambiente.findUnique({ where: { id: datos.idAmbiente } }) : Promise.resolve(null),
       prisma.grupo.findUnique({ where: { id: datos.idGrupo } }),
@@ -97,6 +97,32 @@ export class HorariosService {
 
     // Validar que no exceda las horas asignadas
     const seleccionesTemporales = await this.obtenerSeleccionesTemporales(datos.idDocente);
+
+    // 0.1. Validar que no exceda las horas del grupo específico
+    const nGrupos = componente.grupos?.length || 1;
+    const horasPorGrupo = componente.horas_requeridas / nGrupos;
+    const horasGrupoSeleccionadas = seleccionesTemporales.filter(
+      (s) => s.idComponente === datos.idComponente && s.idGrupo === datos.idGrupo
+    ).length;
+    if (horasGrupoSeleccionadas >= horasPorGrupo) {
+      throw new Error(
+        `No se pueden seleccionar más horas para el grupo ${grupo.codigo}. Límite del grupo: ${horasPorGrupo}h (Ya seleccionadas: ${horasGrupoSeleccionadas}h).`
+      );
+    }
+
+    // 0.2. Validar que el docente no exceda la cantidad máxima de grupos asignados
+    const maxGrupos = Math.round(asignacion.horas_asignadas / horasPorGrupo);
+    const gruposConSelecciones = new Set(
+      seleccionesTemporales
+        .filter((s) => s.idComponente === datos.idComponente)
+        .map((s) => s.idGrupo)
+    );
+    if (!gruposConSelecciones.has(datos.idGrupo) && gruposConSelecciones.size >= maxGrupos) {
+      throw new Error(
+        `Has alcanzado el límite máximo de grupos asignados para este componente (${maxGrupos} grupo(s)).`
+      );
+    }
+
     const horasSeleccionadas = seleccionesTemporales.filter((s) => s.idComponente === datos.idComponente).length;
     if (horasSeleccionadas >= asignacion.horas_asignadas) {
       throw new Error(
@@ -320,7 +346,8 @@ export class HorariosService {
 
     const selecciones = await this.obtenerSeleccionesTemporales(idDocente);
 
-    return asignaciones.map((a) => {
+    return asignaciones.map((a) =>
+    {
       const horasAsignadas = selecciones.filter((s) => s.idComponente === a.id_componente).length;
       return {
         idComponente: a.id_componente,
@@ -329,6 +356,22 @@ export class HorariosService {
         horasRequeridas: a.horas_asignadas,
         horasAsignadas,
       };
+    });
+  }
+
+  /**
+   * Exportar horarios de un día específico
+   */
+  static async exportarHorariosDia(diaSemana: string) {
+    return prisma.bloque_horario.findMany({
+      where: { dia_semana: diaSemana },
+      include: {
+        docente: true,
+        componente: { include: { oferta: { include: { curso: true } } } },
+        ambiente: true,
+        grupo: true,
+      },
+      orderBy: [{ hora_inicio: 'asc' }],
     });
   }
 }

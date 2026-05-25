@@ -186,10 +186,16 @@ export class ValidadorHorario {
     // 6. Validar horas requeridas
     const asignaciones = await prisma.asignacion_docente_componente.findMany({
       where: { id_docente: idDocente },
-      include: { componente: { include: { oferta: { include: { curso: true } } } } },
+      include: { componente: { include: { oferta: { include: { curso: true } }, grupos: true } } },
     });
     for (const a of asignaciones) {
-      const countSelecciones = seleccionesDocente.filter((s) => s.idComponente === a.id_componente).length;
+      const nGrupos = a.componente.grupos?.length || 1;
+      const horasPorGrupo = a.componente.horas_requeridas / nGrupos;
+      const maxGrupos = Math.round(a.horas_asignadas / horasPorGrupo);
+
+      const seleccionesComp = seleccionesDocente.filter((s) => s.idComponente === a.id_componente);
+      const countSelecciones = seleccionesComp.length;
+
       if (a.horas_asignadas > 0 && countSelecciones < a.horas_asignadas) {
         advertencias.push(
           `Faltan ${a.horas_asignadas - countSelecciones}h de ${a.componente.tipo} para ${a.componente.oferta.curso.nombre}`
@@ -198,6 +204,29 @@ export class ValidadorHorario {
       if (a.horas_asignadas > 0 && countSelecciones > a.horas_asignadas) {
         conflictos.push(
           `Conflicto: Se han asignado más horas de las requeridas para ${a.componente.oferta.curso.nombre} (${countSelecciones}/${a.horas_asignadas}h)`
+        );
+      }
+
+      // Validar límite de horas por grupo
+      const horasPorGrupoMap: Record<number, number> = {};
+      for (const s of seleccionesComp) {
+        horasPorGrupoMap[s.idGrupo] = (horasPorGrupoMap[s.idGrupo] || 0) + 1;
+      }
+
+      for (const [idGrupoStr, horas] of Object.entries(horasPorGrupoMap)) {
+        if (horas > horasPorGrupo) {
+          const grupoObj = a.componente.grupos.find((g) => g.id === parseInt(idGrupoStr));
+          conflictos.push(
+            `Conflicto: El grupo ${grupoObj?.codigo || idGrupoStr} de ${a.componente.oferta.curso.nombre} excede su límite de ${horasPorGrupo}h (${horas}h seleccionadas)`
+          );
+        }
+      }
+
+      // Validar cantidad máxima de grupos
+      const uniqueGrupos = Object.keys(horasPorGrupoMap);
+      if (uniqueGrupos.length > maxGrupos) {
+        conflictos.push(
+          `Conflicto: Has seleccionado horarios para ${uniqueGrupos.length} grupos de ${a.componente.oferta.curso.nombre}, pero solo tienes asignados máximo ${maxGrupos} grupo(s)`
         );
       }
     }

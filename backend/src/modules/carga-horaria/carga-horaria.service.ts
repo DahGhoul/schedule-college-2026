@@ -16,7 +16,7 @@ export class CargaHorariaService {
     const [componente, docente] = await Promise.all([
       prisma.curso_componente.findUnique({
         where: { id: id_componente },
-        include: { oferta: true, asignaciones: true }
+        include: { oferta: true, asignaciones: true, grupos: true }
       }),
       prisma.docente.findUnique({
         where: { id: id_docente },
@@ -36,6 +36,17 @@ export class CargaHorariaService {
     if (!docente) throw new Error('Docente no encontrado');
 
     const id_periodo = componente.oferta.id_periodo;
+
+    // 1.5. Validar que las horas asignadas sean un múltiplo exacto de las horas por grupo
+    const nGrupos = componente.grupos?.length || 1;
+    const horasPorGrupo = componente.horas_requeridas / nGrupos;
+    const numGruposAsignados = horas_asignadas / horasPorGrupo;
+
+    if (Math.abs(numGruposAsignados - Math.round(numGruposAsignados)) > 0.01) {
+      throw new Error(
+        `Las horas asignadas (${horas_asignadas}h) deben ser un múltiplo exacto de las horas del grupo (${horasPorGrupo}h), correspondiente a un número entero de grupos.`
+      );
+    }
 
     // 2. Validar límite legal de horas del docente en el periodo actual
     const horasActualesPeriodo = docente.asignaciones
