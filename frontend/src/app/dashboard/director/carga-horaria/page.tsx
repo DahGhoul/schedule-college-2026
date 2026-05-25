@@ -179,7 +179,7 @@ export default function CargaHorariaPage() {
                                   Carga Total: {comp.horas_requeridas}h
                                   {nGrupos > 1 && (
                                     <span className="text-[10px] text-slate-500 font-medium ml-2 bg-slate-100 px-2 py-0.5 rounded-full">
-                                      {nGrupos} grupos de {comp.horas_requeridas / nGrupos}h
+                                      ({nGrupos} grupos repartibles de {comp.horas_requeridas / nGrupos}h)
                                     </span>
                                   )}
                                 </span>

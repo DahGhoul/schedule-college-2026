@@ -177,37 +177,39 @@ export class CargaHorariaService {
       // 3. Procesar componentes (actualizar o crear)
       const resultados = [];
       for (const comp of datos.componentes) {
-        // CÁLCULO CRÍTICO: Horas Totales = Horas por Grupo * Número de Grupos
-        const horasPorGrupo = Number(comp.horas_requeridas);
-        const numGrupos = Number(comp.n_grupos) || 1;
-        const totalHorasCalculadas = horasPorGrupo * numGrupos;
+        // CÁLCULO CRÍTICO Y DEFINITIVO: 
+        // El usuario ingresa "Horas Semanales por Grupo" y "Número de Grupos".
+        // La Carga Total que debe guardarse es la multiplicación de ambos.
+        const horasSemanalesPorGrupo = parseFloat(String(comp.horas_requeridas));
+        const cantidadDeGrupos = parseInt(String(comp.n_grupos)) || 1;
+        const cargaTotalCalculada = horasSemanalesPorGrupo * cantidadDeGrupos;
 
-        console.log(`[OFERTA] Componente: ${comp.tipo}, Por Grupo: ${horasPorGrupo}, Grupos: ${numGrupos}, Total: ${totalHorasCalculadas}`);
+        console.log(`[CÁLCULO CARGA] Componente: ${comp.tipo} | Horas/Grupo: ${horasSemanalesPorGrupo} | Grupos: ${cantidadDeGrupos} | TOTAL GUARDADO: ${cargaTotalCalculada}`);
 
         // Buscar si ya existe el componente en esta oferta
         const componenteExistente = oferta.componentes.find(c => c.tipo === comp.tipo);
 
         let componente;
         if (componenteExistente) {
-          // Si existe, actualizar horas totales y multi-docente
+          // Si existe, actualizar horas totales calculadas
           componente = await tx.curso_componente.update({
             where: { id: componenteExistente.id },
             data: {
-              horas_requeridas: totalHorasCalculadas,
-              permite_multi_docente: numGrupos > 1 || comp.tipo === 'TEORIA'
+              horas_requeridas: cargaTotalCalculada,
+              permite_multi_docente: true // Forzamos true para que siempre se puedan repartir las horas
             }
           });
 
           // Gestionar Grupos
           const gruposActuales = await tx.grupo.findMany({ where: { id_componente: componente.id } });
-          if (gruposActuales.length !== numGrupos) {
+          if (gruposActuales.length !== cantidadDeGrupos) {
             const tieneHorarios = await tx.bloque_horario.findFirst({ where: { id_componente: componente.id } });
             if (tieneHorarios) {
               throw new Error(`No se puede cambiar el número de grupos para ${comp.tipo} porque ya tiene horarios asignados.`);
             }
             
             await tx.grupo.deleteMany({ where: { id_componente: componente.id } });
-            for (let i = 0; i < numGrupos; i++) {
+            for (let i = 0; i < cantidadDeGrupos; i++) {
               await tx.grupo.create({
                 data: {
                   id_componente: componente.id,
@@ -223,18 +225,17 @@ export class CargaHorariaService {
             data: {
               id_oferta: oferta.id,
               tipo: comp.tipo,
-              horas_requeridas: totalHorasCalculadas,
-              permite_multi_docente: numGrupos > 1 || comp.tipo === 'TEORIA'
+              horas_requeridas: cargaTotalCalculada,
+              permite_multi_docente: true
             }
           });
 
           // Crear grupos iniciales
-          const numGruposACrear = numGrupos;
-          for (let i = 0; i < numGruposACrear; i++) {
+          for (let i = 0; i < cantidadDeGrupos; i++) {
             await tx.grupo.create({
               data: {
                 id_componente: componente.id,
-                codigo: numGruposACrear === 1 && comp.tipo === 'TEORIA' ? 'UNICO' : String.fromCharCode(65 + i),
+                codigo: cantidadDeGrupos === 1 && comp.tipo === 'TEORIA' ? 'UNICO' : String.fromCharCode(65 + i),
                 capacidad_maxima: comp.tipo === 'LABORATORIO' ? 20 : 40
               }
             });
