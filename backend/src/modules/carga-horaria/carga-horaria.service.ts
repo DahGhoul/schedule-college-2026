@@ -177,10 +177,15 @@ export class CargaHorariaService {
       // 3. Procesar componentes (actualizar o crear)
       const resultados = [];
       for (const comp of datos.componentes) {
-        // Para laboratorios, las horas totales son (horas por grupo * numero de grupos)
+        // ASEGURAR MULTIPLICACIÓN: horas_por_grupo * n_grupos
+        const horasBase = Number(comp.horas_requeridas);
+        const numGrupos = Number(comp.n_grupos) || 1;
+        
         const totalHoras = comp.tipo === 'LABORATORIO' 
-          ? comp.horas_requeridas * comp.n_grupos 
-          : comp.horas_requeridas;
+          ? horasBase * numGrupos 
+          : horasBase;
+
+        console.log(`Configurando componente ${comp.tipo}: ${horasBase}h x ${numGrupos} grupos = ${totalHoras}h totales`);
 
         // Buscar si ya existe el componente en esta oferta
         const componenteExistente = oferta.componentes.find(c => c.tipo === comp.tipo);

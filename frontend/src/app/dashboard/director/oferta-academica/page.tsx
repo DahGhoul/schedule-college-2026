@@ -188,10 +188,10 @@ export default function OfertaAcademicaPage() {
                     disabled={comp.tipo === 'TEORIA'} // Teoría suele ser único
                   />
                 </div>
-                {comp.tipo === 'LABORATORIO' && comp.n_grupos > 1 && (
-                  <p className="text-[10px] font-bold text-unt-primary mt-1 flex items-center gap-1">
-                    <Clock/>
-                    Total Carga Horaria: {comp.horas_requeridas * comp.n_grupos} horas (repartibles entre docentes)
+                {comp.tipo === 'LABORATORIO' && (
+                  <p className="text-[11px] font-bold text-unt-primary mt-2 flex items-center gap-1 bg-unt-primary/5 p-2 rounded-lg">
+                    <Clock className="w-4 h-4" />
+                    RESUMEN: {comp.horas_requeridas}h por grupo × {comp.n_grupos} grupos = {comp.horas_requeridas * comp.n_grupos} horas totales de carga.
                   </p>
                 )}
               </div>

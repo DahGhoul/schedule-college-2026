@@ -167,7 +167,6 @@ export default function CargaHorariaPage() {
                         const horasAsignadasActual = comp.asignaciones.reduce((acc: number, a: any) => acc + a.horas_asignadas, 0);
                         const faltan = comp.horas_requeridas - horasAsignadasActual;
                         const nGrupos = comp.grupos?.length || 1;
-                        const horasPorGrupo = comp.horas_requeridas / nGrupos;
                         
                         return (
                           <div key={comp.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl border border-slate-100 gap-4">
@@ -177,10 +176,10 @@ export default function CargaHorariaPage() {
                                   {comp.tipo}
                                 </span>
                                 <span className="text-sm font-bold text-slate-700">
-                                  Total: {comp.horas_requeridas}h 
+                                  Carga Total: {comp.horas_requeridas}h
                                   {nGrupos > 1 && (
                                     <span className="text-[10px] text-slate-500 font-medium ml-2 bg-slate-100 px-2 py-0.5 rounded-full">
-                                      {nGrupos} grupos de {horasPorGrupo}h
+                                      {nGrupos} grupos (repartibles)
                                     </span>
                                   )}
                                 </span>
