@@ -136,10 +136,10 @@ export class GeneradorPdfService {
 
     // --- 3. HORARIO ---
     const horarioTop = Math.max(currentY + 20, 140);
-    const dias = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES'];
+    const dias = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
     const horas = ['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'];
-    const gridColWidth = pageWidth / 6;
-    const gridRowHeight = 25;
+    const gridColWidth = pageWidth / 7;
+    const gridRowHeight = 20;
 
     doc.font('Helvetica-Bold').fontSize(8);
     doc.rect(leftColX, horarioTop, gridColWidth, 15).fill('#334155').stroke('#334155');
@@ -196,7 +196,7 @@ export class GeneradorPdfService {
     doc.text(`TÉRMINO DEL CICLO: ${periodo?.fecha_fin ? new Date(periodo.fecha_fin).toLocaleDateString('es-PE') : '-'}`, leftColX, topMargin + 95, { width: headerBoxWidth - 12, align: 'center' });
 
     const detailHeaders = ['N°', 'PROFESOR', 'ASIGNATURA', 'T', 'P', 'L', 'G', 'T.HORAS', 'DEPARTAMENTO'];
-    const colWidths = [14, 72, 92, 16, 16, 16, 16, 24, 59];
+    const colWidths = [14, 144, 92, 16, 16, 16, 16, 24, 59];
     let currentY = topMargin;
     let currentX = rightColX;
 
@@ -249,8 +249,10 @@ export class GeneradorPdfService {
         doc.rect(currentX, currentY, colWidths[i], 10).fill(`#${info.color.slice(2)}`).stroke('#E2E8F0');
         doc.fillColor('#334155').text(val, currentX, currentY + 2, {
           width: colWidths[i],
+          height: 10,
           align: 'center',
-          ellipsis: true
+          ellipsis: true,
+          lineBreak: false
         });
         currentX += colWidths[i];
       });
@@ -258,14 +260,14 @@ export class GeneradorPdfService {
     }
 
     const horarioTop = Math.max(currentY + 24, topMargin + headerBoxHeight + 18);
-    const dias = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES'];
+    const dias = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
     const horas = [
       '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00',
       '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'
     ];
 
-    const gridColWidth = Math.min((doc.page.width - (leftColX * 2)) / 6, 125);
-    const gridRowHeight = 25;
+    const gridColWidth = Math.min((doc.page.width - (leftColX * 2)) / 7, 125);
+    const gridRowHeight = 20;
 
     doc.font('Helvetica-Bold').fontSize(8);
     doc.rect(leftColX, horarioTop, gridColWidth, 15).fill('#334155').stroke('#334155');
@@ -341,6 +343,7 @@ export class GeneradorPdfService {
     const rightColX = 220;
     const topMargin = 30;
     const pageWidth = doc.page.width - 60;
+    const headerBoxWidth = 205;
 
     // 1. CABECERA
     doc.fontSize(10).font('Helvetica-Bold').text('UNIVERSIDAD NACIONAL DE TRUJILLO', leftColX, topMargin);
@@ -348,10 +351,10 @@ export class GeneradorPdfService {
     doc.text('ESCUELA DE INGENIERÍA DE SISTEMAS', leftColX, topMargin + 24);
     
     doc.fontSize(8).font('Helvetica');
-    doc.font('Helvetica-Bold').text(`AMBIENTE: ${ambiente?.codigo} (${ambiente?.tipo})`, leftColX, topMargin + 45);
-    doc.font('Helvetica').text(`CAPACIDAD: ${ambiente?.capacidad} personas`, leftColX, topMargin + 55);
-    doc.text(`SEMESTRE: ${periodo?.nombre}`, leftColX, topMargin + 65);
-    doc.text(`FECHA: ${new Date().toLocaleDateString('es-PE')}`, leftColX, topMargin + 75);
+    doc.font('Helvetica-Bold').text(`AMBIENTE: ${ambiente?.codigo} (${ambiente?.tipo})`, leftColX, topMargin + 45, { width: headerBoxWidth - 12, align: 'center' });
+    doc.font('Helvetica').text(`CAPACIDAD: ${ambiente?.capacidad} personas`, leftColX, topMargin + 55, { width: headerBoxWidth - 12, align: 'center' });
+    doc.text(`SEMESTRE: ${periodo?.nombre}`, leftColX, topMargin + 65, { width: headerBoxWidth - 12, align: 'center' });
+    doc.text(`FECHA: ${new Date().toLocaleDateString('es-PE')}`, leftColX, topMargin + 75, { width: headerBoxWidth - 12, align: 'center' });
 
     // 2. TABLA DETALLE
     const detailHeaders = ['N°', 'PROFESOR', 'ASIGNATURA', 'CICLO', 'TIPO', 'G', 'TOT'];
@@ -411,10 +414,10 @@ export class GeneradorPdfService {
 
     // 3. HORARIO
     const horarioTop = Math.max(currentY + 20, 140);
-    const dias = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES'];
+    const dias = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
     const horas = ['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'];
-    const gridColWidth = pageWidth / 6;
-    const gridRowHeight = 25;
+    const gridColWidth = pageWidth / 7;
+    const gridRowHeight = 20;
 
     doc.font('Helvetica-Bold').fontSize(8);
     doc.rect(leftColX, horarioTop, gridColWidth, 15).fill('#334155').stroke('#334155');
@@ -454,7 +457,7 @@ export class GeneradorPdfService {
       orderBy: { numero: 'asc' } 
     });
     
-    const doc = new PDFDocument({ margin: 30, size: 'A4' });
+    const doc = new PDFDocument({ margin: 30, size: 'A4', layout: 'landscape' });
     const chunks: Buffer[] = [];
     doc.on('data', (c: Buffer) => chunks.push(c));
     
@@ -463,7 +466,7 @@ export class GeneradorPdfService {
       doc.on('error', reject);
 
       for (let i = 0; i < ciclos.length; i++) {
-        if (i > 0) doc.addPage();
+        if (i > 0) doc.addPage({ layout: 'landscape' });
         await this.generarPaginaCiclo(doc, idPeriodo, ciclos[i].id, periodo, ciclos[i]);
       }
       doc.end();

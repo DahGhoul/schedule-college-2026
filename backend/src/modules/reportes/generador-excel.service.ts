@@ -249,7 +249,7 @@ export class GeneradorExcelService {
     // 2. TABLA DETALLE
     const detailHeaders = ['N°', 'PROFESOR', 'ASIGNATURA', 'CICLO', 'TIPO', 'GRUPO', 'TOTAL'];
     const detailCols = [5, 6, 7, 8, 9, 10, 11];
-    worksheet.getColumn(5).width = 4; worksheet.getColumn(6).width = 25; worksheet.getColumn(7).width = 30;
+    worksheet.getColumn(5).width = 4; worksheet.getColumn(6).width = 50; worksheet.getColumn(7).width = 30;
     
     detailHeaders.forEach((h, i) => {
       const cell = worksheet.getCell(1, detailCols[i]);
@@ -298,6 +298,9 @@ export class GeneradorExcelService {
         const cell = worksheet.getCell(currentRow, detailCols[i]);
         cell.value = val;
         cell.font = { size: 8 };
+        if (i === 1) {
+          cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: false };
+        }
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + info.color } };
         cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
       });

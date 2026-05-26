@@ -740,7 +740,7 @@ async function main() {
             hora_fin: `${String(parseInt(hora.slice(0, 2), 10) + 1).padStart(2, '0')}:00`,
             disponible: true,
           }))
-        ),
+        ), 
       });
     }
 
