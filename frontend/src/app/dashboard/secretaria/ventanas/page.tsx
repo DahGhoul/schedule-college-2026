@@ -149,7 +149,7 @@ export default function VentanasSecretariaPage() {
   const filas = useMemo(() => {
     const now = new Date();
     const lista: any[] = [];
-    (ventanas || []).forEach((ventana: any) => {
+    (ventanas || []).filter((ventana: any) => ventana.estado !== 'CANCELADO').forEach((ventana: any) => {
       const vFecha = new Date(ventana.fecha);
       const y = vFecha.getUTCFullYear();
       const m = vFecha.getUTCMonth();
@@ -196,20 +196,25 @@ export default function VentanasSecretariaPage() {
     });
   }, [ventanas]);
 
-  const totalVentanas = ventanas?.length ?? 0;
+  const ventanasActivas = useMemo(
+    () => (ventanas || []).filter((ventana: any) => ventana.estado !== 'CANCELADO'),
+    [ventanas]
+  );
+
+  const totalVentanas = ventanasActivas.length;
   const totalDocentes = filas.length;
   const enTurnoAhora = filas.filter((f) => f.razonTiempo === 'EN_TURNO').length;
   const completados = filas.filter((f) => f.estadoAtencion === 'COMPLETADO').length;
 
   const rangoVentana = useMemo(() => {
-    if (!ventanas || ventanas.length === 0) return null;
-    const fechas = ventanas.map((v: any) => new Date(v.fecha));
+    if (ventanasActivas.length === 0) return null;
+    const fechas = ventanasActivas.map((v: any) => new Date(v.fecha));
     const fechaMin = new Date(Math.min(...fechas.map((f: Date) => f.getTime())));
     const fechaMax = new Date(Math.max(...fechas.map((f: Date) => f.getTime())));
-    const horaMin = ventanas.reduce((acc: string, v: any) => v.hora_inicio < acc ? v.hora_inicio : acc, '23:59');
-    const horaMax = ventanas.reduce((acc: string, v: any) => v.hora_fin > acc ? v.hora_fin : acc, '00:00');
+    const horaMin = ventanasActivas.reduce((acc: string, v: any) => v.hora_inicio < acc ? v.hora_inicio : acc, '23:59');
+    const horaMax = ventanasActivas.reduce((acc: string, v: any) => v.hora_fin > acc ? v.hora_fin : acc, '00:00');
     return { fechaInicio: formatearFecha(fechaMin), fechaFin: formatearFecha(fechaMax), horaInicio: horaMin, horaFin: horaMax };
-  }, [ventanas]);
+  }, [ventanasActivas]);
 
   useEffect(() => {
     if (rangoVentana && !mostrarEdicion) {

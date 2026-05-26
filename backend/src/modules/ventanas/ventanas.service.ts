@@ -305,7 +305,10 @@ export class VentanasService {
 
   static async listar(idPeriodo?: number) {
     const ventanas = await prisma.ventana_atencion.findMany({
-      where: idPeriodo ? { id_periodo: idPeriodo } : {},
+      where: {
+        ...(idPeriodo ? { id_periodo: idPeriodo } : {}),
+        estado: { not: 'CANCELADO' },
+      },
       include: {
         atenciones: {
           include: {
