@@ -1,157 +1,636 @@
-import puppeteer from 'puppeteer';
 import { prisma } from '@/lib/prisma';
+import PDFDocument from 'pdfkit';
 
-export class GeneradorPDFService {
-  /**
-   * Genera el PDF a partir de los datos y tipo de reporte
-   */
-  static async generar(tipo: string, parametros: any): Promise<Buffer> {
-    const html = await this.construirHTML(tipo, parametros);
-    const browser = await puppeteer.launch({
-      headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+export class GeneradorPdfService {
+  static async generarHorarioPdf(idPeriodo: number, idCiclo: number): Promise<Buffer> {
+    const periodo = await prisma.periodo_academico.findUnique({ where: { id: idPeriodo } });
+    const ciclo = await prisma.ciclo.findUnique({ where: { id: idCiclo } });
+    
+    const doc = new PDFDocument({ 
+      margin: 30, 
+      size: 'A4',
+      layout: 'portrait'
     });
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0' });
-    const pdfBuffer = await page.pdf({
-      format: 'A4',
-      landscape: tipo === 'aula' || tipo === 'laboratorio',
-      printBackground: true,
-      margin: { top: '20px', right: '20px', bottom: '20px', left: '20px' },
+
+    const chunks: Buffer[] = [];
+    doc.on('data', (c: Buffer) => chunks.push(c));
+    
+    return new Promise((resolve, reject) => {
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      this.generarPaginaCiclo(doc, idPeriodo, idCiclo, periodo, ciclo).then(() => {
+        doc.end();
+      });
     });
-    await browser.close();
-    return Buffer.from(pdfBuffer);
   }
 
-  /**
-   * Construye el HTML según el tipo de reporte
-   */
-  private static async construirHTML(tipo: string, parametros: any): Promise<string> {
-    switch (tipo) {
-      case 'aula':
-        return this.reporteAula(parametros);
-      case 'laboratorio':
-        return this.reporteLaboratorio(parametros);
-      case 'docente':
-        return this.reporteDocente(parametros);
-      case 'gestion':
-        return this.reporteGestion(parametros);
-      default:
-        throw new Error('Tipo de reporte no válido');
+  static async generarHorarioDocentePdf(idPeriodo: number, idDocente: number): Promise<Buffer> {
+    const periodo = await prisma.periodo_academico.findUnique({ where: { id: idPeriodo } });
+    const docente = await prisma.docente.findUnique({ where: { id: idDocente } });
+    
+    const doc = new PDFDocument({ 
+      margin: 30, 
+      size: 'A4',
+      layout: 'portrait'
+    });
+
+    const chunks: Buffer[] = [];
+    doc.on('data', (c: Buffer) => chunks.push(c));
+    
+    return new Promise((resolve, reject) => {
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      this.generarPaginaDocente(doc, idPeriodo, idDocente, periodo, docente).then(() => {
+        doc.end();
+      });
+    });
+  }
+
+  private static async generarPaginaDocente(doc: PDFDocumentWithTable, idPeriodo: number, idDocente: number, periodo: any, docente: any) {
+    const coloresPasteles = [
+      '#F0F9FF', '#F5F3FF', '#ECFDF5', '#FFFBEB', '#FFF1F2',
+      '#EFF6FF', '#F5F5F4', '#F0FDFA', '#FAF0FF', '#FDF2F8'
+    ];
+
+    const leftColX = 30;
+    const rightColX = 220;
+    const topMargin = 30;
+    const pageWidth = doc.page.width - 60;
+
+    // --- 1. CABECERA ---
+    doc.fontSize(10).font('Helvetica-Bold').text('UNIVERSIDAD NACIONAL DE TRUJILLO', leftColX, topMargin);
+    doc.fontSize(9).text('FACULTAD DE INGENIERÍA', leftColX, topMargin + 12);
+    doc.text('ESCUELA DE INGENIERÍA DE SISTEMAS', leftColX, topMargin + 24);
+    
+    doc.fontSize(8).font('Helvetica');
+    doc.font('Helvetica-Bold').text(`DOCENTE: ${docente?.apellidos}, ${docente?.nombres}`, leftColX, topMargin + 45);
+    doc.font('Helvetica').text(`CATEGORÍA: ${docente?.categoria}`, leftColX, topMargin + 55);
+    doc.text(`MODALIDAD: ${docente?.modalidad}`, leftColX, topMargin + 65);
+    doc.text(`SEMESTRE: ${periodo?.nombre}`, leftColX, topMargin + 75);
+    doc.text(`FECHA: ${new Date().toLocaleDateString('es-PE')}`, leftColX, topMargin + 85);
+
+    // --- 2. TABLA DETALLE ---
+    const detailHeaders = ['N°', 'ASIGNATURA', 'CICLO', 'T', 'L', 'GRP', 'TOT'];
+    const colWidths = [15, 180, 30, 20, 20, 30, 25];
+    let currentY = topMargin;
+    
+    doc.font('Helvetica-Bold').fontSize(7);
+    let currentX = rightColX;
+    detailHeaders.forEach((h, i) => {
+      doc.rect(currentX, currentY, colWidths[i], 12).fill('#1E293B').stroke('#1E293B');
+      doc.fillColor('white').text(h, currentX, currentY + 3, { width: colWidths[i], align: 'center' });
+      currentX += colWidths[i];
+    });
+    currentY += 12;
+
+    const asignaciones = await prisma.asignacion_docente_componente.findMany({
+      where: { id_docente: idDocente, componente: { oferta: { id_periodo: idPeriodo } } },
+      include: {
+        componente: { 
+          include: { 
+            oferta: { include: { curso: true } },
+            grupos: true
+          } 
+        }
+      }
+    });
+
+    const mapaCursos: Record<number, { indice: number; color: string; nombre: string; ciclo: number; teo: number; lab: number; grupos: number; total: number }> = {};
+    let indexCurso = 1;
+
+    for (const asig of asignaciones) {
+      const cursoId = asig.componente.oferta.id_curso;
+      if (!mapaCursos[cursoId]) {
+        mapaCursos[cursoId] = {
+          indice: indexCurso++,
+          color: coloresPasteles[(indexCurso - 2) % coloresPasteles.length],
+          nombre: asig.componente.oferta.curso.nombre,
+          ciclo: asig.componente.oferta.id_ciclo,
+          teo: 0,
+          lab: 0,
+          grupos: 0,
+          total: 0
+        };
+      }
+      if (asig.componente.tipo === 'TEORIA') mapaCursos[cursoId].teo += asig.horas_asignadas;
+      else mapaCursos[cursoId].lab += asig.horas_asignadas;
+      mapaCursos[cursoId].grupos += asig.componente.grupos.length;
+      mapaCursos[cursoId].total += asig.horas_asignadas;
     }
+
+    for (const cid in mapaCursos) {
+      const info = mapaCursos[cid];
+      const rowData = [String(info.indice), info.nombre, `${info.ciclo}°`, String(info.teo), String(info.lab), String(info.grupos), String(info.total)];
+      currentX = rightColX;
+      doc.font('Helvetica').fontSize(6).fillColor('black');
+      rowData.forEach((val, i) => {
+        doc.rect(currentX, currentY, colWidths[i], 10).fill(info.color).stroke('#E2E8F0');
+        doc.fillColor('#334155').text(val, currentX, currentY + 2, { width: colWidths[i], align: i === 1 ? 'left' : 'center', ellipsis: true });
+        currentX += colWidths[i];
+      });
+      currentY += 10;
+    }
+
+    // --- 3. HORARIO ---
+    const horarioTop = Math.max(currentY + 20, 140);
+    const dias = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES'];
+    const horas = ['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'];
+    const gridColWidth = pageWidth / 6;
+    const gridRowHeight = 25;
+
+    doc.font('Helvetica-Bold').fontSize(8);
+    doc.rect(leftColX, horarioTop, gridColWidth, 15).fill('#334155').stroke('#334155');
+    doc.fillColor('white').text('HORA', leftColX, horarioTop + 3, { width: gridColWidth, align: 'center' });
+    dias.forEach((dia, i) => {
+      const x = leftColX + (i + 1) * gridColWidth;
+      doc.rect(x, horarioTop, gridColWidth, 15).fill('#334155').stroke('#334155');
+      doc.fillColor('white').text(dia, x, horarioTop + 3, { width: gridColWidth, align: 'center' });
+    });
+
+    const bloques = await prisma.bloque_horario.findMany({
+      where: { id_periodo: idPeriodo, id_docente: idDocente },
+      include: { componente: { include: { oferta: true } }, ambiente: true }
+    });
+
+    let y = horarioTop + 15;
+    horas.forEach((hora) => {
+      doc.rect(leftColX, y, gridColWidth, gridRowHeight).stroke('#E2E8F0');
+      doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(7).text(hora, leftColX, y + 8, { width: gridColWidth, align: 'center' });
+      dias.forEach((dia, dIdx) => {
+        const x = leftColX + (dIdx + 1) * gridColWidth;
+        const bloque = bloques.find(b => b.dia_semana === dia && b.hora_inicio === hora);
+        doc.rect(x, y, gridColWidth, gridRowHeight).stroke('#E2E8F0');
+        if (bloque) {
+          const info = mapaCursos[bloque.componente.id_oferta];
+          doc.rect(x + 1, y + 1, gridColWidth - 2, gridRowHeight - 2).fill(info?.color || '#FFFFFF');
+          doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(8).text(String(info?.indice || '?'), x, y + 4, { width: gridColWidth, align: 'center' });
+          doc.fontSize(6).font('Helvetica').text(`(${bloque.ambiente?.codigo || 'Solic.'})`, x, y + 14, { width: gridColWidth, align: 'center' });
+        }
+      });
+      y += gridRowHeight;
+    });
   }
 
-  private static async reporteAula(params: any): Promise<string> {
-    const { idAula, idPeriodo } = params;
-    const ambiente = await prisma.ambiente.findUnique({
-      where: { id: idAula },
+  private static async generarPaginaCiclo(doc: PDFDocumentWithTable, idPeriodo: number, idCiclo: number, periodo: any, ciclo: any) {
+    // --- COLORES PASTEL ---
+    const coloresPasteles = [
+      '#F0F9FF', '#F5F3FF', '#ECFDF5', '#FFFBEB', '#FFF1F2',
+      '#EFF6FF', '#F5F5F4', '#F0FDFA', '#FAF0FF', '#FDF2F8'
+    ];
+
+    // --- 1. CABECERA (1/3 IZQUIERDA) ---
+    const topMargin = 30;
+    const leftColX = 30;
+    const rightColX = 220;
+    const pageWidth = doc.page.width - 60;
+
+    doc.fontSize(10).font('Helvetica-Bold').text('UNIVERSIDAD NACIONAL DE TRUJILLO', leftColX, topMargin);
+    doc.fontSize(9).text('FACULTAD DE INGENIERÍA', leftColX, topMargin + 12);
+    doc.text('ESCUELA DE INGENIERÍA DE SISTEMAS', leftColX, topMargin + 24);
+    
+    doc.fontSize(8).font('Helvetica');
+    doc.text(`CICLO: ${ciclo?.numero}°`, leftColX, topMargin + 45);
+    doc.text('SECCIÓN: ÚNICA', leftColX, topMargin + 55);
+    doc.text(`AÑO ACADÉMICO: ${new Date().getFullYear()}`, leftColX, topMargin + 65);
+    doc.text(`SEMESTRE: ${periodo?.nombre}`, leftColX, topMargin + 75);
+    doc.text(`FECHA: ${new Date().toLocaleDateString('es-PE')}`, leftColX, topMargin + 85);
+
+    // --- 2. TABLA DETALLE (2/3 DERECHA) ---
+    const detailHeaders = ['N°', 'PROFESOR', 'ASIGNATURA', 'T', 'L', 'G', 'TOT'];
+    const colWidths = [15, 100, 140, 20, 20, 20, 25];
+    let currentY = topMargin;
+    
+    // Draw Detail Headers
+    doc.font('Helvetica-Bold').fontSize(7);
+    let currentX = rightColX;
+    detailHeaders.forEach((h, i) => {
+      doc.rect(currentX, currentY, colWidths[i], 12).fill('#1E293B').stroke('#1E293B');
+      doc.fillColor('white').text(h, currentX, currentY + 3, { width: colWidths[i], align: 'center' });
+      currentX += colWidths[i];
+    });
+    currentY += 12;
+
+    const ofertas = await prisma.curso_oferta.findMany({
+      where: { id_periodo: idPeriodo, id_ciclo: idCiclo },
       include: {
-        bloques: {
-          where: {
-            id_periodo: idPeriodo,
-            estado: { in: ['BORRADOR', 'CONFIRMADO', 'PUBLICADO'] },
-          },
-          include: { componente: { include: { oferta: { include: { curso: true } } } }, docente: true, grupo: true },
-          orderBy: [{ dia_semana: 'asc' }, { hora_inicio: 'asc' }],
-        },
-      },
+        curso: true,
+        componentes: {
+          include: {
+            grupos: true,
+            asignaciones: { include: { docente: true } }
+          }
+        }
+      }
     });
-    if (!ambiente) throw new Error('Ambiente no encontrado');
 
-    const filas = ambiente.bloques
-      .map(
-        (h) => `
-      <tr>
-        <td>${h.dia_semana}</td>
-        <td>${h.hora_inicio} - ${h.hora_fin}</td>
-        <td>${h.componente?.oferta?.curso?.nombre || ''}</td>
-        <td>${h.docente?.nombres} ${h.docente?.apellidos}</td>
-        <td>${h.componente?.tipo || ''}</td>
-      </tr>`
-      )
-      .join('');
+    // Mapeo por Docente-Curso para que tengan ID y Color único por curso
+    const mapaDocenteCurso: Record<string, { 
+      indice: number; 
+      color: string; 
+      nombre: string;
+      cursoNombre: string;
+      teo: number;
+      lab: number;
+      grupos: number;
+      total: number;
+    }> = {};
+    
+    let indexDocente = 1;
 
-    return `
-      <html><body>
-        <h1>Reporte de Horario - Aula: ${ambiente.codigo}</h1>
-        <table border="1" cellpadding="5" style="width:100%;border-collapse:collapse;">
-          <tr><th>Día</th><th>Hora</th><th>Curso</th><th>Docente</th><th>Tipo</th></tr>
-          ${filas}
-        </table>
-      </body></html>`;
-  }
+    for (const o of ofertas) {
+      for (const comp of o.componentes) {
+        for (const asig of comp.asignaciones) {
+          const key = `${asig.id_docente}-${o.id_curso}`;
+          
+          if (!mapaDocenteCurso[key]) {
+            mapaDocenteCurso[key] = {
+              indice: indexDocente++,
+              color: coloresPasteles[(indexDocente - 2) % coloresPasteles.length],
+              nombre: `${asig.docente.apellidos}, ${asig.docente.nombres.substring(0,1)}.`,
+              cursoNombre: o.curso.nombre,
+              teo: 0,
+              lab: 0,
+              grupos: 0,
+              total: 0
+            };
+          }
 
-  private static async reporteLaboratorio(params: any): Promise<string> {
-    return this.reporteAula(params); // Misma estructura
-  }
+          if (comp.tipo === 'TEORIA') mapaDocenteCurso[key].teo += asig.horas_asignadas;
+          else if (comp.tipo === 'LABORATORIO') mapaDocenteCurso[key].lab += asig.horas_asignadas;
+          
+          mapaDocenteCurso[key].grupos += comp.grupos.length;
+          mapaDocenteCurso[key].total += asig.horas_asignadas;
+        }
+      }
+    }
 
-  private static async reporteDocente(params: any): Promise<string> {
-    const { idDocente, idPeriodo } = params;
-    const docente = await prisma.docente.findUnique({
-      where: { id: idDocente },
+    for (const key in mapaDocenteCurso) {
+      const info = mapaDocenteCurso[key];
+      const rowData = [
+        String(info.indice),
+        info.nombre,
+        info.cursoNombre,
+        String(info.teo),
+        String(info.lab),
+        String(info.grupos),
+        String(info.total)
+      ];
+
+      currentX = rightColX;
+      doc.font('Helvetica').fontSize(6).fillColor('black');
+      rowData.forEach((val, i) => {
+        doc.rect(currentX, currentY, colWidths[i], 10).fill(info.color).stroke('#E2E8F0');
+        doc.fillColor('#334155').text(val, currentX, currentY + 2, { 
+          width: colWidths[i], 
+          align: i === 1 || i === 2 ? 'left' : 'center',
+          ellipsis: true 
+        });
+        currentX += colWidths[i];
+      });
+      currentY += 10;
+    }
+
+    // --- 3. HORARIO (FILA 2) ---
+    const horarioTop = Math.max(currentY + 20, 140);
+    const dias = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES'];
+    const horas = [
+      '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00',
+      '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'
+    ];
+
+    const gridColWidth = pageWidth / 6;
+    const gridRowHeight = 25;
+
+    // Header Horario
+    doc.font('Helvetica-Bold').fontSize(8);
+    doc.rect(leftColX, horarioTop, gridColWidth, 15).fill('#334155').stroke('#334155');
+    doc.fillColor('white').text('HORA', leftColX, horarioTop + 3, { width: gridColWidth, align: 'center' });
+    
+    dias.forEach((dia, i) => {
+      const x = leftColX + (i + 1) * gridColWidth;
+      doc.rect(x, horarioTop, gridColWidth, 15).fill('#334155').stroke('#334155');
+      doc.fillColor('white').text(dia, x, horarioTop + 3, { width: gridColWidth, align: 'center' });
+    });
+
+    const bloques = await prisma.bloque_horario.findMany({
+      where: { 
+        id_periodo: idPeriodo, 
+        componente: { oferta: { id_ciclo: idCiclo, id_periodo: idPeriodo } }
+      },
       include: {
-        bloques: {
-          where: {
-            id_periodo: idPeriodo,
-            estado: { in: ['BORRADOR', 'CONFIRMADO', 'PUBLICADO'] },
-          },
-          include: { componente: { include: { oferta: { include: { curso: true } } } }, ambiente: true, grupo: true },
-          orderBy: [{ dia_semana: 'asc' }, { hora_inicio: 'asc' }],
-        },
-      },
+        componente: { include: { oferta: { include: { curso: true } } } },
+        docente: true,
+        ambiente: true
+      }
     });
-    if (!docente) throw new Error('Docente no encontrado');
 
-    const filas = docente.bloques
-      .map(
-        (h) => `
-      <tr>
-        <td>${h.dia_semana}</td>
-        <td>${h.hora_inicio} - ${h.hora_fin}</td>
-        <td>${h.componente?.oferta?.curso?.nombre || ''}</td>
-        <td>${h.ambiente?.codigo || ''}</td>
-        <td>${h.componente?.tipo || ''}</td>
-      </tr>`
-      )
-      .join('');
+    let y = horarioTop + 15;
+    horas.forEach((hora) => {
+      // Hora col
+      doc.rect(leftColX, y, gridColWidth, gridRowHeight).stroke('#E2E8F0');
+      doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(7).text(hora, leftColX, y + 8, { width: gridColWidth, align: 'center' });
 
-    return `
-      <html><body>
-        <h1>Reporte de Horario - Docente: ${docente.nombres} ${docente.apellidos}</h1>
-        <table border="1" cellpadding="5" style="width:100%;border-collapse:collapse;">
-          <tr><th>Día</th><th>Hora</th><th>Curso</th><th>Ambiente</th><th>Tipo</th></tr>
-          ${filas}
-        </table>
-      </body></html>`;
+      dias.forEach((dia, dIdx) => {
+        const x = leftColX + (dIdx + 1) * gridColWidth;
+        const bloque = bloques.find(b => b.dia_semana === dia && b.hora_inicio === hora);
+        
+        doc.rect(x, y, gridColWidth, gridRowHeight).stroke('#E2E8F0');
+        if (bloque) {
+          const key = `${bloque.id_docente}-${bloque.componente.id_oferta}`;
+          const infoDocente = mapaDocenteCurso[key];
+          doc.rect(x + 1, y + 1, gridColWidth - 2, gridRowHeight - 2).fill(infoDocente?.color || '#FFFFFF');
+          doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(8).text(String(infoDocente?.indice || '?'), x, y + 4, { width: gridColWidth, align: 'center' });
+          doc.fontSize(6).font('Helvetica').text(`(${bloque.ambiente?.codigo || 'Solic.'})`, x, y + 14, { width: gridColWidth, align: 'center' });
+        }
+      });
+      y += gridRowHeight;
+    });
   }
 
-  private static async reporteGestion(params: any): Promise<string> {
-    const { idPeriodo } = params;
-    const resumen = await prisma.bloque_horario.groupBy({
-      by: ['estado'],
-      where: { id_periodo: idPeriodo },
-      _count: true,
+  static async generarHorarioAmbientePdf(idPeriodo: number, idAmbiente: number): Promise<Buffer> {
+    const periodo = await prisma.periodo_academico.findUnique({ where: { id: idPeriodo } });
+    const ambiente = await prisma.ambiente.findUnique({ where: { id: idAmbiente } });
+    
+    const doc = new PDFDocument({ margin: 30, size: 'A4', layout: 'portrait' });
+    const chunks: Buffer[] = [];
+    doc.on('data', (c: Buffer) => chunks.push(c));
+    
+    return new Promise((resolve, reject) => {
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+      this.generarPaginaAmbiente(doc, idPeriodo, idAmbiente, periodo, ambiente).then(() => doc.end());
     });
-    const totalDocentes = await prisma.docente.count({ where: { activo: true } });
-    const totalAmbientes = await prisma.ambiente.count({ where: { activo: true } });
-    const totalCursos = await prisma.curso.count();
+  }
 
-    const filasEstado = resumen
-      .map((r) => `<tr><td>${r.estado}</td><td>${r._count}</td></tr>`)
-      .join('');
+  static async generarTodosLosAmbientesPdf(idPeriodo: number): Promise<Buffer> {
+    const periodo = await prisma.periodo_academico.findUnique({ where: { id: idPeriodo } });
+    const ambientes = await prisma.ambiente.findMany({ 
+      where: { activo: true },
+      orderBy: { codigo: 'asc' } 
+    });
+    
+    const doc = new PDFDocument({ margin: 30, size: 'A4' });
+    const chunks: Buffer[] = [];
+    doc.on('data', (c: Buffer) => chunks.push(c));
+    
+    return new Promise(async (resolve, reject) => {
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+      for (let i = 0; i < ambientes.length; i++) {
+        if (i > 0) doc.addPage();
+        await this.generarPaginaAmbiente(doc, idPeriodo, ambientes[i].id, periodo, ambientes[i]);
+      }
+      doc.end();
+    });
+  }
 
-    return `
-      <html><body>
-        <h1>Reporte de Gestión</h1>
-        <h2>Resumen General</h2>
-        <p>Total Docentes Activos: ${totalDocentes}</p>
-        <p>Total Ambientes Activos: ${totalAmbientes}</p>
-        <p>Total Cursos: ${totalCursos}</p>
-        <h3>Distribución de Horarios por Estado</h3>
-        <table border="1" cellpadding="5">
-          <tr><th>Estado</th><th>Cantidad</th></tr>
-          ${filasEstado}
-        </table>
-      </body></html>`;
+  private static async generarPaginaAmbiente(doc: PDFDocumentWithTable, idPeriodo: number, idAmbiente: number, periodo: any, ambiente: any) {
+    const coloresPasteles = ['#F0F9FF', '#F5F3FF', '#ECFDF5', '#FFFBEB', '#FFF1F2', '#EFF6FF', '#F5F5F4', '#F0FDFA', '#FAF0FF', '#FDF2F8'];
+    const leftColX = 30;
+    const rightColX = 220;
+    const topMargin = 30;
+    const pageWidth = doc.page.width - 60;
+
+    // 1. CABECERA
+    doc.fontSize(10).font('Helvetica-Bold').text('UNIVERSIDAD NACIONAL DE TRUJILLO', leftColX, topMargin);
+    doc.fontSize(9).text('FACULTAD DE INGENIERÍA', leftColX, topMargin + 12);
+    doc.text('ESCUELA DE INGENIERÍA DE SISTEMAS', leftColX, topMargin + 24);
+    
+    doc.fontSize(8).font('Helvetica');
+    doc.font('Helvetica-Bold').text(`AMBIENTE: ${ambiente?.codigo} (${ambiente?.tipo})`, leftColX, topMargin + 45);
+    doc.font('Helvetica').text(`CAPACIDAD: ${ambiente?.capacidad} personas`, leftColX, topMargin + 55);
+    doc.text(`SEMESTRE: ${periodo?.nombre}`, leftColX, topMargin + 65);
+    doc.text(`FECHA: ${new Date().toLocaleDateString('es-PE')}`, leftColX, topMargin + 75);
+
+    // 2. TABLA DETALLE
+    const detailHeaders = ['N°', 'PROFESOR', 'ASIGNATURA', 'CICLO', 'TIPO', 'G', 'TOT'];
+    const colWidths = [15, 90, 130, 30, 30, 20, 25];
+    let currentY = topMargin;
+    
+    doc.font('Helvetica-Bold').fontSize(7);
+    let currentX = rightColX;
+    detailHeaders.forEach((h, i) => {
+      doc.rect(currentX, currentY, colWidths[i], 12).fill('#1E293B').stroke('#1E293B');
+      doc.fillColor('white').text(h, currentX, currentY + 3, { width: colWidths[i], align: 'center' });
+      currentX += colWidths[i];
+    });
+    currentY += 12;
+
+    const bloques = await prisma.bloque_horario.findMany({
+      where: { id_periodo: idPeriodo, id_ambiente: idAmbiente, estado: { in: ['BORRADOR', 'CONFIRMADO', 'PUBLICADO'] } },
+      include: {
+        docente: true,
+        componente: { include: { oferta: { include: { curso: true } } } },
+        grupo: true
+      }
+    });
+
+    const mapaDocenteCurso: Record<string, any> = {};
+    let indexDocente = 1;
+
+    bloques.forEach(b => {
+      const key = `${b.id_docente}-${b.componente.id_oferta}`;
+      if (!mapaDocenteCurso[key]) {
+        mapaDocenteCurso[key] = {
+          indice: indexDocente++,
+          color: coloresPasteles[(indexDocente - 2) % coloresPasteles.length],
+          nombre: `${b.docente.apellidos}, ${b.docente.nombres.substring(0,1)}.`,
+          cursoNombre: b.componente.oferta.curso.nombre,
+          ciclo: b.componente.oferta.id_ciclo,
+          tipo: b.componente.tipo,
+          grupo: b.grupo.codigo,
+          total: 0
+        };
+      }
+      mapaDocenteCurso[key].total += 1;
+    });
+
+    for (const key in mapaDocenteCurso) {
+      const info = mapaDocenteCurso[key];
+      const rowData = [String(info.indice), info.nombre, info.cursoNombre, `${info.ciclo}°`, info.tipo, info.grupo, String(info.total)];
+      currentX = rightColX;
+      doc.font('Helvetica').fontSize(6).fillColor('black');
+      rowData.forEach((val, i) => {
+        doc.rect(currentX, currentY, colWidths[i], 10).fill(info.color).stroke('#E2E8F0');
+        doc.fillColor('#334155').text(val, currentX, currentY + 2, { width: colWidths[i], align: i === 1 || i === 2 ? 'left' : 'center', ellipsis: true });
+        currentX += colWidths[i];
+      });
+      currentY += 10;
+    }
+
+    // 3. HORARIO
+    const horarioTop = Math.max(currentY + 20, 140);
+    const dias = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES'];
+    const horas = ['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'];
+    const gridColWidth = pageWidth / 6;
+    const gridRowHeight = 25;
+
+    doc.font('Helvetica-Bold').fontSize(8);
+    doc.rect(leftColX, horarioTop, gridColWidth, 15).fill('#334155').stroke('#334155');
+    doc.fillColor('white').text('HORA', leftColX, horarioTop + 3, { width: gridColWidth, align: 'center' });
+    dias.forEach((dia, i) => {
+      const x = leftColX + (i + 1) * gridColWidth;
+      doc.rect(x, horarioTop, gridColWidth, 15).fill('#334155').stroke('#334155');
+      doc.fillColor('white').text(dia, x, horarioTop + 3, { width: gridColWidth, align: 'center' });
+    });
+
+    let y = horarioTop + 15;
+    horas.forEach((hora) => {
+      doc.rect(leftColX, y, gridColWidth, gridRowHeight).stroke('#E2E8F0');
+      doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(7).text(hora, leftColX, y + 8, { width: gridColWidth, align: 'center' });
+      dias.forEach((dia, dIdx) => {
+        const x = leftColX + (dIdx + 1) * gridColWidth;
+        const bloque = bloques.find(b => b.dia_semana === dia && b.hora_inicio === hora);
+        doc.rect(x, y, gridColWidth, gridRowHeight).stroke('#E2E8F0');
+        if (bloque) {
+          const info = mapaDocenteCurso[`${bloque.id_docente}-${bloque.componente.id_oferta}`];
+          doc.rect(x + 1, y + 1, gridColWidth - 2, gridRowHeight - 2).fill(info?.color || '#FFFFFF');
+          doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(8).text(String(info?.indice || '?'), x, y + 4, { width: gridColWidth, align: 'center' });
+          doc.fontSize(6).font('Helvetica').text(`(Ciclo: ${bloque.componente.oferta.id_ciclo}°)`, x, y + 14, { width: gridColWidth, align: 'center' });
+        }
+      });
+      y += gridRowHeight;
+    });
+  }
+
+  static async generarTodosLosCiclosPdf(idPeriodo: number): Promise<Buffer> {
+    const periodo = await prisma.periodo_academico.findUnique({ where: { id: idPeriodo } });
+    const ciclos = await prisma.ciclo.findMany({ 
+      where: { 
+        id_periodo: idPeriodo,
+        ofertas: { some: {} } // Solo ciclos con oferta
+      },
+      orderBy: { numero: 'asc' } 
+    });
+    
+    const doc = new PDFDocument({ margin: 30, size: 'A4' });
+    const chunks: Buffer[] = [];
+    doc.on('data', (c: Buffer) => chunks.push(c));
+    
+    return new Promise(async (resolve, reject) => {
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      for (let i = 0; i < ciclos.length; i++) {
+        if (i > 0) doc.addPage();
+        await this.generarPaginaCiclo(doc, idPeriodo, ciclos[i].id, periodo, ciclos[i]);
+      }
+      doc.end();
+    });
+  }
+
+  static async generarAuditoriaDiaPdf(idPeriodo: number, dia: string): Promise<Buffer> {
+    const periodo = await prisma.periodo_academico.findUnique({ where: { id: idPeriodo } });
+    const bloques = await prisma.bloque_horario.findMany({
+      where: { id_periodo: idPeriodo, dia_semana: dia },
+      include: {
+        docente: true,
+        ambiente: true,
+        componente: { include: { oferta: { include: { curso: true } } } }
+      },
+      orderBy: [
+        { id_docente: 'asc' },
+        { componente: { id_oferta: 'asc' } },
+        { id_ambiente: 'asc' },
+        { hora_inicio: 'asc' }
+      ]
+    });
+
+    // Lógica de agrupación de bloques contiguos
+    const bloquesAgrupados: any[] = [];
+    if (bloques.length > 0) {
+      let actual = { ...bloques[0] };
+      for (let i = 1; i < bloques.length; i++) {
+        const b = bloques[i];
+        const esContiguo = b.id_docente === actual.id_docente && 
+                          b.componente.id_oferta === actual.componente.id_oferta && 
+                          b.id_ambiente === actual.id_ambiente && 
+                          b.hora_inicio === actual.hora_fin;
+
+        if (esContiguo) {
+          actual.hora_fin = b.hora_fin;
+        } else {
+          bloquesAgrupados.push(actual);
+          actual = { ...b };
+        }
+      }
+      bloquesAgrupados.push(actual);
+    }
+
+    const doc = new PDFDocument({ margin: 30, size: 'A4', layout: 'landscape' });
+    const chunks: Buffer[] = [];
+    doc.on('data', (c: Buffer) => chunks.push(c));
+
+    return new Promise((resolve, reject) => {
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      doc.fontSize(14).font('Helvetica-Bold').text(`REPORTE DE AUDITORÍA - ${dia}`, { align: 'center' });
+      doc.fontSize(10).font('Helvetica').text(`Periodo: ${periodo?.nombre} | Fecha: ${new Date().toLocaleDateString()}`, { align: 'center' });
+      doc.moveDown(2);
+
+      const tableTop = doc.y;
+      const colX = [30, 100, 250, 450, 500, 580, 750];
+      const headers = ['HORARIO', 'DOCENTE', 'ASIGNATURA', 'CICLO', 'TIPO', 'AMBIENTE'];
+      
+      doc.font('Helvetica-Bold').fontSize(9);
+      headers.forEach((h, i) => {
+        doc.rect(colX[i], tableTop, colX[i+1] - colX[i], 15).fill('#1E293B').stroke('#1E293B');
+        doc.fillColor('white').text(h, colX[i], tableTop + 4, { width: colX[i+1] - colX[i], align: 'center' });
+      });
+
+      let currentY = tableTop + 15;
+      doc.font('Helvetica').fontSize(8).fillColor('black');
+
+      bloquesAgrupados.forEach((b) => {
+        if (currentY > 500) {
+          doc.addPage({ layout: 'landscape' });
+          currentY = 30;
+        }
+        const row = [
+          `${b.hora_inicio} - ${b.hora_fin}`,
+          `${b.docente.apellidos}, ${b.docente.nombres}`,
+          b.componente.oferta.curso.nombre,
+          `${b.componente.oferta.id_ciclo}°`,
+          b.componente.tipo,
+          b.ambiente?.codigo || 'Por asignar'
+        ];
+
+        row.forEach((val, i) => {
+          doc.rect(colX[i], currentY, colX[i+1] - colX[i], 15).stroke('#E2E8F0');
+          doc.text(val, colX[i] + 2, currentY + 4, { width: colX[i+1] - colX[i] - 4, align: i === 1 || i === 2 ? 'left' : 'center', ellipsis: true });
+        });
+        currentY += 15;
+      });
+
+      doc.end();
+    });
+  }
+
+  static async generarGlobalPdf(idPeriodo: number): Promise<Buffer> {
+    const periodo = await prisma.periodo_academico.findUnique({ where: { id: idPeriodo } });
+    const docentes = await prisma.docente.findMany({
+      where: { asignaciones: { some: { componente: { oferta: { id_periodo: idPeriodo } } } } },
+      orderBy: { apellidos: 'asc' }
+    });
+
+    const doc = new PDFDocument({ margin: 30, size: 'A4', layout: 'portrait' });
+    const chunks: Buffer[] = [];
+    doc.on('data', (c: Buffer) => chunks.push(c));
+
+    return new Promise(async (resolve, reject) => {
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      for (let i = 0; i < docentes.length; i++) {
+        if (i > 0) doc.addPage();
+        await this.generarPaginaDocente(doc, idPeriodo, docentes[i].id, periodo, docentes[i]);
+      }
+      doc.end();
+    });
   }
 }
+
+type PDFDocumentWithTable = typeof PDFDocument.prototype;

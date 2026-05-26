@@ -37,15 +37,17 @@ export class CargaHorariaService {
 
     const id_periodo = componente.oferta.id_periodo;
 
-    // 1.5. Validar que las horas asignadas sean un múltiplo exacto de las horas por grupo
-    const nGrupos = componente.grupos?.length || 1;
-    const horasPorGrupo = componente.horas_requeridas / nGrupos;
-    const numGruposAsignados = horas_asignadas / horasPorGrupo;
+    // 1.5. Validar que las horas asignadas sean un múltiplo exacto de las horas por grupo (Solo para LABORATORIO)
+    if (componente.tipo === 'LABORATORIO') {
+      const nGrupos = componente.grupos?.length || 1;
+      const horasPorGrupo = componente.horas_requeridas / nGrupos;
+      const numGruposAsignados = horas_asignadas / horasPorGrupo;
 
-    if (Math.abs(numGruposAsignados - Math.round(numGruposAsignados)) > 0.01) {
-      throw new Error(
-        `Las horas asignadas (${horas_asignadas}h) deben ser un múltiplo exacto de las horas del grupo (${horasPorGrupo}h), correspondiente a un número entero de grupos.`
-      );
+      if (Math.abs(numGruposAsignados - Math.round(numGruposAsignados)) > 0.01) {
+        throw new Error(
+          `Para Laboratorios, las horas asignadas (${horas_asignadas}h) deben ser un múltiplo exacto de las horas del grupo (${horasPorGrupo}h).`
+        );
+      }
     }
 
     // 2. Validar límite legal de horas del docente en el periodo actual
@@ -81,17 +83,17 @@ export class CargaHorariaService {
     return prisma.asignacion_docente_componente.upsert({
       where: {
         id_componente_id_docente: {
-          id_componente,
-          id_docente
+          id_componente: id_componente,
+          id_docente: id_docente
         }
       },
       update: {
-        horas_asignadas
+        horas_asignadas: horas_asignadas
       },
       create: {
-        id_componente,
-        id_docente,
-        horas_asignadas
+        id_componente: id_componente,
+        id_docente: id_docente,
+        horas_asignadas: horas_asignadas
       }
     });
   }
@@ -171,7 +173,7 @@ export class CargaHorariaService {
         },
         update: {
           tipo_curso: datos.tipo_curso,
-          estado: 'BORRADOR' // Reactivar si estaba ELIMINADO
+          estado: 'BORRADOR'
         },
         create: {
           id_periodo: datos.id_periodo,
@@ -181,26 +183,55 @@ export class CargaHorariaService {
           estado: 'BORRADOR'
         },
         include: {
-          componentes: true
+          componentes: {
+            include: {
+              grupos: true
+            }
+          }
         }
       });
 
-      // 3. Procesar componentes (actualizar o crear)
+      // 3. Validar componentes duplicados en el payload
+      const tiposEnPayload = datos.componentes.map(c => c.tipo);
+      const duplicados = tiposEnPayload.filter((item, index) => tiposEnPayload.indexOf(item) !== index);
+      if (duplicados.length > 0) {
+        throw new Error(`No se puede enviar el mismo tipo de componente (${duplicados.join(', ')}) varias veces.`);
+      }
+
+      // 3.5. Eliminar componentes que ya no están en la solicitud
+      const componentesAEliminar = oferta.componentes.filter(c => !tiposEnPayload.includes(c.tipo));
+
+      for (const compAEliminar of componentesAEliminar) {
+        // Verificar si tiene asignaciones o grupos con horarios
+        const tieneAsignaciones = await tx.asignacion_docente_componente.findFirst({ where: { id_componente: compAEliminar.id } });
+        const tieneHorarios = await tx.bloque_horario.findFirst({ where: { id_componente: compAEliminar.id } });
+        
+        if (tieneAsignaciones || tieneHorarios) {
+          throw new Error(`No se puede eliminar el componente ${compAEliminar.tipo === 'TEORIA' ? 'TEORÍA-PRÁCTICA' : 'LABORATORIO'} porque ya tiene carga docente o horarios asignados.`);
+        }
+
+        // Eliminar grupos asociados
+        await tx.grupo.deleteMany({ where: { id_componente: compAEliminar.id } });
+        // Eliminar componente
+        await tx.curso_componente.delete({ where: { id: compAEliminar.id } });
+      }
+
+      // 4. Procesar componentes (actualizar o crear)
       const resultados = [];
       for (const comp of datos.componentes) {
-        // CÁLCULO CRÍTICO: Horas Semanales (por grupo) * Cantidad de Grupos
-        const hPorGrupo = parseFloat(String(comp.horas_requeridas));
-        const nGrupos = parseInt(String(comp.n_grupos)) || 1;
-        const totalHoras = hPorGrupo * nGrupos;
+        // CÁLCULO DEFINITIVO: Horas por Grupo * Número de Grupos (Trabajando con ENTEROS)
+        const horasPorGrupo = Math.round(parseFloat(String(comp.horas_requeridas)));
+        const cantidadGrupos = Math.round(parseInt(String(comp.n_grupos))) || 1;
+        const totalHoras = horasPorGrupo * cantidadGrupos;
 
-        console.log(`[CONFIGURAR_OFERTA] ${comp.tipo}: ${hPorGrupo}h x ${nGrupos} grupos = ${totalHoras}h totales`);
+        console.log(`[OFERTA_AUDIT] Componente: ${comp.tipo} | h/grupo: ${horasPorGrupo} | grupos: ${cantidadGrupos} | TOTAL: ${totalHoras}`);
 
         // Buscar si ya existe el componente en esta oferta
         const componenteExistente = oferta.componentes.find(c => c.tipo === comp.tipo);
 
         let componente;
         if (componenteExistente) {
-          // Si existe, actualizar con el total multiplicado
+          // Si existe, actualizar con el total MULTIPLICADO
           componente = await tx.curso_componente.update({
             where: { id: componenteExistente.id },
             data: {
@@ -211,14 +242,14 @@ export class CargaHorariaService {
 
           // Gestionar Grupos
           const gruposActuales = await tx.grupo.findMany({ where: { id_componente: componente.id } });
-          if (gruposActuales.length !== nGrupos) {
+          if (gruposActuales.length !== cantidadGrupos) {
             const tieneHorarios = await tx.bloque_horario.findFirst({ where: { id_componente: componente.id } });
             if (tieneHorarios) {
               throw new Error(`No se puede cambiar el número de grupos para ${comp.tipo} porque ya tiene horarios asignados.`);
             }
             
             await tx.grupo.deleteMany({ where: { id_componente: componente.id } });
-            for (let i = 0; i < nGrupos; i++) {
+            for (let i = 0; i < cantidadGrupos; i++) {
               await tx.grupo.create({
                 data: {
                   id_componente: componente.id,
@@ -240,11 +271,11 @@ export class CargaHorariaService {
           });
 
           // Crear grupos iniciales
-          for (let i = 0; i < nGrupos; i++) {
+          for (let i = 0; i < cantidadGrupos; i++) {
             await tx.grupo.create({
               data: {
                 id_componente: componente.id,
-                codigo: nGrupos === 1 && comp.tipo === 'TEORIA' ? 'UNICO' : String.fromCharCode(65 + i),
+                codigo: cantidadGrupos === 1 && comp.tipo === 'TEORIA' ? 'UNICO' : String.fromCharCode(65 + i),
                 capacidad_maxima: comp.tipo === 'LABORATORIO' ? 20 : 40
               }
             });
@@ -254,6 +285,38 @@ export class CargaHorariaService {
       }
 
       return { ...oferta, componentes: resultados };
+    });
+  }
+
+  /**
+   * Actualizar una asignación de carga horaria
+   */
+  static async actualizarAsignacion(id: number, datos: { horas_asignadas: number }) {
+    const asignacion = await prisma.asignacion_docente_componente.findUnique({
+      where: { id },
+      include: { componente: { include: { grupos: true } } }
+    });
+
+    if (!asignacion) throw new Error('Asignación no encontrada');
+
+    // Validar bloques para Laboratorio
+    if (asignacion.componente.tipo === 'LABORATORIO') {
+      const nGrupos = asignacion.componente.grupos?.length || 1;
+      const horasPorGrupo = asignacion.componente.horas_requeridas / nGrupos;
+      const numGruposAsignados = datos.horas_asignadas / horasPorGrupo;
+
+      if (Math.abs(numGruposAsignados - Math.round(numGruposAsignados)) > 0.01) {
+        throw new Error(
+          `Para Laboratorios, las horas asignadas (${datos.horas_asignadas}h) deben ser un múltiplo exacto de las horas del grupo (${horasPorGrupo}h).`
+        );
+      }
+    }
+
+    return prisma.asignacion_docente_componente.update({
+      where: { id },
+      data: {
+        horas_asignadas: Math.round(datos.horas_asignadas)
+      }
     });
   }
 
@@ -287,11 +350,40 @@ export class CargaHorariaService {
   }
 
   /**
-   * Obtener ciclos de un período específico
+   * Obtener detalle de una oferta específica
+   */
+  static async obtenerOfertaDetalle(id_periodo: number, id_curso: number, id_ciclo: number) {
+    return prisma.curso_oferta.findUnique({
+      where: {
+        id_periodo_id_curso_id_ciclo: {
+          id_periodo,
+          id_curso,
+          id_ciclo
+        }
+      },
+      include: {
+        componentes: {
+          include: {
+            grupos: true
+          }
+        }
+      }
+    });
+  }
+
+  /**
+   * Obtener ciclos de un período específico que tengan oferta académica activa
    */
   static async obtenerCiclosPorPeriodo(id_periodo: number) {
     return prisma.ciclo.findMany({
-      where: { id_periodo },
+      where: { 
+        id_periodo,
+        ofertas: {
+          some: {
+            estado: { not: 'ELIMINADO' }
+          }
+        }
+      },
       orderBy: { numero: 'asc' }
     });
   }
@@ -315,6 +407,7 @@ export class CargaHorariaService {
         ciclo: true,
         componentes: {
           include: {
+            grupos: true, // INCLUIR GRUPOS PARA CALCULAR n_grupos EN FRONTEND
             asignaciones: {
               include: {
                 docente: true

@@ -111,7 +111,9 @@ export class HorariosService {
     }
 
     // 0.2. Validar que el docente no exceda la cantidad máxima de grupos asignados
-    const maxGrupos = Math.round(asignacion.horas_asignadas / horasPorGrupo);
+    const maxGrupos = componente.tipo === 'TEORIA' 
+      ? (asignacion.horas_asignadas > 0 ? 1 : 0) 
+      : Math.round(asignacion.horas_asignadas / horasPorGrupo);
     const gruposConSelecciones = new Set(
       seleccionesTemporales
         .filter((s) => s.idComponente === datos.idComponente)

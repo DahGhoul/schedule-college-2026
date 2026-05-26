@@ -216,31 +216,51 @@ export class EstadisticasService {
    * KPIs for secretary/director dashboard
    */
   static async obtenerKPIsSecretaria(idPeriodo: number) {
-    const [totalDocentes, docentesConBloques, totalBloques, bloquesConfirmados,
-      totalOfertas, ofertasAsignadas, totalAmbientes, bloquesPeriodo] = await Promise.all([
+    const [totalDocentes, docentesConBloques, totalOfertas, totalAmbientes, bloquesPeriodo, configs] = await Promise.all([
       prisma.docente.count({ where: { activo: true } }),
       prisma.docente.count({
         where: { activo: true, bloques: { some: { id_periodo: idPeriodo } } },
       }),
-      prisma.bloque_horario.count({ where: { id_periodo: idPeriodo } }),
-      prisma.bloque_horario.count({
-        where: { id_periodo: idPeriodo, estado: { in: ['CONFIRMADO', 'PUBLICADO'] } },
-      }),
       prisma.curso_oferta.count({ where: { id_periodo: idPeriodo } }),
-      prisma.curso_oferta.count({
-        where: { id_periodo: idPeriodo, estado: { in: ['ASIGNADO', 'PUBLICADO'] } },
-      }),
       prisma.ambiente.count({ where: { activo: true } }),
       prisma.bloque_horario.findMany({
-        where: { id_periodo: idPeriodo },
+        where: { id_periodo: idPeriodo, estado: { in: ['BORRADOR', 'CONFIRMADO', 'PUBLICADO'] } },
         select: { hora_inicio: true, hora_fin: true },
       }),
+      prisma.configuracion.findMany({ where: { id_periodo: idPeriodo } }),
     ]);
 
-    // Calcular ocupacion de ambientes en horas
+    // Calcular ofertas completas (aquellas donde la suma de horas asignadas >= requeridas)
+    const ofertas = await prisma.curso_oferta.findMany({
+      where: { id_periodo: idPeriodo },
+      include: {
+        componentes: {
+          include: { asignaciones: true },
+        },
+      },
+    });
+
+    const ofertasCompletas = ofertas.filter(o => {
+      const requeridas = o.componentes.reduce((s, c) => s + c.horas_requeridas, 0);
+      const asignadas = o.componentes.reduce(
+        (s, c) => s + c.asignaciones.reduce((s2, a) => s2 + a.horas_asignadas, 0),
+        0
+      );
+      return asignadas >= requeridas && requeridas > 0;
+    }).length;
+
+    // Calcular ocupacion de ambientes en horas reales
+    const mapaConfig: Record<string, string> = {};
+    configs.forEach((c) => (mapaConfig[c.clave] = c.valor));
+
+    const franjaInicio = mapaConfig['FRANJA_INICIO'] || '07:00';
+    const franjaFin = mapaConfig['FRANJA_FIN'] || '22:00';
+    const almuerzoInicio = mapaConfig['BLOQUEO_ALMUERZO_INICIO'] || '12:00';
+    const almuerzoFin = mapaConfig['BLOQUEO_ALMUERZO_FIN'] || '13:00';
+
+    const horasPorDia = duracionHoras(franjaInicio, franjaFin) - duracionHoras(almuerzoInicio, almuerzoFin);
+    const horasDisponibles = totalAmbientes * horasPorDia * 5; // 5 días a la semana
     const horasOcupadas = bloquesPeriodo.reduce((sum, b) => sum + duracionHoras(b.hora_inicio, b.hora_fin), 0);
-    // Estimacion de horas disponibles: total ambientes * 13 horas/dia * 5 dias/semana
-    const horasDisponibles = totalAmbientes * 65;
 
     // Calcular estado de la ventana activa de atencion
     const lp = this.getLimaParts(new Date());
@@ -294,6 +314,8 @@ export class EstadisticasService {
       }
 
       ventanaInfo = {
+        id: ventanaActiva.id,
+        nombre: ventanaActiva.nombre,
         semaforo,
         tiempoRestante: { dias, horas, minutos },
       };
@@ -309,11 +331,11 @@ export class EstadisticasService {
       },
       cursos: {
         total: totalOfertas,
-        completos: ofertasAsignadas,
+        completos: ofertasCompletas,
       },
       ocupacion: {
-        horasDisponibles,
-        horasOcupadas,
+        horasDisponibles: Math.round(horasDisponibles),
+        horasOcupadas: Math.round(horasOcupadas),
       },
       ventana: ventanaInfo,
       avanceCursos,

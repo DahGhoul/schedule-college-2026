@@ -4,7 +4,8 @@ export function Card({ className, children, ...props }: React.HTMLAttributes<HTM
   return (
     <div
       className={cn(
-        'bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden',
+        'bg-white rounded-xl border border-gray-100 shadow-sm',
+        !className?.includes('overflow-') && 'overflow-hidden',
         className
       )}
       {...props}

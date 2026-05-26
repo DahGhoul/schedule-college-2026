@@ -5,7 +5,7 @@ import { z } from 'zod';
 const asignarCargaSchema = z.object({
   id_componente: z.number().int().positive(),
   id_docente: z.number().int().positive(),
-  horas_asignadas: z.number().positive(), // Permitir decimales
+  horas_asignadas: z.number().int().positive(), // Forzar entero
 });
 
 const configurarOfertaSchema = z.object({
@@ -15,7 +15,7 @@ const configurarOfertaSchema = z.object({
   tipo_curso: z.enum(['REGULAR', 'ELECTIVO']),
   componentes: z.array(z.object({
     tipo: z.enum(['TEORIA', 'PRACTICA', 'LABORATORIO']),
-    horas_requeridas: z.number().positive(), // Permitir decimales (horas por grupo)
+    horas_requeridas: z.number().int().positive(), // Forzar entero
     n_grupos: z.number().int().min(1),
   })),
 });
@@ -34,6 +34,21 @@ export class CargaHorariaController {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Datos inválidos', detalles: error.errors });
       }
+      res.status(400).json({ error: error.message });
+    }
+  }
+
+  static async actualizarAsignacion(req: Request, res: Response) {
+    try {
+      const id = parseInt(req.params.id);
+      const { horas_asignadas } = req.body;
+      
+      if (isNaN(id)) return res.status(400).json({ error: 'ID inválido' });
+      if (typeof horas_asignadas !== 'number') return res.status(400).json({ error: 'Horas inválidas' });
+
+      const resultado = await CargaHorariaService.actualizarAsignacion(id, { horas_asignadas });
+      res.json(resultado);
+    } catch (error: any) {
       res.status(400).json({ error: error.message });
     }
   }
@@ -84,6 +99,23 @@ export class CargaHorariaController {
       res.json(resultado);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
+    }
+  }
+
+  static async obtenerOfertaDetalle(req: Request, res: Response) {
+    try {
+      const id_periodo = parseInt(req.query.id_periodo as string);
+      const id_curso = parseInt(req.query.id_curso as string);
+      const id_ciclo = parseInt(req.query.id_ciclo as string);
+
+      if (isNaN(id_periodo) || isNaN(id_curso) || isNaN(id_ciclo)) {
+        return res.status(400).json({ error: 'Parámetros inválidos' });
+      }
+
+      const resultado = await CargaHorariaService.obtenerOfertaDetalle(id_periodo, id_curso, id_ciclo);
+      res.json(resultado);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   }
 

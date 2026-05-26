@@ -19,10 +19,18 @@ export const cargaHorariaService = {
   eliminarOferta: (id: number) =>
     apiClient.delete(`/carga-horaria/oferta/${id}`),
 
+  obtenerOfertaDetalle: (idPeriodo: number, idCurso: number, idCiclo: number) =>
+    apiClient.get('/carga-horaria/oferta/detalle', {
+      params: { id_periodo: idPeriodo, id_curso: idCurso, id_ciclo: idCiclo }
+    }),
+
   actualizarAsignacion: (idAsignacion: number, datos: any) =>
     apiClient.put(`/carga-horaria/asignacion/${idAsignacion}`, datos),
 
   obtenerCiclos: (idPeriodo: number) =>
+    apiClient.get(`/carga-horaria/ciclos/${idPeriodo}`),
+
+  obtenerCiclosPorPeriodo: (idPeriodo: number) =>
     apiClient.get(`/carga-horaria/ciclos/${idPeriodo}`),
 
   obtenerCursosPorCiclo: (idPeriodo: number, idCiclo?: number) => {

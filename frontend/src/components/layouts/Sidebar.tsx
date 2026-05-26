@@ -69,7 +69,6 @@ export function Sidebar() {
     { href: '/dashboard/secretaria/ventanas', etiqueta: 'Ventanas de Atención', Icono: Clock },
     { href: '/dashboard/secretaria/registro-horarios', etiqueta: 'Registro Manual', Icono: CheckSquare },
     { href: '/dashboard/secretaria/reportes', etiqueta: 'Reportes PDF/Excel', Icono: FileDown },
-    { href: '/dashboard/secretaria/horarios-finales', etiqueta: 'Horarios Finales', Icono: Send },
     { href: '/dashboard/horarios/vista-aula', etiqueta: 'Horario por Aulas', Icono: MapPin },
     { href: '/dashboard/horarios/vista-ciclo', etiqueta: 'Horario por Ciclo', Icono: Calendar },
   ];

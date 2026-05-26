@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { periodosService } from '@/services/periodos.service';
 import { reportesService, descargarBlob } from '@/services/reportes.service';
@@ -10,9 +10,25 @@ import { Selector } from '@/components/ui/Selector';
 import { SpinnerCarga } from '@/components/ui/SpinnerCarga';
 import { NotificacionToast } from '@/components/ui/NotificacionToast';
 import { cn } from '@/lib/utilidades';
+import { SelectorFiltrable } from '@/components/ui/SelectorFiltrable';
+import { 
+  FileText, 
+  FileSpreadsheet, 
+  Mail, 
+  MessageCircle, 
+  Download, 
+  Calendar, 
+  User, 
+  BarChart3,
+  ArrowRight,
+  ShieldCheck,
+  LayoutDashboard
+} from 'lucide-react';
 
 export default function ReportesSecretariaPage() {
   const [idPeriodo, setIdPeriodo] = useState<number | null>(null);
+  const [idDocente, setIdDocente] = useState<number>(0);
+  const [diaSeleccionado, setDiaSeleccionado] = useState<string>('');
   const [toast, setToast] = useState<{ mensaje: string; tipo: 'exito' | 'error' } | null>(null);
   const [enviandoId, setEnviandoId] = useState<number | null>(null);
   const [modalEnviarTodos, setModalEnviarTodos] = useState(false);
@@ -23,24 +39,41 @@ export default function ReportesSecretariaPage() {
     queryFn: () => periodosService.listar().then((res) => res.data),
   });
 
+  const { data: periodoActivo } = useQuery({
+    queryKey: ['periodo-activo-reportes'],
+    queryFn: () => periodosService.activo().then(res => res.data),
+  });
+
+  // Seleccionar periodo activo por defecto
+  useEffect(() => {
+    if (!idPeriodo) {
+      if (periodoActivo?.id) {
+        setIdPeriodo(periodoActivo.id);
+      } else if (periodos && periodos.length > 0) {
+        // Si no hay activo, seleccionar el primero de la lista (el más reciente por el order desc)
+        setIdPeriodo(periodos[0].id);
+      }
+    }
+  }, [periodoActivo, idPeriodo, periodos]);
+
   const { data: cargaDocentes, isLoading: cargaLoading } = useQuery({
     queryKey: ['carga-docente-reportes', idPeriodo],
     queryFn: () => estadisticasService.cargaDocente(idPeriodo!).then((res) => res.data),
     enabled: !!idPeriodo,
   });
 
-  const handleDescargar = async (tipo: 'pdf' | 'excel', idDocente?: number) => {
+  const handleDescargar = async (tipo: 'pdf' | 'excel', idDoc?: number) => {
     if (!idPeriodo) return;
-    const key = idDocente ? `${tipo}-${idDocente}` : `global-${tipo}`;
+    const key = idDoc ? `${tipo}-${idDoc}` : `global-${tipo}`;
     setDescargando(key);
     try {
       let response: any;
-      if (idDocente) {
+      if (idDoc) {
         response = tipo === 'pdf'
-          ? await reportesService.pdfDocente(idDocente, idPeriodo)
-          : await reportesService.excelDocente(idDocente, idPeriodo);
-        const docente = (cargaDocentes || []).find((d: any) => d.id === idDocente);
-        const nombre = docente ? `${docente.apellidos}_${docente.nombres}` : `docente_${idDocente}`;
+          ? await reportesService.pdfDocente(idDoc, idPeriodo)
+          : await reportesService.excelDocente(idDoc, idPeriodo);
+        const docente = (cargaDocentes || []).find((d: any) => d.id === idDoc);
+        const nombre = docente ? `${docente.apellidos}_${docente.nombres}` : `docente_${idDoc}`;
         descargarBlob(response.data, `horario_${nombre}.${tipo === 'pdf' ? 'pdf' : 'xlsx'}`);
       } else {
         response = tipo === 'pdf'
@@ -56,11 +89,28 @@ export default function ReportesSecretariaPage() {
     }
   };
 
-  const handleEnviarCorreo = async (idDocente: number) => {
-    if (!idPeriodo) return;
-    setEnviandoId(idDocente);
+  const handleDescargarDia = async (tipo: 'pdf' | 'excel') => {
+    if (!idPeriodo || !diaSeleccionado) return;
+    const key = `dia-${tipo}`;
+    setDescargando(key);
     try {
-      await reportesService.enviarCorreoDocente(idDocente, idPeriodo);
+      const response = tipo === 'pdf'
+        ? await reportesService.pdfDia(diaSeleccionado, idPeriodo)
+        : await reportesService.excelDia(diaSeleccionado, idPeriodo);
+      descargarBlob(response.data, `auditoria_${diaSeleccionado.toLowerCase()}.${tipo === 'pdf' ? 'pdf' : 'xlsx'}`);
+      setToast({ mensaje: 'Reporte de auditoría generado', tipo: 'exito' });
+    } catch (err: any) {
+      setToast({ mensaje: 'Error al generar reporte de auditoría', tipo: 'error' });
+    } finally {
+      setDescargando(null);
+    }
+  };
+
+  const handleEnviarCorreo = async (idDoc: number) => {
+    if (!idPeriodo) return;
+    setEnviandoId(idDoc);
+    try {
+      await reportesService.enviarCorreoDocente(idDoc, idPeriodo);
       setToast({ mensaje: 'Reporte enviado al correo del docente', tipo: 'exito' });
     } catch (err: any) {
       setToast({ mensaje: err.response?.data?.error || 'Error al enviar correo', tipo: 'error' });
@@ -74,18 +124,14 @@ export default function ReportesSecretariaPage() {
       setToast({ mensaje: `El docente ${docente.apellidos} no tiene un teléfono registrado`, tipo: 'error' });
       return;
     }
-    // Formatear el número (eliminar caracteres no numericos y asegurar prefijo de pais de Peru 51)
     let numero = docente.telefono.replace(/\D/g, '');
-    if (numero.length === 9) {
-      numero = `51${numero}`;
-    }
+    if (numero.length === 9) numero = `51${numero}`;
 
     const urlReporte = `${window.location.origin}/api/reportes/docente/${docente.id}/pdf`;
-    const mensaje = `Estimado/a Prof. *${docente.nombres} ${docente.apellidos}*,\n\nLe saluda la Secretaría de la Escuela de Ingeniería de Sistemas de la UNT.\n\nLe notificamos que su horario oficial para el periodo académico actual ha sido programado. Puede descargarlo directamente en formato PDF ingresando al siguiente enlace:\n👉 ${urlReporte}\n\nQuedamos a su disposición para cualquier consulta.\nAtentamente,\n*Escuela de Ingeniería de Sistemas - UNT*`;
+    const mensaje = `Estimado/a Prof. *${docente.nombres} ${docente.apellidos}*,\n\nLe saluda la Secretaría de la EIS-UNT. Adjuntamos su horario oficial para el periodo actual.\n👉 ${urlReporte}`;
 
     const link = `https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`;
     window.open(link, '_blank');
-    setToast({ mensaje: 'Redirigiendo a WhatsApp Web...', tipo: 'exito' });
   };
 
   const enviarTodosMutation = useMutation({
@@ -101,211 +147,263 @@ export default function ReportesSecretariaPage() {
     },
   });
 
+  const dias = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES'];
+
   if (periodosLoading) return <SpinnerCarga />;
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="overflow-hidden rounded-3xl bg-gradient-to-br from-[#0b1f3a] via-[#123b6d] to-[#0f4c81] px-8 py-8 text-white shadow-xl relative">
-        <div className="absolute -right-8 -top-8 h-40 w-40 rounded-full bg-white/10 blur-3xl pointer-events-none" />
-        <div className="relative z-10 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <span className="inline-flex items-center rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-widest text-white/80 mb-3">
-              Gestión de Reportes
-            </span>
-            <h1 className="text-3xl font-extrabold tracking-tight">Reportes de Horarios</h1>
-            <p className="text-sm text-white/70 mt-1">
-              Descarga o envía por correo los reportes PDF y Excel por docente o de forma global.
+    <div className="space-y-10 max-w-[1400px] mx-auto pb-20">
+      {/* Header Estilo Classroom */}
+      <div className="relative overflow-hidden rounded-[3rem] bg-gradient-to-br from-[#0b1f3a] via-[#123b6d] to-[#0f4c81] px-10 py-12 text-white shadow-2xl">
+        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/10 blur-3xl pointer-events-none" />
+        <div className="absolute -left-10 -bottom-10 h-40 w-40 rounded-full bg-white/5 blur-2xl pointer-events-none" />
+        
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-end justify-between gap-8">
+          <div className="space-y-4">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/10 backdrop-blur-md rounded-full border border-white/20 text-xs font-bold uppercase tracking-widest text-white/90">
+              <BarChart3 className="w-3.5 h-3.5" />
+              Centro de Reportes y Auditoría
+            </div>
+            <h1 className="text-4xl font-extrabold tracking-tight">Reportes Institucionales</h1>
+            <p className="text-lg text-white/70 max-w-2xl">
+              Genera reportes profesionales para docentes, auditorías diarias o consolidados globales en formatos Excel y PDF.
             </p>
           </div>
-          <div className="w-64">
+          
+          <div className="w-full lg:w-80 bg-white/10 backdrop-blur-xl p-4 rounded-[2rem] border border-white/20 shadow-inner">
+            <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest mb-2 ml-1 text-center">Seleccionar Periodo Académico</p>
             <Selector
               label=""
               opciones={[
-                { valor: '', etiqueta: 'Seleccionar periodo' },
+                { valor: '', etiqueta: 'Elegir Periodo...' },
                 ...(periodos || []).map((p: any) => ({ valor: String(p.id), etiqueta: p.nombre })),
               ]}
               value={idPeriodo?.toString() || ''}
               onChange={(e) => setIdPeriodo(e.target.value ? parseInt(e.target.value) : null)}
-              className="border-white/20 bg-white/90 text-slate-900"
+              className="w-full bg-white border-none rounded-2xl text-slate-900 font-bold py-3"
             />
           </div>
         </div>
       </div>
 
-      {/* Global Actions */}
-      {idPeriodo && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[
-            {
-              icon: '📄',
-              title: 'PDF Global',
-              desc: 'Un PDF con los horarios de todos los docentes del periodo.',
-              action: () => handleDescargar('pdf'),
-              key: 'global-pdf',
-              label: 'Descargar PDF Global',
-              color: 'from-red-50 to-rose-50 border-red-200',
-            },
-            {
-              icon: '📊',
-              title: 'Excel Global',
-              desc: 'Un Excel con una hoja por docente y todos sus bloques.',
-              action: () => handleDescargar('excel'),
-              key: 'global-excel',
-              label: 'Descargar Excel Global',
-              color: 'from-emerald-50 to-green-50 border-emerald-200',
-            },
-            {
-              icon: '✉️',
-              title: 'Enviar a todos',
-              desc: 'Envía PDF + Excel a todos los docentes por correo electrónico.',
-              action: () => setModalEnviarTodos(true),
-              key: 'enviar-todos',
-              label: 'Enviar correos a todos',
-              color: 'from-blue-50 to-indigo-50 border-blue-200',
-            },
-          ].map((card) => (
-            <div key={card.key} className={cn('rounded-2xl border bg-gradient-to-br p-6 space-y-3', card.color)}>
-              <div className="text-3xl">{card.icon}</div>
-              <div>
-                <h3 className="font-bold text-slate-800">{card.title}</h3>
-                <p className="text-sm text-slate-600 mt-1">{card.desc}</p>
+      {!idPeriodo ? (
+        <div className="flex flex-col items-center justify-center py-32 bg-white/50 backdrop-blur-sm rounded-[3rem] border-2 border-dashed border-slate-200 animate-in fade-in duration-700">
+          <div className="p-8 bg-slate-100/50 rounded-full mb-6 ring-8 ring-slate-50">
+            <LayoutDashboard className="w-16 h-12 text-slate-300" />
+          </div>
+          <h4 className="text-xl font-bold text-slate-800">Módulo de Reportes</h4>
+          <p className="text-slate-400 font-medium mt-2 text-center max-w-sm">
+            Por favor, seleccione un periodo académico para habilitar las herramientas de exportación y auditoría.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-in slide-in-from-bottom-4 duration-700">
+          
+          {/* SECCIÓN 1: REPORTES POR DOCENTE */}
+          <div className="lg:col-span-7 space-y-8">
+            <div className="bg-white rounded-[3rem] shadow-xl border border-slate-200/60 p-8 space-y-8">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600">
+                    <User className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-800 tracking-tight">Reporte por Docente</h2>
+                    <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Horarios Individuales</p>
+                  </div>
+                </div>
               </div>
-              <Boton
-                onClick={card.action}
-                disabled={descargando === card.key || (enviarTodosMutation.isPending && card.key === 'enviar-todos')}
-                className="w-full"
-              >
-                {descargando === card.key ? 'Generando...' : (enviarTodosMutation.isPending && card.key === 'enviar-todos') ? 'Enviando...' : card.label}
-              </Boton>
+
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-end">
+                <div className="sm:col-span-8 overflow-visible">
+                  <SelectorFiltrable
+                    label="Buscar Docente"
+                    value={idDocente}
+                    onChange={(val) => setIdDocente(Number(val))}
+                    opciones={(cargaDocentes || []).map((d: any) => ({
+                      valor: d.id,
+                      etiqueta: `${d.apellidos}, ${d.nombres}`
+                    }))}
+                    placeholder="Escriba el apellido del docente..."
+                  />
+                </div>
+                <div className="sm:col-span-4 flex gap-2">
+                  <Boton 
+                    className="flex-1 py-4 rounded-2xl shadow-sm"
+                    disabled={!idDocente || !!descargando}
+                    onClick={() => handleDescargar('pdf', idDocente)}
+                  >
+                    {descargando === `pdf-${idDocente}` ? <SpinnerCarga /> : <FileText className="w-5 h-5" />}
+                  </Boton>
+                  <Boton 
+                    className="flex-1 py-4 rounded-2xl shadow-sm bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-600 hover:text-white"
+                    disabled={!idDocente || !!descargando}
+                    onClick={() => handleDescargar('excel', idDocente)}
+                  >
+                    {descargando === `excel-${idDocente}` ? <SpinnerCarga /> : <FileSpreadsheet className="w-5 h-5" />}
+                  </Boton>
+                </div>
+              </div>
+
+              {idDocente > 0 && (
+                <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 animate-in fade-in zoom-in duration-300">
+                  <p className="text-sm font-bold text-slate-600 flex-1">Enviar reporte oficial al docente:</p>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => handleEnviarCorreo(idDocente)}
+                      className="p-3 bg-white border border-slate-200 rounded-xl text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+                    >
+                      <Mail className="w-5 h-5" />
+                    </button>
+                    <button 
+                      onClick={() => handleEnviarWhatsApp((cargaDocentes || []).find((d:any) => d.id === idDocente))}
+                      className="p-3 bg-white border border-slate-200 rounded-xl text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
+                    >
+                      <MessageCircle className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
-          ))}
+
+            {/* SECCIÓN 2: AUDITORÍA POR DÍA */}
+            <div className="bg-white rounded-[3rem] shadow-xl border border-slate-200/60 p-8 space-y-8">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-amber-50 rounded-2xl text-amber-600">
+                  <ShieldCheck className="w-6 h-6" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-slate-800 tracking-tight">Control de Auditoría por Día</h2>
+                  <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Seguimiento de Asistencia</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-end">
+                <div className="sm:col-span-8">
+                  <Selector
+                    label="Seleccionar Día de la Semana"
+                    opciones={[
+                      { valor: '', etiqueta: 'Elegir Día...' },
+                      ...dias.map(d => ({ valor: d, etiqueta: d }))
+                    ]}
+                    value={diaSeleccionado}
+                    onChange={(e) => setDiaSeleccionado(e.target.value)}
+                    className="w-full py-4 rounded-2xl border-slate-200 bg-slate-50/50"
+                  />
+                </div>
+                <div className="sm:col-span-4 flex gap-2">
+                  <Boton 
+                    className="flex-1 py-4 rounded-2xl shadow-sm bg-rose-50 text-rose-600 border-rose-100 hover:bg-rose-600 hover:text-white"
+                    disabled={!diaSeleccionado || !!descargando}
+                    onClick={() => handleDescargarDia('pdf')}
+                  >
+                    {descargando === 'dia-pdf' ? <SpinnerCarga /> : <FileText className="w-5 h-5" />}
+                  </Boton>
+                  <Boton 
+                    className="flex-1 py-4 rounded-2xl shadow-sm bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-600 hover:text-white"
+                    disabled={!diaSeleccionado || !!descargando}
+                    onClick={() => handleDescargarDia('excel')}
+                  >
+                    {descargando === 'dia-excel' ? <SpinnerCarga /> : <FileSpreadsheet className="w-5 h-5" />}
+                  </Boton>
+                </div>
+              </div>
+              
+              <p className="text-sm text-slate-400 italic bg-slate-50 p-4 rounded-2xl border border-slate-100 text-center">
+                Este reporte detalla: Docente, Asignatura, Aula y Horario para el día seleccionado.
+              </p>
+            </div>
+          </div>
+
+          {/* SECCIÓN 3: REPORTES GLOBALES */}
+          <div className="lg:col-span-5 space-y-8">
+            <div className="bg-[#0b1f3a] rounded-[3rem] shadow-2xl p-8 text-white space-y-8">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-white/10 rounded-2xl">
+                  <LayoutDashboard className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold tracking-tight">Consolidados Globales</h2>
+                  <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest">Reportes de Periodo Completo</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <Boton 
+                  className="w-full py-6 rounded-2xl bg-white/10 hover:bg-white/20 border-white/10 text-white font-bold text-lg flex justify-between px-8"
+                  onClick={() => handleDescargar('pdf')}
+                  disabled={!!descargando}
+                >
+                  <span className="flex items-center gap-3"><FileText className="w-6 h-6 text-rose-400" /> PDF Global</span>
+                  <ArrowRight className="w-5 h-5 opacity-50" />
+                </Boton>
+                
+                <Boton 
+                  className="w-full py-6 rounded-2xl bg-white/10 hover:bg-white/20 border-white/10 text-white font-bold text-lg flex justify-between px-8"
+                  onClick={() => handleDescargar('excel')}
+                  disabled={!!descargando}
+                >
+                  <span className="flex items-center gap-3"><FileSpreadsheet className="w-6 h-6 text-emerald-400" /> Excel Global</span>
+                  <ArrowRight className="w-5 h-5 opacity-50" />
+                </Boton>
+              </div>
+
+              <div className="pt-6 border-t border-white/10">
+                <Boton 
+                  variante="borde"
+                  className="w-full py-8 rounded-[2rem] border-2 border-dashed border-white/20 text-white hover:bg-white hover:text-[#0b1f3a] transition-all duration-500 font-black text-xl flex flex-col items-center gap-2"
+                  onClick={() => setModalEnviarTodos(true)}
+                >
+                  <Mail className="w-8 h-8 mb-2" />
+                  ENVIAR A TODOS LOS DOCENTES
+                  <span className="text-[10px] font-bold opacity-50 uppercase tracking-[0.2em]">Sincronización masiva</span>
+                </Boton>
+              </div>
+            </div>
+
+            {/* Tarjeta Informativa */}
+            <div className="bg-white rounded-[3rem] shadow-lg border border-slate-200/60 p-8 flex items-center gap-4">
+              <div className="p-4 bg-indigo-50 rounded-2xl text-indigo-500">
+                <ShieldCheck className="w-8 h-8" />
+              </div>
+              <div>
+                <h4 className="font-bold text-slate-800 leading-tight">Garantía de Formato</h4>
+                <p className="text-xs text-slate-500 mt-1">
+                  Todos los reportes cumplen con el formato institucional A4 y codificación por colores/docente.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Per-docente table */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-          <h2 className="font-bold text-slate-800 flex items-center gap-2">
-            <span className="w-1.5 h-5 rounded-full bg-indigo-500 inline-block" />
-            Reportes por Docente
-          </h2>
-          {cargaLoading && <SpinnerCarga />}
-        </div>
-
-        {!idPeriodo ? (
-          <div className="px-6 py-14 text-center text-slate-500">
-            Selecciona un periodo para ver los docentes disponibles.
-          </div>
-        ) : cargaLoading ? (
-          <div className="p-8 flex justify-center"><SpinnerCarga /></div>
-        ) : (cargaDocentes || []).length === 0 ? (
-          <div className="px-6 py-14 text-center text-slate-500">
-            No hay docentes con carga asignada en este periodo.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-100">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Docente</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Modalidad / Categoría</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">H. Asignadas</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">H. Requeridas</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Avance</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">PDF · Excel · Correo</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {(cargaDocentes || []).map((d: any) => (
-                  <tr key={d.id} className="hover:bg-slate-50/60 transition-colors">
-                    <td className="px-4 py-3 font-semibold text-slate-800">{d.apellidos}, {d.nombres}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[11px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full w-fit">{d.modalidad}</span>
-                        <span className="text-[11px] font-medium text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full w-fit border border-indigo-100">{d.categoria}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-center font-mono text-slate-700">{d.horasAsignadas}h</td>
-                    <td className="px-4 py-3 text-center font-mono text-slate-700">{d.horasRequeridas}h</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
-                          <div
-                            className={cn('h-full rounded-full transition-all',
-                              d.porcentajeCumplimiento >= 100 ? 'bg-emerald-500' :
-                              d.porcentajeCumplimiento >= 50 ? 'bg-amber-500' : 'bg-rose-400'
-                            )}
-                            style={{ width: `${Math.min(d.porcentajeCumplimiento, 100)}%` }}
-                          />
-                        </div>
-                        <span className="text-xs font-bold text-slate-600 w-10">{d.porcentajeCumplimiento}%</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-center gap-2">
-                        <button
-                          onClick={() => handleDescargar('pdf', d.id)}
-                          disabled={descargando === `pdf-${d.id}`}
-                          title="Descargar PDF"
-                          className="p-2 rounded-lg text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition-all disabled:opacity-50 text-base"
-                        >
-                          {descargando === `pdf-${d.id}` ? '⏳' : '📄'}
-                        </button>
-                        <button
-                          onClick={() => handleDescargar('excel', d.id)}
-                          disabled={descargando === `excel-${d.id}`}
-                          title="Descargar Excel"
-                          className="p-2 rounded-lg text-emerald-600 hover:bg-emerald-50 border border-transparent hover:border-emerald-200 transition-all disabled:opacity-50 text-base"
-                        >
-                          {descargando === `excel-${d.id}` ? '⏳' : '📊'}
-                        </button>
-                        <button
-                          onClick={() => handleEnviarCorreo(d.id)}
-                          disabled={enviandoId === d.id}
-                          title="Enviar por correo"
-                          className="p-2 rounded-lg text-blue-600 hover:bg-blue-50 border border-transparent hover:border-blue-200 transition-all disabled:opacity-50 text-base"
-                        >
-                          {enviandoId === d.id ? '⏳' : '✉️'}
-                        </button>
-                        <button
-                          onClick={() => handleEnviarWhatsApp(d)}
-                          title="Notificar por WhatsApp"
-                          className="p-2 rounded-lg text-emerald-600 hover:bg-emerald-50 border border-transparent hover:border-emerald-200 transition-all text-base animate-pulse-subtle"
-                        >
-                          💬
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
       {/* Modal enviar a todos */}
       {modalEnviarTodos && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4">
-            <div className="text-center mb-6">
-              <div className="text-4xl mb-3">✉️</div>
-              <h2 className="text-xl font-bold text-slate-800">Enviar reportes a todos</h2>
-              <p className="text-slate-600 text-sm mt-2">
-                Se generará y enviará un PDF + Excel a cada docente con bloques asignados en este periodo. Esta acción puede tardar varios minutos.
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-white rounded-[3rem] shadow-2xl p-10 max-w-md w-full mx-4 border border-slate-100">
+            <div className="text-center mb-8">
+              <div className="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-6 ring-8 ring-indigo-50/50">
+                <Mail className="w-10 h-10 text-indigo-600" />
+              </div>
+              <h2 className="text-2xl font-black text-slate-900 tracking-tight">¿Confirmar envío masivo?</h2>
+              <p className="text-slate-500 font-medium mt-4 leading-relaxed">
+                Esta acción enviará automáticamente los horarios personalizados (PDF + Excel) a los correos institucionales de todos los docentes activos.
               </p>
             </div>
-            <div className="flex gap-3">
-              <Boton variante="secundario" onClick={() => setModalEnviarTodos(false)} className="flex-1">
+            <div className="flex gap-4">
+              <Boton 
+                variante="secundario" 
+                onClick={() => setModalEnviarTodos(false)} 
+                className="flex-1 py-4 rounded-2xl font-bold border-slate-200"
+              >
                 Cancelar
               </Boton>
               <Boton
                 onClick={() => enviarTodosMutation.mutate()}
                 disabled={enviarTodosMutation.isPending}
-                className="flex-1"
+                className="flex-1 py-4 rounded-2xl font-black shadow-lg shadow-unt-primary/20"
               >
-                {enviarTodosMutation.isPending ? 'Enviando...' : 'Confirmar envío'}
+                {enviarTodosMutation.isPending ? 'Enviando...' : 'Confirmar Envío'}
               </Boton>
             </div>
           </div>

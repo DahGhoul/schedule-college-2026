@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { periodosService } from '@/services/periodos.service';
 import { cursosService } from '@/services/cursos.service';
@@ -10,6 +10,7 @@ import { Selector } from '@/components/ui/Selector';
 import { Boton } from '@/components/ui/Boton';
 import { CampoTexto } from '@/components/ui/CampoTexto';
 import { NotificacionToast } from '@/components/ui/NotificacionToast';
+import { SelectorFiltrable } from '@/components/ui/SelectorFiltrable';
 import { Plus, Trash2, Save, Clock } from 'lucide-react';
 
 export default function OfertaAcademicaPage() {
@@ -30,6 +31,14 @@ export default function OfertaAcademicaPage() {
     queryFn: () => periodosService.listar().then(res => res.data)
   });
 
+  // Pre-seleccionar periodo activo
+  useEffect(() => {
+    if (periodos && idPeriodo === 0) {
+      const activo = periodos.find((p: any) => p.activo);
+      if (activo) setIdPeriodo(activo.id);
+    }
+  }, [periodos, idPeriodo]);
+
   const { data: cursos } = useQuery({
     queryKey: ['cursos'],
     queryFn: () => cursosService.listar().then(res => res.data)
@@ -41,10 +50,43 @@ export default function OfertaAcademicaPage() {
     enabled: idPeriodo > 0
   });
 
+  const { data: ciclosConOferta } = useQuery({
+    queryKey: ['ciclos-con-oferta', idPeriodo],
+    queryFn: () => cargaHorariaService.obtenerCiclosPorPeriodo(idPeriodo).then(res => res.data),
+    enabled: idPeriodo > 0
+  });
+
+  const { data: ofertaExistente, isLoading: isLoadingOferta } = useQuery({
+    queryKey: ['oferta-detalle', idPeriodo, idCurso, idCiclo],
+    queryFn: () => cargaHorariaService.obtenerOfertaDetalle(idPeriodo, idCurso, idCiclo).then(res => res.data),
+    enabled: idPeriodo > 0 && idCurso > 0 && idCiclo > 0
+  });
+
+  // Usar useEffect para reaccionar a ofertaExistente
+  useEffect(() => {
+    if (isLoadingOferta) return;
+
+    if (ofertaExistente) {
+      setTipoCurso(ofertaExistente.tipo_curso);
+      const comps = ofertaExistente.componentes.map((c: any) => ({
+        tipo: c.tipo,
+        horas_requeridas: c.horas_requeridas / (c.grupos?.length || 1),
+        n_grupos: c.grupos?.length || 1
+      }));
+      setComponentes(comps);
+    } else if (idCurso > 0 && idPeriodo > 0 && idCiclo > 0) {
+      // Si no existe pero hay curso seleccionado, empezar con uno por defecto
+      setComponentes([{ tipo: 'TEORIA', horas_requeridas: 2, n_grupos: 1 }]);
+    } else {
+      setComponentes([]);
+    }
+  }, [ofertaExistente, idCurso, idPeriodo, idCiclo, isLoadingOferta]);
+
   const mutation = useMutation({
     mutationFn: (datos: any) => cargaHorariaService.configurarOferta(datos),
     onSuccess: () => {
       setMensaje({ texto: 'Oferta académica configurada correctamente', tipo: 'exito' });
+      queryClient.invalidateQueries({ queryKey: ['oferta-detalle', idPeriodo, idCurso, idCiclo] });
       queryClient.invalidateQueries({ queryKey: ['curso', idCurso] });
     },
     onError: (error: any) => {
@@ -55,6 +97,13 @@ export default function OfertaAcademicaPage() {
   const agregarComponente = () => {
     // Si no hay teoría, agregamos teoría por defecto, si no, laboratorio
     const tieneTeoria = componentes.some(c => c.tipo === 'TEORIA');
+    const tieneLab = componentes.some(c => c.tipo === 'LABORATORIO');
+
+    if (tieneTeoria && tieneLab) {
+      setMensaje({ texto: 'Este curso ya tiene todos los componentes permitidos (Teoría-Práctica y Laboratorio)', tipo: 'advertencia' });
+      return;
+    }
+
     const nuevoTipo = tieneTeoria ? 'LABORATORIO' : 'TEORIA';
     setComponentes([...componentes, { tipo: nuevoTipo, horas_requeridas: 2, n_grupos: 1 }]);
   };
@@ -64,6 +113,13 @@ export default function OfertaAcademicaPage() {
   };
 
   const actualizarComponente = (index: number, campo: string, valor: any) => {
+    if (campo === 'tipo') {
+      const yaExiste = componentes.some((c, i) => i !== index && c.tipo === valor);
+      if (yaExiste) {
+        setMensaje({ texto: `El componente de ${valor === 'TEORIA' ? 'Teoría-Práctica' : 'Laboratorio'} ya está agregado.`, tipo: 'advertencia' });
+        return;
+      }
+    }
     const nuevos = [...componentes];
     nuevos[index][campo] = valor;
     setComponentes(nuevos);
@@ -72,6 +128,13 @@ export default function OfertaAcademicaPage() {
   const guardarOferta = () => {
     if (!idPeriodo || !idCurso || !idCiclo) {
       setMensaje({ texto: 'Debe completar todos los campos obligatorios', tipo: 'error' });
+      return;
+    }
+
+    // Validar duplicados de tipos (Teoría/Laboratorio)
+    const tipos = componentes.map(c => c.tipo);
+    if (new Set(tipos).size !== tipos.length) {
+      setMensaje({ texto: 'No se pueden guardar componentes duplicados para el mismo curso.', tipo: 'error' });
       return;
     }
     
@@ -104,11 +167,11 @@ export default function OfertaAcademicaPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-1">
+        <Card className="lg:col-span-1 overflow-visible">
           <CardHeader>
             <CardTitle>Datos de la Oferta</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 min-h-[450px]">
             <Selector
               label="Período Académico"
               value={idPeriodo}
@@ -127,21 +190,22 @@ export default function OfertaAcademicaPage() {
               disabled={!idPeriodo}
             >
               <option value={0}>Seleccione un ciclo</option>
+              {/* Solo mostrar ciclos 1-10 por defecto, pero podrías usar ciclosConOferta si quieres filtrar aquí también */}
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
                 <option key={n} value={n}>Ciclo {n}</option>
               ))}
             </Selector>
 
-            <Selector
+            <SelectorFiltrable
               label="Curso"
               value={idCurso}
-              onChange={(e: any) => setIdCurso(Number(e.target.value))}
-            >
-              <option value={0}>Seleccione un curso</option>
-              {cursos?.map((c: any) => (
-                <option key={c.id} value={c.id}>{c.codigo} - {c.nombre}</option>
-              ))}
-            </Selector>
+              onChange={(valor) => setIdCurso(Number(valor))}
+              opciones={cursos?.map((c: any) => ({
+                valor: c.id,
+                etiqueta: `${c.codigo} - ${c.nombre}`
+              })) || []}
+              placeholder="Buscar curso por código o nombre..."
+            />
 
             <Selector
               label="Tipo de Curso"
@@ -186,7 +250,7 @@ export default function OfertaAcademicaPage() {
                     ]}
                   />
                   <CampoTexto
-                    label={comp.tipo === 'LABORATORIO' ? "Horas/Semana (por grupo)" : "Horas/Semana"}
+                    label={comp.tipo === 'LABORATORIO' ? "Horas/Semana (por grupo)" : "Horas/Semana (Teoría-Práctica)"}
                     type="number"
                     value={comp.horas_requeridas}
                     onChange={(e: any) => actualizarComponente(index, 'horas_requeridas', Number(e.target.value))}
@@ -196,15 +260,13 @@ export default function OfertaAcademicaPage() {
                     type="number"
                     value={comp.n_grupos}
                     onChange={(e: any) => actualizarComponente(index, 'n_grupos', Number(e.target.value))}
-                    disabled={comp.tipo === 'TEORIA'} // Teoría suele ser único
+                    disabled={comp.tipo === 'TEORIA'} // Teoría-Práctica suele ser único
                   />
                 </div>
-                {comp.tipo === 'LABORATORIO' && (
-                  <p className="text-[11px] font-bold text-unt-primary mt-2 flex items-center gap-1 bg-unt-primary/5 p-2 rounded-lg">
-                    <Clock className="w-4 h-4" />
-                    RESUMEN: {comp.horas_requeridas}h por grupo × {comp.n_grupos} grupos = {comp.horas_requeridas * comp.n_grupos} horas totales de carga.
-                  </p>
-                )}
+                <p className="text-[11px] font-bold text-unt-primary mt-2 flex items-center gap-1 bg-unt-primary/5 p-2 rounded-lg">
+                  <Clock className="w-4 h-4" />
+                  RESUMEN: {comp.horas_requeridas}h por grupo × {comp.n_grupos} {comp.n_grupos === 1 ? 'grupo' : 'grupos'} = {comp.horas_requeridas * comp.n_grupos} horas totales de carga.
+                </p>
               </div>
             ))}
 

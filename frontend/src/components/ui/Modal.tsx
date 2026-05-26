@@ -14,6 +14,8 @@ export interface ModalProps {
   titulo?: string;
   title?: string; // Alias
   className?: string;
+  classNameContenido?: string;
+  overflowVisible?: boolean;
 }
 
 export function Modal({ 
@@ -24,7 +26,9 @@ export function Modal({
   cerrar, 
   titulo, 
   title,
-  className 
+  className,
+  classNameContenido,
+  overflowVisible = false
 }: ModalProps) {
   const [montado, setMontado] = useState(false);
 
@@ -66,12 +70,12 @@ export function Modal({
       {/* Modal Content */}
       <div 
         className={cn(
-          "relative bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden transition-all duration-300",
+          "relative bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg transition-all duration-300",
           className
         )}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-8 py-6 border-b border-gray-100 bg-slate-50/50">
+        <div className="flex items-center justify-between px-8 py-6 border-b border-gray-100 bg-slate-50/50 rounded-t-[2.5rem]">
           <h3 className="text-xl font-bold text-gray-900 tracking-tight">
             {displayTitle}
           </h3>
@@ -84,7 +88,11 @@ export function Modal({
         </div>
 
         {/* Body */}
-        <div className="p-8 max-h-[75vh] overflow-y-auto custom-scrollbar">
+        <div className={cn(
+          "p-8",
+          !overflowVisible ? "max-h-[75vh] overflow-y-auto custom-scrollbar" : "overflow-visible",
+          classNameContenido
+        )}>
           {children}
         </div>
       </div>

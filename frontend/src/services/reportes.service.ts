@@ -22,9 +22,65 @@ export const reportesService = {
       responseType: 'blob',
     }),
 
+  // Download PDF report for a specific day (auditoria)
+  pdfDia: (dia: string, idPeriodo: number) =>
+    apiClient.get(`/reportes/dia/${dia}/pdf`, {
+      params: { idPeriodo },
+      responseType: 'blob',
+    }),
+
+  // Download Excel report for a specific day (auditoria)
+  excelDia: (dia: string, idPeriodo: number) =>
+    apiClient.get(`/reportes/dia/${dia}/excel`, {
+      params: { idPeriodo },
+      responseType: 'blob',
+    }),
+
+  // Download PDF report for a specific cycle
+  pdfCiclo: (idCiclo: number, idPeriodo: number) =>
+    apiClient.get(`/reportes/ciclo/${idCiclo}/pdf`, {
+      params: { idPeriodo },
+      responseType: 'blob',
+    }),
+
+  // Download PDF report for a specific ambiente
+  pdfAmbiente: (idAmbiente: number, idPeriodo: number) =>
+    apiClient.get(`/reportes/ambiente/${idAmbiente}/pdf`, {
+      params: { idPeriodo },
+      responseType: 'blob',
+    }),
+
+  // Download Excel report for a specific ambiente
+  excelAmbiente: (idAmbiente: number, idPeriodo: number) =>
+    apiClient.get(`/reportes/ambiente/${idAmbiente}/excel`, {
+      params: { idPeriodo },
+      responseType: 'blob',
+    }),
+
   // Download Excel report for all cycles
   excelTodosLosCiclos: (idPeriodo: number) =>
     apiClient.get('/reportes/todos-los-ciclos/excel', {
+      params: { idPeriodo },
+      responseType: 'blob',
+    }),
+
+  // Download PDF report for all cycles
+  pdfTodosLosCiclos: (idPeriodo: number) =>
+    apiClient.get('/reportes/todos-los-ciclos/pdf', {
+      params: { idPeriodo },
+      responseType: 'blob',
+    }),
+
+  // Download Excel report for all ambientes
+  excelTodosLosAmbientes: (idPeriodo: number) =>
+    apiClient.get('/reportes/todos-los-ambientes/excel', {
+      params: { idPeriodo },
+      responseType: 'blob',
+    }),
+
+  // Download PDF report for all ambientes
+  pdfTodosLosAmbientes: (idPeriodo: number) =>
+    apiClient.get('/reportes/todos-los-ambientes/pdf', {
       params: { idPeriodo },
       responseType: 'blob',
     }),

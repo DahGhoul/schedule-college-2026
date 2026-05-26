@@ -2,26 +2,10 @@ import { Request, Response } from 'express';
 import { ReportesService } from './reportes.service';
 import { EmailService } from './email.service';
 import { GeneradorExcelService } from './generador-excel.service';
+import { GeneradorPdfService } from './generador-pdf.service';
 
 export class ReportesController {
-  // ---- PDF: single teacher ----
-  static async pdfDocente(req: Request, res: Response) {
-    try {
-      const idDocente = parseInt(req.params.idDocente);
-      const idPeriodo = parseInt(req.query.idPeriodo as string);
-      if (isNaN(idDocente) || isNaN(idPeriodo)) {
-        return res.status(400).json({ error: 'idDocente e idPeriodo son requeridos' });
-      }
-      const buffer = await ReportesService.generarPDFDocente(idDocente, idPeriodo);
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="horario-docente-${idDocente}.pdf"`);
-      res.send(buffer);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  }
-
-  // ---- Excel: single teacher ----
+  // ---- Excel: per docente ----
   static async excelDocente(req: Request, res: Response) {
     try {
       const idDocente = parseInt(req.params.idDocente);
@@ -29,9 +13,26 @@ export class ReportesController {
       if (isNaN(idDocente) || isNaN(idPeriodo)) {
         return res.status(400).json({ error: 'idDocente e idPeriodo son requeridos' });
       }
-      const buffer = await ReportesService.generarExcelDocente(idDocente, idPeriodo);
+      const buffer = await GeneradorExcelService.generarHorarioDocenteExcel(idPeriodo, idDocente);
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', `attachment; filename="horario-docente-${idDocente}.xlsx"`);
+      res.send(buffer);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  // ---- PDF: per docente ----
+  static async pdfDocente(req: Request, res: Response) {
+    try {
+      const idDocente = parseInt(req.params.idDocente);
+      const idPeriodo = parseInt(req.query.idPeriodo as string);
+      if (isNaN(idDocente) || isNaN(idPeriodo)) {
+        return res.status(400).json({ error: 'idDocente e idPeriodo son requeridos' });
+      }
+      const buffer = await GeneradorPdfService.generarHorarioDocentePdf(idPeriodo, idDocente);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="horario-docente-${idDocente}.pdf"`);
       res.send(buffer);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -45,7 +46,7 @@ export class ReportesController {
       if (isNaN(idPeriodo)) {
         return res.status(400).json({ error: 'idPeriodo es requerido' });
       }
-      const buffer = await ReportesService.generarPDFGlobal(idPeriodo);
+      const buffer = await GeneradorPdfService.generarGlobalPdf(idPeriodo);
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', 'attachment; filename="horario-global.pdf"');
       res.send(buffer);
@@ -61,7 +62,7 @@ export class ReportesController {
       if (isNaN(idPeriodo)) {
         return res.status(400).json({ error: 'idPeriodo es requerido' });
       }
-      const buffer = await ReportesService.generarExcelGlobal(idPeriodo);
+      const buffer = await GeneradorExcelService.generarGlobalExcel(idPeriodo);
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', 'attachment; filename="horario-global.xlsx"');
       res.send(buffer);
@@ -97,6 +98,139 @@ export class ReportesController {
       const buffer = await GeneradorExcelService.generarTodosLosCiclosExcel(idPeriodo);
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', 'attachment; filename="horarios-todos-los-ciclos.xlsx"');
+      res.send(buffer);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  // ---- Excel: per ambiente ----
+  static async excelAmbiente(req: Request, res: Response) {
+    try {
+      const idAmbiente = parseInt(req.params.idAmbiente);
+      const idPeriodo = parseInt(req.query.idPeriodo as string);
+      if (isNaN(idAmbiente) || isNaN(idPeriodo)) {
+        return res.status(400).json({ error: 'idAmbiente e idPeriodo son requeridos' });
+      }
+      const buffer = await GeneradorExcelService.generarHorarioAmbienteExcel(idPeriodo, idAmbiente);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="horario-ambiente-${idAmbiente}.xlsx"`);
+      res.send(buffer);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  // ---- Excel: all ambientes ----
+  static async excelTodosLosAmbientes(req: Request, res: Response) {
+    try {
+      const idPeriodo = parseInt(req.query.idPeriodo as string);
+      if (isNaN(idPeriodo)) {
+        return res.status(400).json({ error: 'idPeriodo es requerido' });
+      }
+      const buffer = await GeneradorExcelService.generarTodosLosAmbientesExcel(idPeriodo);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', 'attachment; filename="horarios-todos-los-ambientes.xlsx"');
+      res.send(buffer);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  // ---- PDF: auditoria por dia ----
+  static async pdfDia(req: Request, res: Response) {
+    try {
+      const dia = req.params.dia;
+      const idPeriodo = parseInt(req.query.idPeriodo as string);
+      if (!dia || isNaN(idPeriodo)) {
+        return res.status(400).json({ error: 'dia e idPeriodo son requeridos' });
+      }
+      const buffer = await GeneradorPdfService.generarAuditoriaDiaPdf(idPeriodo, dia);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="auditoria-${dia.toLowerCase()}.pdf"`);
+      res.send(buffer);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  // ---- Excel: auditoria por dia ----
+  static async excelDia(req: Request, res: Response) {
+    try {
+      const dia = req.params.dia;
+      const idPeriodo = parseInt(req.query.idPeriodo as string);
+      if (!dia || isNaN(idPeriodo)) {
+        return res.status(400).json({ error: 'dia e idPeriodo son requeridos' });
+      }
+      const buffer = await GeneradorExcelService.generarAuditoriaDiaExcel(idPeriodo, dia);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="auditoria-${dia.toLowerCase()}.xlsx"`);
+      res.send(buffer);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  // ---- PDF: per cycle ----
+  static async pdfCiclo(req: Request, res: Response) {
+    try {
+      const idCiclo = parseInt(req.params.idCiclo);
+      const idPeriodo = parseInt(req.query.idPeriodo as string);
+      if (isNaN(idCiclo) || isNaN(idPeriodo)) {
+        return res.status(400).json({ error: 'idCiclo e idPeriodo son requeridos' });
+      }
+      const buffer = await GeneradorPdfService.generarHorarioPdf(idPeriodo, idCiclo);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="horario-ciclo-${idCiclo}.pdf"`);
+      res.send(buffer);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  // ---- PDF: per ambiente ----
+  static async pdfAmbiente(req: Request, res: Response) {
+    try {
+      const idAmbiente = parseInt(req.params.idAmbiente);
+      const idPeriodo = parseInt(req.query.idPeriodo as string);
+      if (isNaN(idAmbiente) || isNaN(idPeriodo)) {
+        return res.status(400).json({ error: 'idAmbiente e idPeriodo son requeridos' });
+      }
+      const buffer = await GeneradorPdfService.generarHorarioAmbientePdf(idPeriodo, idAmbiente);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="horario-ambiente-${idAmbiente}.pdf"`);
+      res.send(buffer);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  // ---- PDF: all ambientes ----
+  static async pdfTodosLosAmbientes(req: Request, res: Response) {
+    try {
+      const idPeriodo = parseInt(req.query.idPeriodo as string);
+      if (isNaN(idPeriodo)) {
+        return res.status(400).json({ error: 'idPeriodo es requerido' });
+      }
+      const buffer = await GeneradorPdfService.generarTodosLosAmbientesPdf(idPeriodo);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'attachment; filename="horarios-todos-los-ambientes.pdf"');
+      res.send(buffer);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  // ---- PDF: all cycles ----
+  static async pdfTodosLosCiclos(req: Request, res: Response) {
+    try {
+      const idPeriodo = parseInt(req.query.idPeriodo as string);
+      if (isNaN(idPeriodo)) {
+        return res.status(400).json({ error: 'idPeriodo es requerido' });
+      }
+      const buffer = await GeneradorPdfService.generarTodosLosCiclosPdf(idPeriodo);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'attachment; filename="horarios-todos-los-ciclos.pdf"');
       res.send(buffer);
     } catch (error: any) {
       res.status(500).json({ error: error.message });

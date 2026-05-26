@@ -191,7 +191,9 @@ export class ValidadorHorario {
     for (const a of asignaciones) {
       const nGrupos = a.componente.grupos?.length || 1;
       const horasPorGrupo = a.componente.horas_requeridas / nGrupos;
-      const maxGrupos = Math.round(a.horas_asignadas / horasPorGrupo);
+      const maxGrupos = a.componente.tipo === 'TEORIA' 
+        ? (a.horas_asignadas > 0 ? 1 : 0) 
+        : Math.round(a.horas_asignadas / horasPorGrupo);
 
       const seleccionesComp = seleccionesDocente.filter((s) => s.idComponente === a.id_componente);
       const countSelecciones = seleccionesComp.length;

@@ -8,10 +8,12 @@ const router = Router();
 router.use(middlewareAutenticacion);
 
 router.post('/asignar', CargaHorariaController.asignarCarga);
+router.put('/asignacion/:id', CargaHorariaController.actualizarAsignacion);
 router.get('/resumen/:id_periodo', CargaHorariaController.obtenerResumenCarga);
 router.post('/configurar-oferta', CargaHorariaController.configurarOferta);
 router.delete('/asignacion/:id_asignacion', CargaHorariaController.eliminarAsignacion);
 router.delete('/oferta/:id', CargaHorariaController.eliminarOferta);
+router.get('/oferta/detalle', CargaHorariaController.obtenerOfertaDetalle);
 router.get('/ciclos/:id_periodo', CargaHorariaController.obtenerCiclosPorPeriodo);
 router.get('/cursos/:id_periodo', CargaHorariaController.obtenerCursosPorCiclo);
 

@@ -503,37 +503,49 @@ async function main() {
       });
 
       // Crear componentes según T/P/L
-      const componentes: { tipo: TipoComponente; horas: number; grupos: string[] }[] = [];
+      // UNIFICACIÓN: T y P se suman en TEORIA (Teoría-Práctica)
+      // LABORATORIO se multiplica por gruposLab
+      const componentesDef: { tipo: TipoComponente; horasTotales: number; nGrupos: number; grupos: string[] }[] = [];
 
-      if (def.T > 0) {
-        componentes.push({ tipo: TipoComponente.TEORIA, horas: def.T, grupos: ['UNICO'] });
+      if (def.T > 0 || def.P > 0) {
+        componentesDef.push({ 
+          tipo: TipoComponente.TEORIA, 
+          horasTotales: (def.T + def.P), 
+          nGrupos: 1,
+          grupos: ['UNICO'] 
+        });
       }
-      if (def.P > 0) {
-        componentes.push({ tipo: TipoComponente.PRACTICA, horas: def.P, grupos: ['UNICO'] });
-      }
+      
       if (def.L > 0) {
-        const codigos = def.gruposLab > 1
-          ? Array.from({ length: def.gruposLab }, (_, i) => String.fromCharCode(65 + i)) // A, B, C, ...
+        const nGruposLab = def.gruposLab || 1;
+        const codigos = nGruposLab > 1
+          ? Array.from({ length: nGruposLab }, (_, i) => String.fromCharCode(65 + i))
           : ['UNICO'];
-        componentes.push({ tipo: TipoComponente.LABORATORIO, horas: def.L, grupos: codigos });
+        
+        componentesDef.push({ 
+          tipo: TipoComponente.LABORATORIO, 
+          horasTotales: (def.L * nGruposLab), 
+          nGrupos: nGruposLab,
+          grupos: codigos 
+        });
       }
 
-      for (const comp of componentes) {
+      for (const compDef of componentesDef) {
         const componente = await prisma.curso_componente.create({
           data: {
             id_oferta: oferta.id,
-            tipo: comp.tipo,
-            horas_requeridas: comp.horas,
-            permite_multi_docente: false,
+            tipo: compDef.tipo,
+            horas_requeridas: compDef.horasTotales,
+            permite_multi_docente: true,
           },
         });
 
-        for (const codigo of comp.grupos) {
+        for (const codigo of compDef.grupos) {
           await prisma.grupo.create({
             data: {
               id_componente: componente.id,
               codigo,
-              capacidad_maxima: comp.tipo === TipoComponente.LABORATORIO ? 18 : 40,
+              capacidad_maxima: compDef.tipo === TipoComponente.LABORATORIO ? 18 : 40,
               activo: true,
             },
           });

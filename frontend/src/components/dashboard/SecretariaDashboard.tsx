@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { periodosService } from '@/services/periodos.service';
 import { useKPIsSecretaria } from '@/hooks/useEstadisticas';
@@ -12,23 +12,53 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Modal } from '@/components/ui/Modal';
 import { useAuthStore } from '@/stores/auth.store';
 import { NotificacionToast } from '@/components/ui/NotificacionToast';
-import { Users, BookOpen, School, Clock, CheckSquare, FileDown, AlertCircle, AlertTriangle, CheckCircle2, Mail } from 'lucide-react';
+import { 
+  Users, 
+  BookOpen, 
+  School, 
+  Clock, 
+  CheckSquare, 
+  FileDown, 
+  AlertCircle, 
+  AlertTriangle, 
+  CheckCircle2, 
+  Mail,
+  LayoutDashboard,
+  Calendar,
+  ArrowRight,
+  TrendingUp,
+  ShieldCheck,
+  MessageCircle,
+  FileText,
+  FileSpreadsheet
+} from 'lucide-react';
 import Link from 'next/link';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList, Cell } from 'recharts';
+import { cn } from '@/lib/utilidades';
 
 export default function SecretariaDashboard() {
   const { usuario } = useAuthStore();
-  const { data: periodoActivo, isLoading: periodoLoading } = useQuery({
-    queryKey: ['periodo-activo-secretaria'],
-    queryFn: () => periodosService.activo().then((res) => res.data),
-  });
-  const { data: periodos } = useQuery({
+  
+  const { data: periodos, isLoading: periodosLoading } = useQuery({
     queryKey: ['periodos-lista-secretaria'],
     queryFn: () => periodosService.listar().then((res) => res.data),
   });
 
-  const [idPeriodoSeleccionado, setIdPeriodoSeleccionado] = useState<number>(0);
-  const idPeriodo = idPeriodoSeleccionado || periodoActivo?.id || 0;
+  const { data: periodoActivo } = useQuery({
+    queryKey: ['periodo-activo-secretaria'],
+    queryFn: () => periodosService.activo().then((res) => res.data),
+  });
+
+  const [idPeriodo, setIdPeriodo] = useState<number>(0);
+
+  // Seleccionar periodo activo por defecto
+  useEffect(() => {
+    if (periodoActivo && idPeriodo === 0) {
+      setIdPeriodo(periodoActivo.id);
+    } else if (!idPeriodo && periodos && periodos.length > 0) {
+      setIdPeriodo(periodos[0].id);
+    }
+  }, [periodoActivo, periodos, idPeriodo]);
 
   const { data: kpisData, isLoading: kpisLoading } = useKPIsSecretaria(idPeriodo);
   const [modalPublicarOpen, setModalPublicarOpen] = useState(false);
@@ -56,46 +86,23 @@ export default function SecretariaDashboard() {
     onSuccess: (res: any) => {
       const { enviados, errores } = res.data;
       setToast({
-        mensaje: `Publicación exitosa. Se enviaron ${enviados} correos (${errores} errores).`,
+        mensaje: errores > 0 
+          ? `Publicación con advertencias. Se enviaron ${enviados} correos, pero hubo ${errores} errores.`
+          : `Publicación exitosa. Se enviaron ${enviados} correos.`,
         tipo: errores > 0 ? 'error' : 'exito',
       });
       setModalPublicarOpen(false);
     },
     onError: (err: any) => {
       setToast({
-        mensaje: err.response?.data?.error || 'Error al publicar y enviar correos',
+        mensaje: err.response?.data?.error || 'Error al publicar e informar',
         tipo: 'error',
       });
       setModalPublicarOpen(false);
     },
   });
 
-
-  const getColorSemaforo = (semaforo: string) => {
-    switch (semaforo) {
-      case 'ROJO': return 'bg-red-500';
-      case 'AMARILLO': return 'bg-yellow-500';
-      default: return 'bg-green-500';
-    }
-  };
-
-  const getTextColorSemaforo = (semaforo: string) => {
-    switch (semaforo) {
-      case 'ROJO': return 'text-red-700';
-      case 'AMARILLO': return 'text-yellow-700';
-      default: return 'text-green-700';
-    }
-  };
-
-  const getIconoSemaforo = (semaforo: string) => {
-    switch (semaforo) {
-      case 'ROJO': return <AlertCircle className="h-6 w-6" />;
-      case 'AMARILLO': return <AlertTriangle className="h-6 w-6" />;
-      default: return <CheckCircle2 className="h-6 w-6" />;
-    }
-  };
-
-  if (periodoLoading || kpisLoading) return <SpinnerCarga />;
+  if (periodosLoading || kpisLoading) return <SpinnerCarga />;
 
   const porcentajeDocentes = kpisData?.docentes.total > 0 
     ? Math.round((kpisData.docentes.elegidos / kpisData.docentes.total) * 100) 
@@ -107,289 +114,344 @@ export default function SecretariaDashboard() {
     ? Math.round((kpisData.ocupacion.horasOcupadas / kpisData.ocupacion.horasDisponibles) * 100) 
     : 0;
 
-  const chartData = (kpisData?.avanceCursos || []).map((curso: any) => ({
-    curso: curso.curso,
-    porcentaje: curso.porcentaje
-  }));
+  const chartData = (kpisData?.avanceCursos || [])
+    .map((curso: any) => ({
+      curso: curso.curso,
+      porcentaje: curso.porcentaje
+    }))
+    .sort((a: any, b: any) => b.porcentaje - a.porcentaje)
+    .slice(0, 10); // Mostrar top 10 o los que tengan menos avance
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.10)]">
-        <div className="relative overflow-hidden bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-50 px-6 py-8 text-slate-900 sm:px-8">
-          <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(#1e3a5f 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
-          <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-3xl space-y-4">
-              <div className="inline-flex items-center rounded-full border border-slate-200 bg-white/60 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-700">
-                <div className="w-2 h-2 bg-emerald-500 rounded-full mr-2"></div>
-                SECRETARIA
-              </div>
-              <div className="space-y-2">
-                <h1 className="text-3xl font-bold tracking-tight sm:text-4xl text-slate-900">Dashboard de coordinacion</h1>
-                <p className="text-sm leading-6 text-slate-600 sm:text-base">
-                  Panorama rapido del avance de asignaciones, ocupacion de ambientes y acciones criticas del periodo activo.
-                </p>
-              </div>
+    <div className="space-y-10 max-w-[1600px] mx-auto pb-20">
+      {/* Header Estilo Classroom */}
+      <div className="relative overflow-hidden rounded-[3rem] bg-gradient-to-br from-[#0b1f3a] via-[#123b6d] to-[#0f4c81] px-10 py-12 text-white shadow-2xl">
+        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/10 blur-3xl pointer-events-none" />
+        <div className="absolute -left-10 -bottom-10 h-40 w-40 rounded-full bg-white/5 blur-2xl pointer-events-none" />
+        
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-end justify-between gap-8">
+          <div className="space-y-4">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/10 backdrop-blur-md rounded-full border border-white/20 text-xs font-bold uppercase tracking-widest text-white/90">
+              <LayoutDashboard className="w-3.5 h-3.5" />
+              Panel de Control Administrativo
             </div>
-
-            <div className="w-full max-w-sm rounded-3xl border border-slate-200 bg-white/80 p-5 shadow-lg backdrop-blur-md">
-              <div className="flex items-center gap-3 mb-2">
-                {getIconoSemaforo(kpisData?.ventana?.semaforo || 'VERDE')}
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">VENTANA ACTIVA</p>
-                  <p className={`text-xl font-bold ${getTextColorSemaforo(kpisData?.ventana?.semaforo || 'VERDE')}`}>
-                    {kpisData?.ventana?.tiempoRestante 
-                      ? `${kpisData.ventana.tiempoRestante.dias}d ${kpisData.ventana.tiempoRestante.horas}h ${kpisData.ventana.tiempoRestante.minutos}m restantes`
-                      : 'Sin ventana activa'}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <div className={`w-3 h-3 rounded-full ${getColorSemaforo(kpisData?.ventana?.semaforo || 'VERDE')}`} />
-                <span className="text-slate-600 font-medium">Semaforo: {kpisData?.ventana?.semaforo || 'VERDE'}</span>
-              </div>
-            </div>
+            <h1 className="text-4xl font-extrabold tracking-tight">Bienvenido, {usuario?.nombres?.split(' ')[0] || 'Administrador'}</h1>
+            <p className="text-lg text-white/70 max-w-2xl">
+              Monitorea el avance de la programación académica, gestiona ambientes y publica horarios oficiales para toda la Escuela.
+            </p>
+          </div>
+          
+          <div className="w-full lg:w-96 bg-white/10 backdrop-blur-xl p-6 rounded-[2.5rem] border border-white/20 shadow-inner">
+            <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest mb-3 ml-1">Periodo de Gestión Actual</p>
+            <Selector
+              label=""
+              opciones={[
+                { valor: '', etiqueta: 'Seleccionar Periodo...' },
+                ...(periodos || []).map((p: any) => ({ valor: String(p.id), etiqueta: p.nombre })),
+              ]}
+              value={idPeriodo?.toString() || ''}
+              onChange={(e) => setIdPeriodo(e.target.value ? parseInt(e.target.value) : 0)}
+              className="w-full bg-white border-none rounded-2xl text-slate-900 font-bold py-3"
+            />
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="hover:shadow-md transition-shadow duration-200 border-sky-200 bg-gradient-to-br from-sky-50 to-blue-50">
-          <CardContent className="flex items-center p-6 gap-4">
-            <div className="p-3 bg-white rounded-xl flex-shrink-0 shadow-sm">
-              <Users className="w-6 h-6 text-sky-700" />
+      {/* Grid de KPIs Premium */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-in slide-in-from-bottom-4 duration-700 delay-100">
+        
+        {/* KPI: Docentes */}
+        <div className="bg-white rounded-[2.5rem] p-8 shadow-xl border border-slate-100 group hover:scale-[1.02] transition-all duration-300">
+          <div className="flex items-center justify-between mb-6">
+            <div className="p-4 bg-indigo-50 rounded-2xl text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300">
+              <Users className="w-6 h-6" />
             </div>
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 mb-1">Docentes que eligieron</p>
-              <h4 className="text-3xl font-bold text-slate-900 tracking-tight">
-                {porcentajeDocentes}%
-              </h4>
-              <p className="text-sm text-slate-600 mt-1">
-                {kpisData?.docentes.elegidos} / {kpisData?.docentes.total}
-              </p>
-              <div className="mt-3 h-2 w-full bg-slate-200 rounded-full overflow-hidden">
-                <div className="h-full bg-sky-600 rounded-full transition-all duration-500" style={{ width: `${porcentajeDocentes}%` }} />
-              </div>
+            <div className="text-right">
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Participación</span>
+              <p className="text-2xl font-black text-slate-800">{porcentajeDocentes}%</p>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-md transition-shadow duration-200 border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50">
-          <CardContent className="flex items-center p-6 gap-4">
-            <div className="p-3 bg-white rounded-xl flex-shrink-0 shadow-sm">
-              <BookOpen className="w-6 h-6 text-emerald-700" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 mb-1">Cursos completos</p>
-              <h4 className="text-3xl font-bold text-slate-900 tracking-tight">
-                {porcentajeCursos}%
-              </h4>
-              <p className="text-sm text-slate-600 mt-1">
-                {kpisData?.cursos.completos} / {kpisData?.cursos.total}
-              </p>
-              <div className="mt-3 h-2 w-full bg-slate-200 rounded-full overflow-hidden">
-                <div className="h-full bg-emerald-600 rounded-full transition-all duration-500" style={{ width: `${porcentajeCursos}%` }} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-md transition-shadow duration-200 border-violet-200 bg-gradient-to-br from-violet-50 to-indigo-50">
-          <CardContent className="flex items-center p-6 gap-4">
-            <div className="p-3 bg-white rounded-xl flex-shrink-0 shadow-sm">
-              <School className="w-6 h-6 text-violet-700" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 mb-1">Ocupacion de ambientes</p>
-              <h4 className="text-3xl font-bold text-slate-900 tracking-tight">
-                {porcentajeOcupacion}%
-              </h4>
-              <p className="text-sm text-slate-600 mt-1">
-                {kpisData?.ocupacion.horasOcupadas}h / {kpisData?.ocupacion.horasDisponibles}h
-              </p>
-              <div className="mt-3 h-2 w-full bg-slate-200 rounded-full overflow-hidden">
-                <div className="h-full bg-violet-600 rounded-full transition-all duration-500" style={{ width: `${porcentajeOcupacion}%` }} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-md transition-shadow duration-200 border-slate-200">
-          <CardContent className="flex items-center p-6 gap-4">
-            <div className="p-3 bg-slate-50 rounded-xl flex-shrink-0 shadow-sm">
-              <Clock className="w-6 h-6 text-slate-700" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 mb-1">Tiempo restante</p>
-              <h4 className="text-3xl font-bold text-slate-900 tracking-tight">
-                {kpisData?.ventana?.tiempoRestante 
-                  ? `${kpisData.ventana.tiempoRestante.dias}d ${kpisData.ventana.tiempoRestante.horas}h ${kpisData.ventana.tiempoRestante.minutos}m`
-                  : '---'}
-              </h4>
-              <p className="text-sm text-slate-600 mt-1">
-                Hasta fecha limite de la ventana.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 gap-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-          {/* Card 1: Registro Manual */}
-          <Card className="border-slate-200 shadow-sm hover:shadow-md transition-all duration-200">
-            <CardContent className="p-6 flex flex-col justify-between h-full">
-              <div>
-                <div className="flex items-start justify-between mb-4">
-                  <div className="p-3 bg-sky-50 rounded-xl">
-                    <CheckSquare className="w-7 h-7 text-sky-700" />
-                  </div>
-                </div>
-                <h3 className="text-lg font-bold text-slate-900 mb-2">Registrar horario manual</h3>
-                <p className="text-sm text-slate-600 mb-4">Abre un formulario para que secretaría asigne horario a un docente de forma directa.</p>
-                <p className="text-xs text-slate-500 mb-4">Campos: Docente, Curso, Horario, Ambiente.</p>
-              </div>
-              <Link href="/dashboard/secretaria/registro-horarios" className="mt-auto">
-                <Boton className="w-full">
-                  Ir a formulario
-                </Boton>
-              </Link>
-            </CardContent>
-          </Card>
-
-          {/* Card 2: Buscar ambientes */}
-          <Card className="border-slate-200 shadow-sm hover:shadow-md transition-all duration-200">
-            <CardContent className="p-6 flex flex-col justify-between h-full">
-              <div>
-                <div className="flex items-start justify-between mb-4">
-                  <div className="p-3 bg-indigo-50 rounded-xl">
-                    <School className="w-7 h-7 text-indigo-700" />
-                  </div>
-                </div>
-                <h3 className="text-lg font-bold text-slate-900 mb-2">Buscar ambientes</h3>
-                <p className="text-sm text-slate-600 mb-4">Revisa la disponibilidad de aulas físicas, laboratorios y capacidad ocupada.</p>
-                <p className="text-xs text-slate-500 mb-4">Monitorea y previene cruces de aulas.</p>
-              </div>
-              <Link href="/dashboard/secretaria/ambientes" className="mt-auto">
-                <Boton className="w-full" variante="secundario">
-                  Ver ambientes
-                </Boton>
-              </Link>
-            </CardContent>
-          </Card>
-
-          {/* Card 3: Descargar reportes globales */}
-          <Card className="border-slate-200 shadow-sm hover:shadow-md transition-all duration-200">
-            <CardContent className="p-6 flex flex-col justify-between h-full">
-              <div>
-                <div className="flex items-start justify-between mb-4">
-                  <div className="p-3 bg-emerald-50 rounded-xl">
-                    <FileDown className="w-7 h-7 text-emerald-700" />
-                  </div>
-                </div>
-                <h3 className="text-lg font-bold text-slate-900 mb-2">Reportes Consolidados</h3>
-                <p className="text-sm text-slate-600 mb-4">Descarga los horarios de todos los docentes asignados en este período académico.</p>
-              </div>
-              <div className="space-y-2 mt-auto">
-                <Boton
-                  className="w-full flex items-center justify-center gap-2"
-                  variante="borde"
-                  disabled={descargando !== null}
-                  onClick={() => handleDescargarGlobal('pdf')}
-                >
-                  {descargando === 'pdf' ? 'Generando...' : 'Descargar PDF Global'}
-                </Boton>
-                <Boton
-                  className="w-full flex items-center justify-center gap-2"
-                  variante="borde"
-                  disabled={descargando !== null}
-                  onClick={() => handleDescargarGlobal('excel')}
-                >
-                  {descargando === 'excel' ? 'Generando...' : 'Descargar Excel Global'}
-                </Boton>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Card 4: Generar horarios finales */}
-          <Card className="border-slate-200 shadow-sm hover:shadow-md transition-all duration-200 bg-rose-50/20 border-rose-100">
-            <CardContent className="p-6 flex flex-col justify-between h-full">
-              <div>
-                <div className="flex items-start justify-between mb-4">
-                  <div className="p-3 bg-rose-100 rounded-xl">
-                    <Mail className="w-7 h-7 text-rose-700" />
-                  </div>
-                </div>
-                <h3 className="text-lg font-bold text-rose-950 mb-2">Enviar Horarios por Correo</h3>
-                <p className="text-sm text-rose-900/80 mb-4">Notifica por correo electrónico a todos los docentes activos adjuntando sus horarios en PDF y Excel.</p>
-              </div>
-              <Boton
-                className="w-full mt-auto"
-                variante="peligro"
-                disabled={enviarCorreosTodosMutation.isPending}
-                onClick={() => setModalPublicarOpen(true)}
-              >
-                {enviarCorreosTodosMutation.isPending ? 'Enviando...' : 'Publicar y Notificar'}
-              </Boton>
-            </CardContent>
-          </Card>
+          </div>
+          <h3 className="text-slate-500 font-bold text-sm uppercase tracking-tight mb-1">Docentes Activos</h3>
+          <p className="text-slate-400 text-xs font-medium mb-4">{kpisData?.docentes.elegidos} de {kpisData?.docentes.total} ya eligieron horario</p>
+          <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+            <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${porcentajeDocentes}%` }} />
+          </div>
         </div>
 
-        {/* Chart Card */}
-        <Card className="border-slate-200 shadow-sm">
-          <CardHeader>
-            <CardTitle>Estado de asignación por curso</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={400}>
+        {/* KPI: Cursos */}
+        <div className="bg-white rounded-[2.5rem] p-8 shadow-xl border border-slate-100 group hover:scale-[1.02] transition-all duration-300">
+          <div className="flex items-center justify-between mb-6">
+            <div className="p-4 bg-emerald-50 rounded-2xl text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white transition-colors duration-300">
+              <BookOpen className="w-6 h-6" />
+            </div>
+            <div className="text-right">
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Completitud</span>
+              <p className="text-2xl font-black text-slate-800">{porcentajeCursos}%</p>
+            </div>
+          </div>
+          <h3 className="text-slate-500 font-bold text-sm uppercase tracking-tight mb-1">Cursos Programados</h3>
+          <p className="text-slate-400 text-xs font-medium mb-4">{kpisData?.cursos.completos} de {kpisData?.cursos.total} con carga completa</p>
+          <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+            <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${porcentajeCursos}%` }} />
+          </div>
+        </div>
+
+        {/* KPI: Ambientes */}
+        <div className="bg-white rounded-[2.5rem] p-8 shadow-xl border border-slate-100 group hover:scale-[1.02] transition-all duration-300">
+          <div className="flex items-center justify-between mb-6">
+            <div className="p-4 bg-amber-50 rounded-2xl text-amber-600 group-hover:bg-amber-600 group-hover:text-white transition-colors duration-300">
+              <School className="w-6 h-6" />
+            </div>
+            <div className="text-right">
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Ocupación</span>
+              <p className="text-2xl font-black text-slate-800">{porcentajeOcupacion}%</p>
+            </div>
+          </div>
+          <h3 className="text-slate-500 font-bold text-sm uppercase tracking-tight mb-1">Uso de Ambientes</h3>
+          <p className="text-slate-400 text-xs font-medium mb-4">{kpisData?.ocupacion.horasOcupadas}h de {kpisData?.ocupacion.horasDisponibles}h semanales</p>
+          <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+            <div className="h-full bg-amber-500 rounded-full" style={{ width: `${porcentajeOcupacion}%` }} />
+          </div>
+        </div>
+
+        {/* KPI: Ventana / Tiempo */}
+        <div className="bg-[#0b1f3a] rounded-[2.5rem] p-8 shadow-2xl text-white group hover:scale-[1.02] transition-all duration-300">
+          <div className="flex items-center justify-between mb-6">
+            <div className="p-4 bg-white/10 rounded-2xl text-white group-hover:bg-white group-hover:text-[#0b1f3a] transition-all duration-300">
+              <Clock className="w-6 h-6" />
+            </div>
+            {kpisData?.ventana && (
+              <div className={cn(
+                "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter",
+                kpisData.ventana.semaforo === 'ROJO' ? 'bg-rose-500' : 
+                kpisData.ventana.semaforo === 'AMARILLO' ? 'bg-amber-500' : 'bg-emerald-500'
+              )}>
+                En Curso
+              </div>
+            )}
+          </div>
+          <h3 className="text-white/50 font-bold text-sm uppercase tracking-tight mb-1">Tiempo de Ventana</h3>
+          {kpisData?.ventana ? (
+            <>
+              <p className="text-2xl font-black mb-4">
+                {kpisData.ventana.tiempoRestante.dias}d {kpisData.ventana.tiempoRestante.horas}h {kpisData.ventana.tiempoRestante.minutos}m
+              </p>
+              <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest">Restantes para el cierre</p>
+            </>
+          ) : (
+            <p className="text-xl font-bold text-white/40">Sin ventana activa</p>
+          )}
+        </div>
+      </div>
+
+      {/* Accesos Rápidos y Acciones */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        {/* Lado Izquierdo: Tarjetas de Acción (8/12) */}
+        <div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-6 animate-in slide-in-from-left-4 duration-700 delay-200">
+          
+          {/* Card: Registro Manual */}
+          <Link href="/dashboard/secretaria/registro-horarios" className="group">
+            <div className="h-full bg-white rounded-[3rem] p-8 shadow-xl border border-slate-100 hover:shadow-2xl transition-all duration-500 relative overflow-hidden">
+              <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-indigo-50/50 rounded-full group-hover:scale-150 transition-transform duration-700" />
+              <div className="relative z-10 space-y-6">
+                <div className="p-4 bg-indigo-50 rounded-2xl text-indigo-600 w-fit">
+                  <CheckSquare className="w-8 h-8" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-black text-slate-800 mb-2">Registro Manual</h3>
+                  <p className="text-slate-500 text-sm leading-relaxed">Asigna horarios directamente para docentes con dificultades de acceso.</p>
+                </div>
+                <div className="flex items-center text-indigo-600 font-black text-xs uppercase tracking-widest gap-2">
+                  Ir al Formulario <ArrowRight className="w-4 h-4" />
+                </div>
+              </div>
+            </div>
+          </Link>
+
+          {/* Card: Ambientes */}
+          <Link href="/dashboard/secretaria/ambientes" className="group">
+            <div className="h-full bg-white rounded-[3rem] p-8 shadow-xl border border-slate-100 hover:shadow-2xl transition-all duration-500 relative overflow-hidden">
+              <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-emerald-50/50 rounded-full group-hover:scale-150 transition-transform duration-700" />
+              <div className="relative z-10 space-y-6">
+                <div className="p-4 bg-emerald-50 rounded-2xl text-emerald-600 w-fit">
+                  <School className="w-8 h-8" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-black text-slate-800 mb-2">Infraestructura</h3>
+                  <p className="text-slate-500 text-sm leading-relaxed">Gestiona aulas, laboratorios y verifica disponibilidad física en tiempo real.</p>
+                </div>
+                <div className="flex items-center text-emerald-600 font-black text-xs uppercase tracking-widest gap-2">
+                  Ver Ambientes <ArrowRight className="w-4 h-4" />
+                </div>
+              </div>
+            </div>
+          </Link>
+
+          {/* Card: Reportes Consolidados */}
+          <div className="md:col-span-2 bg-white rounded-[3rem] p-6 sm:p-8 shadow-xl border border-slate-100 overflow-hidden relative">
+            <div className="flex flex-col xl:flex-row items-center justify-between gap-6 xl:gap-8">
+              <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 text-center sm:text-left">
+                <div className="p-4 sm:p-5 bg-blue-50 rounded-[2rem] text-blue-600 flex-shrink-0">
+                  <FileDown className="w-8 h-8 sm:w-10 sm:h-10" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-xl sm:text-2xl font-black text-slate-800 mb-1 truncate sm:whitespace-normal">Reportes Institucionales</h3>
+                  <p className="text-slate-500 text-xs sm:text-sm max-w-md">Descarga consolidados globales de todo el periodo académico.</p>
+                </div>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full xl:w-auto">
+                <Boton
+                  variante="borde"
+                  className="flex-1 xl:flex-none px-6 sm:px-8 py-3 sm:py-4 rounded-2xl font-bold border-slate-200 text-sm sm:text-base whitespace-nowrap"
+                  onClick={() => handleDescargarGlobal('pdf')}
+                  disabled={!!descargando}
+                >
+                  {descargando === 'pdf' ? <SpinnerCarga /> : <><FileText className="w-4 h-4 sm:w-5 sm:h-5 mr-2" /> PDF Global</>}
+                </Boton>
+                <Boton
+                  variante="borde"
+                  className="flex-1 xl:flex-none px-6 sm:px-8 py-3 sm:py-4 rounded-2xl font-bold border-slate-200 text-sm sm:text-base whitespace-nowrap"
+                  onClick={() => handleDescargarGlobal('excel')}
+                  disabled={!!descargando}
+                >
+                  {descargando === 'excel' ? <SpinnerCarga /> : <><FileSpreadsheet className="w-4 h-4 sm:w-5 sm:h-5 mr-2" /> Excel Global</>}
+                </Boton>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Lado Derecho: Publicación y Notificación (4/12) */}
+        <div className="lg:col-span-4 animate-in slide-in-from-right-4 duration-700 delay-300">
+          <div className="bg-[#0b1f3a] h-full rounded-[3rem] p-10 shadow-2xl text-white flex flex-col justify-between relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-20 -mt-20 blur-3xl" />
+            
+            <div className="relative z-10 space-y-8">
+              <div className="p-5 bg-white/10 rounded-[2rem] text-white w-fit">
+                <Mail className="w-10 h-10" />
+              </div>
+              <div>
+                <h3 className="text-3xl font-black tracking-tight mb-4">Publicación Oficial</h3>
+                <p className="text-white/60 leading-relaxed mb-6">
+                  Una vez finalizada la carga horaria, notifica automáticamente a todos los docentes con sus horarios adjuntos en formato oficial.
+                </p>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 text-sm font-bold text-white/80">
+                    <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                    Genera PDF personalizado por docente
+                  </div>
+                  <div className="flex items-center gap-3 text-sm font-bold text-white/80">
+                    <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                    Envío masivo vía correo institucional
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <Boton
+              className="relative z-10 w-full py-8 rounded-[2rem] bg-white text-[#0b1f3a] hover:bg-indigo-50 transition-all duration-500 font-black text-xl flex items-center justify-center gap-3 mt-12 shadow-2xl shadow-black/20"
+              onClick={() => setModalPublicarOpen(true)}
+              disabled={enviarCorreosTodosMutation.isPending}
+            >
+              {enviarCorreosTodosMutation.isPending ? 'PROCESANDO...' : 'PUBLICAR Y ENVIAR'}
+              <ArrowRight className="w-6 h-6" />
+            </Boton>
+          </div>
+        </div>
+      </div>
+
+      {/* Sección de Gráficos de Avance */}
+      <div className="animate-in slide-in-from-bottom-4 duration-700 delay-400">
+        <div className="bg-white rounded-[3rem] shadow-xl border border-slate-100 p-10">
+          <div className="flex items-center justify-between mb-10">
+            <div className="flex items-center gap-4">
+              <div className="p-4 bg-indigo-50 rounded-2xl text-indigo-600">
+                <TrendingUp className="w-6 h-6" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-black text-slate-800 tracking-tight">Avance de Programación</h2>
+                <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Top 10 Cursos por Periodo</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="h-[500px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={chartData}
                 layout="vertical"
-                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                margin={{ top: 5, right: 80, left: 40, bottom: 5 }}
               >
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5E7EB" />
-                <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 12, fill: '#6B7280' }} />
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                <XAxis type="number" domain={[0, 100]} hide />
                 <YAxis
                   dataKey="curso"
                   type="category"
-                  width={200}
-                  tick={{ fontSize: 11, fill: '#6B7280' }}
+                  width={250}
+                  tick={{ fontSize: 11, fontWeight: 700, fill: '#64748b' }}
+                  axisLine={false}
+                  tickLine={false}
                 />
                 <Tooltip
-                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                  formatter={(value: number) => [`${value}%`, 'Avance']}
+                  cursor={{ fill: '#f8fafc' }}
+                  contentStyle={{ borderRadius: '24px', border: 'none', boxShadow: '0 20px 50px rgba(0,0,0,0.1)', padding: '16px' }}
+                  itemStyle={{ fontWeight: 800, fontSize: '14px' }}
                 />
-                <Bar dataKey="porcentaje" fill="#1e3a5f" radius={[0, 4, 4, 0]} barSize={24}>
-                  <LabelList dataKey="porcentaje" position="right" formatter={(value: number) => `${value}%`} fill="#374151" fontSize={12} />
+                <Bar dataKey="porcentaje" radius={[0, 20, 20, 0]} barSize={32}>
+                  {chartData.map((entry: any, index: number) => (
+                    <Cell key={`cell-${index}`} fill={entry.porcentaje === 100 ? '#10b981' : '#6366f1'} />
+                  ))}
+                  <LabelList 
+                    dataKey="porcentaje" 
+                    position="right" 
+                    formatter={(value: number) => `${value}%`} 
+                    style={{ fontWeight: 900, fontSize: '14px', fill: '#1e293b' }} 
+                    offset={15}
+                  />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
+      {/* Modal de Publicación */}
       <Modal
         abierto={modalPublicarOpen}
         cerrar={() => setModalPublicarOpen(false)}
-        titulo="¿Publicar horarios y enviar correos?"
+        titulo="¿Confirmar Publicación Oficial?"
       >
-        <div className="space-y-4">
-          <p className="text-slate-600 text-sm">
-            Esta acción generará los reportes PDF y Excel consolidados para cada uno de los docentes activos que tengan bloques programados en este período, y enviará un correo electrónico con sus respectivos adjuntos.
-          </p>
-          <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-3 text-xs flex gap-2">
-            <AlertCircle className="h-5 w-5 text-amber-500 flex-shrink-0" />
-            <span>
-              Asegúrate de que la configuración del servidor de correo saliente (SMTP) esté activa y con credenciales correctas en el archivo de entorno.
-            </span>
+        <div className="p-6 space-y-6">
+          <div className="flex flex-col items-center text-center space-y-4">
+            <div className="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center ring-8 ring-indigo-50/50">
+              <Mail className="w-10 h-10 text-indigo-600" />
+            </div>
+            <h2 className="text-2xl font-black text-slate-900">Notificación Masiva</h2>
+            <p className="text-slate-500 font-medium leading-relaxed">
+              Esta acción enviará automáticamente los horarios personalizados (PDF + Excel) a los correos institucionales de todos los docentes activos con carga horaria.
+            </p>
           </div>
-          <div className="flex gap-3 justify-end pt-4">
-            <Boton variante="secundario" onClick={() => setModalPublicarOpen(false)} disabled={enviarCorreosTodosMutation.isPending}>
+
+          <div className="bg-amber-50 border border-amber-100 rounded-3xl p-5 flex gap-4">
+            <AlertCircle className="w-6 h-6 text-amber-500 flex-shrink-0" />
+            <p className="text-xs text-amber-800 font-bold leading-relaxed">
+              Asegúrate de que la configuración SMTP esté correcta. El proceso puede tardar unos minutos dependiendo de la cantidad de docentes.
+            </p>
+          </div>
+
+          <div className="flex gap-4 pt-4">
+            <Boton 
+              variante="secundario" 
+              onClick={() => setModalPublicarOpen(false)} 
+              className="flex-1 py-4 rounded-2xl font-bold"
+            >
               Cancelar
             </Boton>
             <Boton
-              variante="peligro"
               onClick={() => enviarCorreosTodosMutation.mutate()}
               disabled={enviarCorreosTodosMutation.isPending}
+              className="flex-1 py-4 rounded-2xl font-black shadow-lg"
             >
               {enviarCorreosTodosMutation.isPending ? 'Enviando...' : 'Confirmar Envío'}
             </Boton>
