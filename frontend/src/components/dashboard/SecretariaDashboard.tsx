@@ -135,7 +135,7 @@ export default function SecretariaDashboard() {
               <LayoutDashboard className="w-3.5 h-3.5" />
               Panel de Control Administrativo
             </div>
-            <h1 className="text-4xl font-extrabold tracking-tight">Bienvenido, Administrador</h1>
+            <h1 className="text-4xl font-extrabold tracking-tight">Bienvenida, Secretaria</h1>
             <p className="text-lg text-white/70 max-w-2xl">
               Monitorea el avance de la programación académica, gestiona ambientes y publica horarios oficiales para toda la Escuela.
             </p>
