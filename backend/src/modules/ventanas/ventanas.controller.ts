@@ -4,6 +4,7 @@ import {
   configurarVentanasSchema,
   generarHorarioVentanasSchema,
   desactivarVentanasSchema,
+  enviarCorreosVentanasSchema,
   actualizarTurnoSchema,
   desactivarTurnoSchema,
 } from './ventanas.schema';
@@ -87,6 +88,20 @@ export class VentanasController {
     try {
       const datos = desactivarVentanasSchema.parse(req.body);
       const resultado = await VentanasService.desactivarVentanas(datos.idPeriodo);
+      res.json(resultado);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Datos inválidos', detalles: error.errors });
+      } else {
+        res.status(400).json({ error: error.message });
+      }
+    }
+  }
+
+  static async enviarCorreos(req: Request, res: Response) {
+    try {
+      const datos = enviarCorreosVentanasSchema.parse(req.body);
+      const resultado = await VentanasService.enviarCorreosVentanas(datos.idPeriodo);
       res.json(resultado);
     } catch (error: any) {
       if (error.name === 'ZodError') {

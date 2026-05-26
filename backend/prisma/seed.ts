@@ -47,9 +47,9 @@ async function main() {
     const restricciones = [
       { clave: 'FRANJA_INICIO', valor: '07:00' },
       { clave: 'FRANJA_FIN', valor: '22:00' },
-      { clave: 'HORAS_MAX_DIARIAS', valor: '8' },
+      { clave: 'HORAS_MAX_DIARIAS', valor: '9' },
       { clave: 'BLOQUEO_ALMUERZO_INICIO', valor: '13:00' },
-      { clave: 'BLOQUEO_ALMUERZO_FIN', valor: '15:00' },
+      { clave: 'BLOQUEO_ALMUERZO_FIN', valor: '14:00' },
     ];
     for (const r of restricciones) {
       await prisma.configuracion.upsert({

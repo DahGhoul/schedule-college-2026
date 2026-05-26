@@ -30,6 +30,10 @@ export const desactivarVentanasSchema = z.object({
   idPeriodo: z.number().int().positive(),
 });
 
+export const enviarCorreosVentanasSchema = z.object({
+  idPeriodo: z.number().int().positive(),
+});
+
 export const actualizarTurnoSchema = z.object({
   idVentana: z.number().int().positive(),
   idDocente: z.number().int().positive(),
