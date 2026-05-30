@@ -22,6 +22,7 @@ import {
   FileDown,
   GraduationCap,
   LayoutGrid,
+  FileText,
 } from 'lucide-react';
 
 export function Sidebar() {
@@ -75,6 +76,7 @@ export function Sidebar() {
 
   const enlacesDocente = [
     { href: '/dashboard/docente', etiqueta: 'Mi Dashboard', Icono: LayoutDashboard },
+    { href: '/dashboard/docente/carga-no-lectiva', etiqueta: 'Carga No Lectiva', Icono: FileText },
     { href: '/dashboard/horarios/seleccion', etiqueta: 'Elegir mi Horario', Icono: CheckSquare },
     { href: '/dashboard/horarios/vista-docente', etiqueta: 'Ver mi Horario', Icono: Eye },
     { href: '/dashboard/notificaciones/preferencias', etiqueta: 'Mis Notificaciones', Icono: BellRing },

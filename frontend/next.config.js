@@ -4,6 +4,10 @@ const nextConfig = {
   output: 'standalone',
   async rewrites() {
     // Opcional: proxy para desarrollo hacia el backend
+    if (!process.env.NEXT_PUBLIC_API_URL) {
+      return [];
+    }
+
     return [
       {
         source: '/api/:path*',
