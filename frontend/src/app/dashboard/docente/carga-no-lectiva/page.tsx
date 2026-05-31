@@ -11,7 +11,7 @@ import { CampoTexto } from '@/components/ui/CampoTexto';
 import { Selector } from '@/components/ui/Selector';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { NotificacionToast } from '@/components/ui/NotificacionToast';
-import { ArrowLeft, CalendarDays, FileText, Save, Trash2, UserRound } from 'lucide-react';
+import { ArrowLeft, CalendarDays, FileText, Save, Trash2, UserRound, Printer } from 'lucide-react';
 
 type FormularioSeccion = {
   horas: string;
@@ -609,10 +609,13 @@ export default function CargaNoLectivaPage() {
                           <th className="py-2 pr-4 font-semibold">Formato</th>
                           <th className="py-2 pr-4 font-semibold">Sede</th>
                           <th className="py-2 pr-4 font-semibold">Estado</th>
+                          <th className="py-2 pr-4 font-semibold text-right">Acción</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {(declaracionData?.formatos ?? []).map((formato: any) => (
+                        {(declaracionData?.formatos ?? [])
+                          .filter((formato: any) => ['CARGA_HORARIA_CENTRAL', 'DECLARACION_JURADA_CENTRAL', 'DECLARACION_JURADA_DESCONCENTRADA'].includes(formato.tipo))
+                          .map((formato: any) => (
                           <tr key={formato.tipo} className="border-b border-slate-100 last:border-b-0">
                             <td className="py-2 pr-4">{formato.etiqueta}</td>
                             <td className="py-2 pr-4">{formato.sede}</td>
@@ -620,6 +623,16 @@ export default function CargaNoLectivaPage() {
                               <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${formato.estado === 'GENERADO' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
                                 {formato.estado}
                               </span>
+                            </td>
+                            <td className="py-2 pr-4 text-right">
+                              <Boton
+                                onClick={() => window.open(`/imprimir/formatos/${formato.tipo}?idPeriodo=${idPeriodo}`, '_blank')}
+                                variant="outline"
+                                className="h-8 rounded-lg px-3 text-xs font-bold text-unt-primary hover:bg-unt-primary/10"
+                              >
+                                <Printer className="mr-2 h-3.5 w-3.5" />
+                                Imprimir
+                              </Boton>
                             </td>
                           </tr>
                         ))}
