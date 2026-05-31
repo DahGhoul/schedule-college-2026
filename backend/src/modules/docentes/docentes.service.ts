@@ -31,8 +31,13 @@ export class DocentesService {
   }
 
   static async crear(datos: any) {
+    const codigoIbm = typeof datos.codigo_ibm === 'string' && datos.codigo_ibm.trim().length > 0
+      ? datos.codigo_ibm.trim()
+      : `IBM-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
     const docente = await prisma.docente.create({
       data: {
+        codigo_ibm: codigoIbm,
         nombres: datos.nombres,
         apellidos: datos.apellidos,
         email: datos.email,

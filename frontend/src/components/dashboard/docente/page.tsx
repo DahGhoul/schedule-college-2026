@@ -34,6 +34,7 @@ export default function DashboardDocentePage() {
     router.prefetch('/dashboard/horarios/seleccion');
     router.prefetch('/dashboard/horarios/vista-docente');
     router.prefetch('/dashboard/notificaciones/preferencias');
+    router.prefetch('/dashboard/docente/carga-no-lectiva');
   }, [router]);
 
   // Si el usuario no es docente, redirigir al dashboard administrativo
@@ -364,6 +365,13 @@ export default function DashboardDocentePage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
+              <Boton
+                onClick={() => router.push('/dashboard/docente/carga-no-lectiva')}
+                className="w-full justify-start text-left bg-amber-50 border border-amber-100 text-amber-700 hover:bg-amber-100 font-semibold"
+              >
+                <FileText className="h-4 w-4 text-amber-500" />
+                Registrar Carga No Lectiva
+              </Boton>
               <Boton
                 onClick={() => router.push('/dashboard/horarios/seleccion')}
                 className="w-full justify-start text-left bg-indigo-50 border border-indigo-100 text-indigo-700 hover:bg-indigo-100 font-semibold"
