@@ -119,7 +119,7 @@ model usuario {
 
 model docente {
   id                Int      @id @default(autoincrement()) @map("id_docente")
-  codigo_ibm        String   @unique @db.VarChar(20)
+  codigo_ibm        String?  @unique @db.VarChar(20)
   nombres           String   @db.VarChar(100)
   apellidos         String   @db.VarChar(100)
   email             String   @unique @db.VarChar(150)

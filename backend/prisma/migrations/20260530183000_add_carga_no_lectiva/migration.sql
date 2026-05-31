@@ -51,14 +51,6 @@ ALTER TABLE "docente"
   ADD COLUMN IF NOT EXISTS "dedicacion" "DedicacionDocente" NOT NULL DEFAULT 'TIEMPO_COMPLETO_40H',
   ADD COLUMN IF NOT EXISTS "id_sede_principal" INTEGER;
 
--- Backfill IBM codes for existing rows before enforcing uniqueness
-UPDATE "docente"
-SET "codigo_ibm" = COALESCE(NULLIF("codigo_ibm", ''), 'IBM-' || "id_docente")
-WHERE "codigo_ibm" IS NULL OR "codigo_ibm" = '';
-
-ALTER TABLE "docente"
-  ALTER COLUMN "codigo_ibm" SET NOT NULL;
-
 ALTER TABLE "docente"
   ADD CONSTRAINT "docente_codigo_ibm_key" UNIQUE ("codigo_ibm");
 
