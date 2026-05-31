@@ -127,6 +127,8 @@ async function main() {
     console.log('Configurando docentes...');
 
     const docentesDef = [
+      // Docente de prueba dedicado
+      { nombres: 'Docente', apellidos: 'De Prueba', email: 'docente@unt.edu.pe', modalidad: 'NOMBRADO', categoria: 'PRINCIPAL', antiguedad: 5 },
       // Ciclo I
       { nombres: 'Marcelino', apellidos: 'Torres Villanueva', email: 'mtorres@unt.edu.pe', modalidad: 'NOMBRADO', categoria: 'PRINCIPAL', antiguedad: 10 },
       { nombres: 'Alberto', apellidos: 'Mendoza de los Santos', email: 'amendoza@unt.edu.pe', modalidad: 'NOMBRADO', categoria: 'PRINCIPAL', antiguedad: 12 },
@@ -716,6 +718,57 @@ async function main() {
             estado: 'PUBLICADO',
             pendiente_ambiente: false,
             comentario: 'Bloque contiguo de prueba generado por seed',
+          },
+        });
+      }
+    }
+
+    // ============================================================
+    // 7.2. ASIGNACIÓN EXPLÍCITA AL DOCENTE DE PRUEBA
+    // ============================================================
+    const docentePrueba = docenteMap['docente@unt.edu.pe'];
+    if (docentePrueba) {
+      // Buscar los componentes del curso de Introducción a la Programación y Desarrollo Personal
+      const componentesPrueba = await prisma.curso_componente.findMany({
+        where: {
+          oferta: { curso: { codigo: { in: ['IS001', 'PS001'] } }, id_periodo: periodo.id }
+        },
+        include: { grupos: true }
+      });
+
+      for (const comp of componentesPrueba) {
+        if (!comp.grupos.length) continue;
+        const grupo = comp.grupos[0];
+        
+        await prisma.asignacion_docente_componente.upsert({
+          where: {
+            id_componente_id_docente: {
+              id_componente: comp.id,
+              id_docente: docentePrueba.id
+            }
+          } as any,
+          update: { horas_asignadas: comp.horas_requeridas },
+          create: {
+            id_componente: comp.id,
+            id_docente: docentePrueba.id,
+            horas_asignadas: comp.horas_requeridas,
+          }
+        });
+
+        const ambiente = ambientesAula[0];
+        await prisma.bloque_horario.create({
+          data: {
+            id_periodo: periodo.id,
+            id_componente: comp.id,
+            id_docente: docentePrueba.id,
+            id_ambiente: ambiente?.id ?? null,
+            id_grupo: grupo.id,
+            dia_semana: 'LUNES',
+            hora_inicio: '08:00',
+            hora_fin: `${String(8 + Math.min(2, comp.horas_requeridas)).padStart(2, '0')}:00`,
+            estado: 'PUBLICADO',
+            pendiente_ambiente: false,
+            comentario: 'Bloque asignado al docente de prueba',
           },
         });
       }

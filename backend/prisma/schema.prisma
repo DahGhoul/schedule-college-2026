@@ -23,6 +23,7 @@ enum DedicacionDocente {
   TIEMPO_PARCIAL_16H
   TIEMPO_PARCIAL_12H
   TIEMPO_PARCIAL_10H
+  TIEMPO_PARCIAL_8H
 }
 
 enum TipoGrupo {
@@ -140,7 +141,7 @@ model docente {
   atenciones        atencion_docente[]
   declaraciones     declaracion_carga[]
   carga_no_lectiva  carga_no_lectiva[]
-  horario_personal  horario_personal_docente[]
+
   asignaciones_sede asignacion_sede[]
   formatos          formato_generado[]
 
@@ -167,7 +168,7 @@ model periodo_academico {
   bloques         bloque_horario[]
   declaraciones   declaracion_carga[]
   cargas_no_lectivas carga_no_lectiva[]
-  horarios_personales horario_personal_docente[]
+
   asignaciones_sede asignacion_sede[]
   formatos        formato_generado[]
 
@@ -390,7 +391,7 @@ model declaracion_carga {
   observaciones           String?           @db.Text
 
   secciones       carga_no_lectiva[]
-  horario_personal horario_personal_docente[]
+
   formatos        formato_generado[]
 
   @@unique([id_docente, id_periodo])
@@ -419,24 +420,7 @@ model carga_no_lectiva {
   @@map("carga_no_lectiva")
 }
 
-model horario_personal_docente {
-  id                  Int               @id @default(autoincrement()) @map("id_horario_personal")
-  id_docente          Int
-  docente             docente           @relation(fields: [id_docente], references: [id])
-  id_periodo          Int
-  periodo             periodo_academico  @relation(fields: [id_periodo], references: [id])
-  id_declaracion      Int
-  declaracion         declaracion_carga  @relation(fields: [id_declaracion], references: [id], onDelete: Cascade)
-  seccion_no_lectiva  SeccionNoLectiva
-  dia_semana          String            @db.VarChar(15)
-  hora_inicio         String            @db.VarChar(5)
-  hora_fin            String            @db.VarChar(5)
-  descripcion         String?           @db.Text
-  fecha_registro      DateTime          @default(now()) @db.Timestamp
 
-  @@index([id_docente, dia_semana])
-  @@map("horario_personal_docente")
-}
 
 model asignacion_sede {
   id                        Int               @id @default(autoincrement()) @map("id_asignacion_sede")
