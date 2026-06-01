@@ -121,9 +121,11 @@ model usuario {
 model docente {
   id                Int      @id @default(autoincrement()) @map("id_docente")
   codigo_ibm        String?  @unique @db.VarChar(20)
+  dni               String?  @unique @db.VarChar(20)
   nombres           String   @db.VarChar(100)
   apellidos         String   @db.VarChar(100)
   email             String   @unique @db.VarChar(150)
+  empleo            String?  @db.VarChar(150)
   telefono          String?  @db.VarChar(20)
   modalidad         String   @db.VarChar(20)   // NOMBRADO, CONTRATADO
   categoria         String   @db.VarChar(30)   // PRINCIPAL, ASOCIADO, AUXILIAR, JEFE_PRACTICA
@@ -328,7 +330,7 @@ model bloque_horario {
 
 model ambiente {
   id               Int                @id @default(autoincrement()) @map("id_ambiente")
-  codigo           String             @unique @db.VarChar(20)
+  codigo           String             @unique @db.VarChar(100)
   tipo             String             @db.VarChar(20)   // AULA, LABORATORIO
   capacidad        Int                @default(40)
   piso             Int?
