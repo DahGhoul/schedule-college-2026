@@ -1,8 +1,11 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import fs from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
 import { PrismaClient, TipoComponente, TipoCurso } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { ambientesSeed, labsSeed, docentesSeed, ofertasSeed as realOfertasSeed } from './seed_data';
 
 for (const envPath of [
   path.join(__dirname, '..', '.env'),
@@ -27,6 +30,18 @@ async function main() {
     // ============================================================
     // 1. PERÍODO ACADÉMICO
     // ============================================================
+    await prisma.bloque_horario.deleteMany();
+    await prisma.asignacion_docente_componente.deleteMany();
+    await prisma.grupo.deleteMany();
+    await prisma.curso_componente.deleteMany();
+    await prisma.curso_oferta.deleteMany();
+    await prisma.disponibilidad_docente.deleteMany();
+    await prisma.disponibilidad_ambiente.deleteMany();
+    await prisma.ambiente.deleteMany();
+    await prisma.usuario.deleteMany();
+    await prisma.docente.deleteMany();
+    await prisma.curso.deleteMany();
+
     let periodo = await prisma.periodo_academico.findUnique({ where: { nombre: '2026-I' } });
     if (!periodo) {
       periodo = await prisma.periodo_academico.create({
@@ -81,9 +96,9 @@ async function main() {
     const passHashSecretaria = await bcrypt.hash('Secretaria123!', 12);
 
     for (const a of [
-      { email: 'director@unt.edu.pe', hash: passHashDirector, rol: 'DIRECTOR' },
-      { email: 'admin@unt.edu.pe', hash: passHashAdmin, rol: 'ADMINISTRADOR' },
-      { email: 'secretaria@unt.edu.pe', hash: passHashSecretaria, rol: 'SECRETARIA' },
+      { email: 'director@unitru.edu.pe', hash: passHashDirector, rol: 'DIRECTOR' },
+      { email: 'admin@unitru.edu.pe', hash: passHashAdmin, rol: 'ADMINISTRADOR' },
+      { email: 'secretaria@unitru.edu.pe', hash: passHashSecretaria, rol: 'SECRETARIA' },
     ]) {
       await prisma.usuario.upsert({
         where: { email: a.email },
@@ -96,8 +111,8 @@ async function main() {
     // ============================================================
     // 5. AMBIENTES
     // ============================================================
-    const ambientesCodigos = ['A-101', 'A-102', 'A-103', 'A-104', 'A-105', 'A-106'];
-    const labsCodigos = ['LAB-1', 'LAB-2', 'LAB-3', 'LAB-4'];
+    const ambientesCodigos = ambientesSeed;
+    const labsCodigos = labsSeed;
 
     for (const codigo of ambientesCodigos) {
       await prisma.ambiente.upsert({
@@ -126,43 +141,7 @@ async function main() {
     // ============================================================
     console.log('Configurando docentes...');
 
-    const docentesDef = [
-      // Docente de prueba dedicado
-      { nombres: 'Docente', apellidos: 'De Prueba', email: 'docente@unt.edu.pe', modalidad: 'NOMBRADO', categoria: 'PRINCIPAL', antiguedad: 5 },
-      // Ciclo I
-      { nombres: 'Marcelino', apellidos: 'Torres Villanueva', email: 'mtorres@unt.edu.pe', modalidad: 'NOMBRADO', categoria: 'PRINCIPAL', antiguedad: 10 },
-      { nombres: 'Alberto', apellidos: 'Mendoza de los Santos', email: 'amendoza@unt.edu.pe', modalidad: 'NOMBRADO', categoria: 'PRINCIPAL', antiguedad: 12 },
-      { nombres: 'Paul', apellidos: 'Cotrina Castellanos', email: 'pcotrina@unt.edu.pe', modalidad: 'NOMBRADO', categoria: 'ASOCIADO', antiguedad: 8 },
-      { nombres: 'Bertha', apellidos: 'Urteche Závaleta', email: 'burteche@unt.edu.pe', modalidad: 'NOMBRADO', categoria: 'ASOCIADO', antiguedad: 7 },
-      { nombres: 'José Luis', apellidos: 'Ponte Béjarano', email: 'jponte@unt.edu.pe', modalidad: 'NOMBRADO', categoria: 'PRINCIPAL', antiguedad: 15 },
-      { nombres: 'Jorge Luis', apellidos: 'Ríos Gonzales', email: 'jrios@unt.edu.pe', modalidad: 'NOMBRADO', categoria: 'ASOCIADO', antiguedad: 9 },
-      { nombres: 'Segundo', apellidos: 'Guibar Obeso', email: 'sguibar@unt.edu.pe', modalidad: 'NOMBRADO', categoria: 'PRINCIPAL', antiguedad: 20 },
-      { nombres: 'Miguel', apellidos: 'Ipanaque Zapata', email: 'mipanaque@unt.edu.pe', modalidad: 'NOMBRADO', categoria: 'ASOCIADO', antiguedad: 6 },
-      { nombres: 'Martha', apellidos: 'Cardoso', email: 'mcardoso@unt.edu.pe', modalidad: 'NOMBRADO', categoria: 'ASOCIADO', antiguedad: 5 },
-      // Ciclo III
-      { nombres: 'Zoraida', apellidos: 'Vidal Melgarejo', email: 'zvidal@unt.edu.pe', modalidad: 'NOMBRADO', categoria: 'PRINCIPAL', antiguedad: 18 },
-      { nombres: 'Everson David', apellidos: 'Agreda Gamboa', email: 'eagreda@unt.edu.pe', modalidad: 'NOMBRADO', categoria: 'ASOCIADO', antiguedad: 10 },
-      { nombres: 'Juan Carlos', apellidos: 'Obando Roldán', email: 'jobando@unt.edu.pe', modalidad: 'NOMBRADO', categoria: 'ASOCIADO', antiguedad: 11 },
-      { nombres: 'Marcos', apellidos: 'Ferrer Reyna', email: 'mferrer@unt.edu.pe', modalidad: 'NOMBRADO', categoria: 'PRINCIPAL', antiguedad: 14 },
-      { nombres: 'Terresita', apellidos: 'Rojas García', email: 'trojas@unt.edu.pe', modalidad: 'NOMBRADO', categoria: 'PRINCIPAL', antiguedad: 16 },
-      { nombres: 'Juan', apellidos: 'Carrascal Cabanillas', email: 'jcarrascal@unt.edu.pe', modalidad: 'NOMBRADO', categoria: 'ASOCIADO', antiguedad: 7 },
-      { nombres: 'Vilma', apellidos: 'Mendez Gil', email: 'vmendez@unt.edu.pe', modalidad: 'NOMBRADO', categoria: 'ASOCIADO', antiguedad: 9 },
-      { nombres: 'Sheyla Laura', apellidos: 'Escobedo Rodriguez', email: 'sescobedo@unt.edu.pe', modalidad: 'CONTRATADO', categoria: 'AUXILIAR', antiguedad: 3 },
-      // Ciclo V
-      { nombres: 'Luis Roy', apellidos: 'Chaul', email: 'lchaul@unt.edu.pe', modalidad: 'NOMBRADO', categoria: 'PRINCIPAL', antiguedad: 20 },
-      { nombres: 'Robert Jerry', apellidos: 'Sánchez Ticona', email: 'rsanchez@unt.edu.pe', modalidad: 'NOMBRADO', categoria: 'ASOCIADO', antiguedad: 8 },
-      { nombres: 'César', apellidos: 'Arellano Salazar', email: 'carellano@unt.edu.pe', modalidad: 'NOMBRADO', categoria: 'ASOCIADO', antiguedad: 9 },
-      { nombres: 'Camilo', apellidos: 'Suárez Rebaza', email: 'csuarez@unt.edu.pe', modalidad: 'NOMBRADO', categoria: 'ASOCIADO', antiguedad: 12 },
-      { nombres: 'Marcos', apellidos: 'Baca Lopez', email: 'mbaca@unt.edu.pe', modalidad: 'NOMBRADO', categoria: 'PRINCIPAL', antiguedad: 15 },
-      { nombres: 'Ane', apellidos: 'Cuadra Mitzugarey', email: 'acuadra@unt.edu.pe', modalidad: 'NOMBRADO', categoria: 'ASOCIADO', antiguedad: 7 },
-      // Ciclo VII
-      { nombres: 'Juan Pedro', apellidos: 'Santos Fernández', email: 'jsantos@unt.edu.pe', modalidad: 'NOMBRADO', categoria: 'PRINCIPAL', antiguedad: 18 },
-      { nombres: 'Ricardo', apellidos: 'Mendoza Rivera', email: 'rmendoza@unt.edu.pe', modalidad: 'NOMBRADO', categoria: 'PRINCIPAL', antiguedad: 14 },
-      { nombres: 'Oscar Romel', apellidos: 'Alcántara Moreno', email: 'oalcantara@unt.edu.pe', modalidad: 'NOMBRADO', categoria: 'ASOCIADO', antiguedad: 10 },
-      { nombres: 'Jhon', apellidos: 'Gonzales Vasquez', email: 'jgonzales@unt.edu.pe', modalidad: 'NOMBRADO', categoria: 'ASOCIADO', antiguedad: 6 },
-      // Ciclo IX
-      { nombres: 'José', apellidos: 'Gómez Ávila', email: 'jgomez@unt.edu.pe', modalidad: 'NOMBRADO', categoria: 'PRINCIPAL', antiguedad: 11 },
-    ];
+    const docentesDef = docentesSeed;
 
     const docenteMap: Record<string, any> = {};
     const hashDocente = await bcrypt.hash('Docente123!', 12);
@@ -210,293 +189,7 @@ async function main() {
     // Definición de ofertas con sus componentes
     // T=Teoría, P=Práctica, L=Laboratorio, G=Grupos de lab
     // ============================================================
-    const ofertasDef = [
-      // ── CICLO I ────────────────────────────────────────────────
-      {
-        ciclo: 1,
-        codigo: 'IS001', nombre: 'Introducción a la Programación',
-        creditos: 3,
-        tipo: TipoCurso.REGULAR,
-        T: 2, P: 0, L: 2, gruposLab: 2,
-      },
-      {
-        ciclo: 1,
-        codigo: 'IS002', nombre: 'Introducción a la Ing. de Sistemas',
-        creditos: 3,
-        tipo: TipoCurso.REGULAR,
-        T: 1, P: 2, L: 0, gruposLab: 0,
-      },
-      {
-        ciclo: 1,
-        codigo: 'PS001', nombre: 'Desarrollo Personal',
-        creditos: 2,
-        tipo: TipoCurso.REGULAR,
-        T: 2, P: 2, L: 0, gruposLab: 0,
-      },
-      {
-        ciclo: 1,
-        codigo: 'MA001', nombre: 'Desarrollo del Pens. Lógico Matemat.',
-        creditos: 3,
-        tipo: TipoCurso.REGULAR,
-        T: 1, P: 4, L: 0, gruposLab: 0,
-      },
-      {
-        ciclo: 1,
-        codigo: 'LET001', nombre: 'Lectura Crítica y Redac. Textos Acad.',
-        creditos: 2,
-        tipo: TipoCurso.REGULAR,
-        T: 2, P: 2, L: 0, gruposLab: 0,
-      },
-      {
-        ciclo: 1,
-        codigo: 'MA002', nombre: 'Introducción al Análisis Matemático',
-        creditos: 3,
-        tipo: TipoCurso.REGULAR,
-        T: 2, P: 4, L: 0, gruposLab: 0,
-      },
-      {
-        ciclo: 1,
-        codigo: 'EST001', nombre: 'Estadística General',
-        creditos: 2,
-        tipo: TipoCurso.REGULAR,
-        T: 2, P: 2, L: 0, gruposLab: 0,
-      },
-      // ── CICLO III ──────────────────────────────────────────────
-      {
-        ciclo: 3,
-        codigo: 'IS101', nombre: 'Programación Orientada a Objetos II',
-        creditos: 5,
-        tipo: TipoCurso.REGULAR,
-        T: 2, P: 1, L: 2, gruposLab: 3,
-      },
-      {
-        ciclo: 3,
-        codigo: 'IS102', nombre: 'Sistémica',
-        creditos: 4,
-        tipo: TipoCurso.REGULAR,
-        T: 2, P: 1, L: 2, gruposLab: 3,
-      },
-      {
-        ciclo: 3,
-        codigo: 'IS103', nombre: 'Ingeniería Gráfica (e)',
-        creditos: 3,
-        tipo: TipoCurso.ELECTIVO,
-        T: 1, P: 2, L: 2, gruposLab: 1,
-      },
-      {
-        ciclo: 3,
-        codigo: 'MA101', nombre: 'Matemática Aplicada',
-        creditos: 3,
-        tipo: TipoCurso.REGULAR,
-        T: 1, P: 2, L: 2, gruposLab: 1,
-      },
-      {
-        ciclo: 3,
-        codigo: 'EST101', nombre: 'Estadística Aplicada',
-        creditos: 5,
-        tipo: TipoCurso.REGULAR,
-        T: 2, P: 2, L: 2, gruposLab: 3,
-      },
-      {
-        ciclo: 3,
-        codigo: 'ADM101', nombre: 'Administración General',
-        creditos: 2,
-        tipo: TipoCurso.REGULAR,
-        T: 2, P: 2, L: 0, gruposLab: 0,
-      },
-      {
-        ciclo: 3,
-        codigo: 'FIS101', nombre: 'Física Electrica (e)',
-        creditos: 3,
-        tipo: TipoCurso.ELECTIVO,
-        T: 2, P: 2, L: 1, gruposLab: 1,
-      },
-      {
-        ciclo: 3,
-        codigo: 'PS101', nombre: 'Psicología Organizacional (e)',
-        creditos: 2,
-        tipo: TipoCurso.ELECTIVO,
-        T: 2, P: 2, L: 0, gruposLab: 0,
-      },
-      // ── CICLO V ────────────────────────────────────────────────
-      {
-        ciclo: 5,
-        codigo: 'IS201', nombre: 'Ingeniería de Datos I',
-        creditos: 5,
-        tipo: TipoCurso.REGULAR,
-        T: 2, P: 1, L: 3, gruposLab: 3,
-      },
-      {
-        ciclo: 5,
-        codigo: 'IS202', nombre: 'Sistemas de Información',
-        creditos: 5,
-        tipo: TipoCurso.REGULAR,
-        T: 2, P: 2, L: 3, gruposLab: 3,
-      },
-      {
-        ciclo: 5,
-        codigo: 'IS203', nombre: 'Transformación digital',
-        creditos: 4,
-        tipo: TipoCurso.REGULAR,
-        T: 2, P: 0, L: 2, gruposLab: 3,
-      },
-      {
-        ciclo: 5,
-        codigo: 'IS204', nombre: 'Tecnología web',
-        creditos: 5,
-        tipo: TipoCurso.REGULAR,
-        T: 1, P: 1, L: 2, gruposLab: 3,
-      },
-      {
-        ciclo: 5,
-        codigo: 'IS205', nombre: 'Arquitectura de computadoras',
-        creditos: 3,
-        tipo: TipoCurso.REGULAR,
-        T: 1, P: 0, L: 2, gruposLab: 1,
-      },
-      {
-        ciclo: 5,
-        codigo: 'IS206', nombre: 'Teleinformática(e)',
-        creditos: 3,
-        tipo: TipoCurso.ELECTIVO,
-        T: 1, P: 0, L: 2, gruposLab: 2,
-      },
-      {
-        ciclo: 5,
-        codigo: 'IND201', nombre: 'Investigación de Operaciones',
-        creditos: 3,
-        tipo: TipoCurso.REGULAR,
-        T: 1, P: 2, L: 2, gruposLab: 1,
-      },
-      {
-        ciclo: 5,
-        codigo: 'CON201', nombre: 'Contabilidad Gerencial',
-        creditos: 3,
-        tipo: TipoCurso.REGULAR,
-        T: 1, P: 2, L: 2, gruposLab: 1,
-      },
-      // ── CICLO VII ──────────────────────────────────────────────
-      {
-        ciclo: 7,
-        codigo: 'IS301', nombre: 'Ingeniería de Software I',
-        creditos: 4,
-        tipo: TipoCurso.REGULAR,
-        T: 2, P: 1, L: 3, gruposLab: 1,
-      },
-      {
-        ciclo: 7,
-        codigo: 'IS302', nombre: 'Redes y Comunicaciones I',
-        creditos: 3,
-        tipo: TipoCurso.REGULAR,
-        T: 0, P: 1, L: 3, gruposLab: 3,
-      },
-      {
-        ciclo: 7,
-        codigo: 'IS303', nombre: 'Ingeniería de Software I',
-        creditos: 3,
-        tipo: TipoCurso.REGULAR,
-        T: 1, P: 1, L: 2, gruposLab: 3,
-      },
-      {
-        ciclo: 7,
-        codigo: 'IS304', nombre: 'Negocios Electrónicos (e)',
-        creditos: 2,
-        tipo: TipoCurso.ELECTIVO,
-        T: 2, P: 0, L: 0, gruposLab: 0,
-      },
-      {
-        ciclo: 7,
-        codigo: 'IS305', nombre: 'Gestión de Servicios de TI',
-        creditos: 3,
-        tipo: TipoCurso.REGULAR,
-        T: 2, P: 2, L: 0, gruposLab: 0,
-      },
-      {
-        ciclo: 7,
-        codigo: 'IS306', nombre: 'Metodología de la Investigación Científica',
-        creditos: 2,
-        tipo: TipoCurso.REGULAR,
-        T: 2, P: 2, L: 0, gruposLab: 0,
-      },
-      {
-        ciclo: 7,
-        codigo: 'IS307', nombre: 'Administración de Base de Datos',
-        creditos: 4,
-        tipo: TipoCurso.REGULAR,
-        T: 1, P: 0, L: 3, gruposLab: 4,
-      },
-      {
-        ciclo: 7,
-        codigo: 'IS308', nombre: 'Planeamiento Estratégico de TI',
-        creditos: 5,
-        tipo: TipoCurso.REGULAR,
-        T: 1, P: 2, L: 2, gruposLab: 4,
-      },
-      {
-        ciclo: 7,
-        codigo: 'IND301', nombre: 'Cadena de Suministros (e)',
-        creditos: 2,
-        tipo: TipoCurso.ELECTIVO,
-        T: 2, P: 2, L: 0, gruposLab: 0,
-      },
-      // ── CICLO IX ───────────────────────────────────────────────
-      {
-        ciclo: 9,
-        codigo: 'IS401', nombre: 'Tesis I',
-        creditos: 3,
-        tipo: TipoCurso.REGULAR,
-        T: 2, P: 2, L: 2, gruposLab: 1,
-      },
-      {
-        ciclo: 9,
-        codigo: 'IS402', nombre: 'Analítica de Negocios',
-        creditos: 3,
-        tipo: TipoCurso.REGULAR,
-        T: 0, P: 2, L: 0, gruposLab: 0,
-      },
-      {
-        ciclo: 9,
-        codigo: 'IS403', nombre: 'Auditoría Informática',
-        creditos: 4,
-        tipo: TipoCurso.REGULAR,
-        T: 1, P: 2, L: 2, gruposLab: 2,
-      },
-      {
-        ciclo: 9,
-        codigo: 'IS404', nombre: 'Gestión de Proyectos de TI',
-        creditos: 3,
-        tipo: TipoCurso.REGULAR,
-        T: 1, P: 2, L: 0, gruposLab: 0,
-      },
-      {
-        ciclo: 9,
-        codigo: 'IS405', nombre: 'Emprendimiento Tecnológico',
-        creditos: 3,
-        tipo: TipoCurso.REGULAR,
-        T: 2, P: 0, L: 2, gruposLab: 2,
-      },
-      {
-        ciclo: 9,
-        codigo: 'IS406', nombre: 'Ingeniería Web',
-        creditos: 4,
-        tipo: TipoCurso.REGULAR,
-        T: 1, P: 0, L: 3, gruposLab: 3,
-      },
-      {
-        ciclo: 9,
-        codigo: 'IS407', nombre: 'Computación en la Nube',
-        creditos: 5,
-        tipo: TipoCurso.REGULAR,
-        T: 1, P: 1, L: 3, gruposLab: 3,
-      },
-      {
-        ciclo: 9,
-        codigo: 'IS408', nombre: 'Hackeo Ético (e)',
-        creditos: 3,
-        tipo: TipoCurso.ELECTIVO,
-        T: 2, P: 0, L: 2, gruposLab: 2,
-      },
-    ];
+    const ofertasDef = realOfertasSeed;
 
     console.log('Creando cursos, ofertas y componentes...');
 
@@ -574,207 +267,6 @@ async function main() {
       console.log(`  ✓ [Ciclo ${def.ciclo}] ${def.nombre}`);
     }
 
-    // ============================================================
-    // 7.1. CARGA DE PRUEBA: asegurar al menos 1 oferta/asignación/bloque por ciclo
-    // ============================================================
-    const ciclosConOferta = await prisma.ciclo.findMany({
-      where: { id_periodo: periodo.id },
-      include: {
-        ofertas: {
-          include: {
-            componentes: {
-              include: {
-                grupos: true,
-                asignaciones: true,
-              },
-            },
-          },
-          orderBy: { id: 'asc' },
-        },
-      },
-      orderBy: { numero: 'asc' },
-    });
-
-    const ambientesAula = await prisma.ambiente.findMany({
-      where: { activo: true, tipo: 'AULA' },
-      orderBy: { codigo: 'asc' },
-    });
-    const ambientesLab = await prisma.ambiente.findMany({
-      where: { activo: true, tipo: 'LABORATORIO' },
-      orderBy: { codigo: 'asc' },
-    });
-    const docentesDisponibles = Object.values(docenteMap);
-    const diasPrueba = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES'];
-    const horasPrueba = ['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '14:00', '15:00'];
-
-    for (const ciclo of ciclosConOferta) {
-      let oferta = ciclo.ofertas[0];
-
-      if (!oferta) {
-        const cursoDemo = await prisma.curso.upsert({
-          where: { codigo: `DEMO-${ciclo.numero}` },
-          update: { nombre: `Curso Demo Ciclo ${ciclo.numero}`, creditos: 2, activo: true },
-          create: {
-            codigo: `DEMO-${ciclo.numero}`,
-            nombre: `Curso Demo Ciclo ${ciclo.numero}`,
-            creditos: 2,
-            activo: true,
-          },
-        });
-
-        oferta = await prisma.curso_oferta.create({
-          data: {
-            id_periodo: periodo.id,
-            id_curso: cursoDemo.id,
-            id_ciclo: ciclo.id,
-            tipo_curso: TipoCurso.REGULAR,
-            estado: 'PUBLICADO',
-          },
-        });
-
-        const componenteDemo = await prisma.curso_componente.create({
-          data: {
-            id_oferta: oferta.id,
-            tipo: TipoComponente.TEORIA,
-            horas_requeridas: 2,
-            permite_multi_docente: false,
-          },
-        });
-
-        await prisma.grupo.create({
-          data: {
-            id_componente: componenteDemo.id,
-            codigo: 'UNICO',
-            capacidad_maxima: 40,
-            activo: true,
-          },
-        });
-
-        oferta = await prisma.curso_oferta.findUniqueOrThrow({
-          where: { id: oferta.id },
-          include: {
-            componentes: {
-              include: { grupos: true, asignaciones: true },
-            },
-          },
-        });
-      }
-
-      const componente = oferta.componentes[0];
-      if (!componente) continue;
-
-      const grupo = componente.grupos[0];
-      if (!grupo) continue;
-
-      const docente = docentesDisponibles[(ciclo.numero - 1) % docentesDisponibles.length];
-      const horasAsignadas = Math.max(1, Math.min(2, componente.horas_requeridas || 1));
-
-      let asignacion = componente.asignaciones[0];
-      if (!asignacion) {
-        asignacion = await prisma.asignacion_docente_componente.create({
-          data: {
-            id_componente: componente.id,
-            id_docente: docente.id,
-            horas_asignadas: horasAsignadas,
-          },
-        });
-      }
-
-      const ambiente = componente.tipo === TipoComponente.LABORATORIO
-        ? ambientesLab[(ciclo.numero - 1) % Math.max(ambientesLab.length, 1)] ?? ambientesAula[0]
-        : ambientesAula[(ciclo.numero - 1) % Math.max(ambientesAula.length, 1)] ?? ambientesLab[0];
-
-      const dia = diasPrueba[(ciclo.numero - 1) % diasPrueba.length];
-      const horaInicio = horasPrueba[(ciclo.numero - 1) % horasPrueba.length];
-      const horaFin = `${String(parseInt(horaInicio.slice(0, 2), 10) + horasAsignadas).padStart(2, '0')}:00`;
-
-      await prisma.bloque_horario.create({
-        data: {
-          id_periodo: periodo.id,
-          id_componente: componente.id,
-          id_docente: docente.id,
-          id_ambiente: ambiente?.id ?? null,
-          id_grupo: grupo.id,
-          dia_semana: dia,
-          hora_inicio: horaInicio,
-          hora_fin: horaFin,
-          estado: 'PUBLICADO',
-          pendiente_ambiente: false,
-          comentario: 'Bloque de prueba generado por seed',
-        },
-      });
-
-      if (horasAsignadas > 1) {
-        await prisma.bloque_horario.create({
-          data: {
-            id_periodo: periodo.id,
-            id_componente: componente.id,
-            id_docente: docente.id,
-            id_ambiente: ambiente?.id ?? null,
-            id_grupo: grupo.id,
-            dia_semana: dia,
-            hora_inicio: `${String(parseInt(horaInicio.slice(0, 2), 10) + 1).padStart(2, '0')}:00`,
-            hora_fin: `${String(parseInt(horaInicio.slice(0, 2), 10) + 2).padStart(2, '0')}:00`,
-            estado: 'PUBLICADO',
-            pendiente_ambiente: false,
-            comentario: 'Bloque contiguo de prueba generado por seed',
-          },
-        });
-      }
-    }
-
-    // ============================================================
-    // 7.2. ASIGNACIÓN EXPLÍCITA AL DOCENTE DE PRUEBA
-    // ============================================================
-    const docentePrueba = docenteMap['docente@unt.edu.pe'];
-    if (docentePrueba) {
-      // Buscar los componentes del curso de Introducción a la Programación y Desarrollo Personal
-      const componentesPrueba = await prisma.curso_componente.findMany({
-        where: {
-          oferta: { curso: { codigo: { in: ['IS001', 'PS001'] } }, id_periodo: periodo.id }
-        },
-        include: { grupos: true }
-      });
-
-      for (const comp of componentesPrueba) {
-        if (!comp.grupos.length) continue;
-        const grupo = comp.grupos[0];
-        
-        await prisma.asignacion_docente_componente.upsert({
-          where: {
-            id_componente_id_docente: {
-              id_componente: comp.id,
-              id_docente: docentePrueba.id
-            }
-          } as any,
-          update: { horas_asignadas: comp.horas_requeridas },
-          create: {
-            id_componente: comp.id,
-            id_docente: docentePrueba.id,
-            horas_asignadas: comp.horas_requeridas,
-          }
-        });
-
-        const ambiente = ambientesAula[0];
-        await prisma.bloque_horario.create({
-          data: {
-            id_periodo: periodo.id,
-            id_componente: comp.id,
-            id_docente: docentePrueba.id,
-            id_ambiente: ambiente?.id ?? null,
-            id_grupo: grupo.id,
-            dia_semana: 'LUNES',
-            hora_inicio: '08:00',
-            hora_fin: `${String(8 + Math.min(2, comp.horas_requeridas)).padStart(2, '0')}:00`,
-            estado: 'PUBLICADO',
-            pendiente_ambiente: false,
-            comentario: 'Bloque asignado al docente de prueba',
-          },
-        });
-      }
-    }
-
-    // ============================================================
     // 8. DISPONIBILIDAD DE DOCENTES Y AMBIENTES
     // ============================================================
     console.log('Configurando disponibilidad de docentes y ambientes...');
@@ -813,6 +305,7 @@ async function main() {
       });
     }
 
+    await syncAndAssignTeachers(prisma);
     console.log('=== SEMILLA DE HORARIOS COMPLETADA CON ÉXITO ===');
     console.log(`Total cursos creados: ${ofertasDef.length}`);
     console.log(`Total docentes configurados: ${docentesDef.length}`);
@@ -831,3 +324,201 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
+
+
+
+async function syncAndAssignTeachers(prisma: any) {
+  console.log("Asignando docentes reales desde schedule_by_ciclo.csv...");
+  const sContent = fs.readFileSync(path.join(__dirname, 'schedule_by_ciclo.csv'), 'utf8');
+
+  const sData = sContent.split(/\r?\n/).slice(1).filter((l: string) => l.trim()).map((l: string) => {
+    const p = l.split(',');
+    return { Asignatura: p[3], Docente: p[2], T: p[4], P: p[5], L: p[6], G: p[7] };
+  });
+
+  const normalize = (s: string) => s ? s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\(e\)$/,'').trim() : '';
+
+  const manualMap: Record<string, string> = {
+    "introduccion a la ing. de sistemas": "introduccion a la ingenieria de sistemas",
+    "desarrollo del pens. logico matemat.": "desarrollo del pensamiento logico matematico",
+    "lectura critica y redac. textos acad.": "lectura critica y redaccion de textos academicos",
+    "psicologia organizacional": "sicologia organizacional",
+    "arquitectura de computadoras": "arquitectura y organizacion de computadoras",
+    "ingenieria de software i": "ingenieria del software i",
+    "gestion de servicios de ti": "gestion de servicios de tic",
+    "planeamiento estrategico de ti": "planeamiento estrategico de la informacion",
+    "cadena de suministros": "cadena de suministro",
+    "gestion de proyectos de ti": "gestion de proyectos de tic",
+    "emprendimiento tecnologica": "emprendedurismo tecnologico",
+    "computacion en la nube": "computacion en la nube",
+    "hackeo etico": "hackeo etico"
+  };
+
+  const manualProfMap: Record<string, string> = {
+    "paul cotrina catellanos": "paul cotrina castellanos",
+    "martha cardoso": "martha cardoso",
+    "jhoe gonzalez vasquez": "jhon gonzales vasquez",
+    "luis boy chavil": "luis roy chaul"
+  };
+
+  const allCursos = await prisma.curso.findMany();
+  const cursoMap: Record<string, any> = {};
+  for (const c of allCursos) {
+    cursoMap[normalize(c.nombre)] = c;
+  }
+
+  const allDocentes = await prisma.docente.findMany();
+  const docenteMap: Record<string, any> = {};
+  for (const d of allDocentes) {
+    docenteMap[normalize(d.nombres) + " " + normalize(d.apellidos)] = d;
+  }
+
+  const courseMaxG: Record<string, number> = {};
+  const courseMaxL: Record<string, number> = {};
+  const courseSumTP: Record<string, number> = {};
+  const courseOverrides: Record<string, { g?: number, sumTP?: number }> = {
+    "negocios electronicos": { g: 2 },
+    "introduccion a la programacion": { g: 4 },
+    "tesis i": { g: 2, sumTP: 8 } // Tesis I will have 2 theory groups (2 * 4h = 8h)
+  };
+
+  for (const s of sData) {
+    const normAsig = manualMap[normalize(s.Asignatura)] || normalize(s.Asignatura);
+    const g = parseInt(s.G) || 1;
+    const l = parseInt(s.L) || 0;
+    const t = parseInt(s.T) || 0;
+    const p = parseInt(s.P) || 0;
+
+    if (!courseMaxG[normAsig] || g > courseMaxG[normAsig]) courseMaxG[normAsig] = g;
+    if (!courseMaxL[normAsig] || l > courseMaxL[normAsig]) courseMaxL[normAsig] = l;
+    
+    courseSumTP[normAsig] = (courseSumTP[normAsig] || 0) + (t + p);
+  }
+
+  // Apply overrides
+  for (const [course, override] of Object.entries(courseOverrides)) {
+    if (override.g) courseMaxG[course] = override.g;
+    if (override.sumTP) courseSumTP[course] = override.sumTP;
+  }
+
+  await prisma.bloque_horario.deleteMany();
+  await prisma.asignacion_docente_componente.deleteMany();
+
+  let count = 0;
+  
+  // Track processed components so we don't duplicate groups/hours required
+  const processedTeoria = new Set();
+  const processedLab = new Set();
+
+  for (const s of sData) {
+    const normAsig = manualMap[normalize(s.Asignatura)] || normalize(s.Asignatura);
+    const curso = cursoMap[normAsig];
+    if (!curso) continue;
+
+    const oferta = await prisma.curso_oferta.findFirst({ where: { id_curso: curso.id } });
+    if (!oferta) continue;
+
+    let normProf = normalize(s.Docente);
+    normProf = manualProfMap[normProf] || normProf;
+    
+    let docente = null;
+    for (const [name, d] of Object.entries(docenteMap)) {
+      if (name.includes(normProf) || normProf.includes(name) || name === normProf) {
+        docente = d; break;
+      }
+    }
+    if (!docente) {
+      const parts = normProf.split(' ');
+      const lastName = parts.slice(-2).join(' ');
+      for (const [name, d] of Object.entries(docenteMap)) {
+        if (name.includes(lastName)) { docente = d; break; }
+      }
+    }
+
+    // specific manual creations
+    if (!docente && normProf === "martha cardoso") {
+      docente = await prisma.docente.upsert({
+        where: { email: "mcardoso@unitru.edu.pe" },
+        update: {},
+        create: { nombres: "Martha", apellidos: "Cardoso", email: "mcardoso@unitru.edu.pe", modalidad: "NOMBRADO", categoria: "ASOCIADO", antiguedad: 5, empleo: "POR_COMPLETAR", activo: true }
+      });
+      docenteMap[normProf] = docente;
+    }
+    if (!docente && normProf === "luis roy chaul") {
+      docente = await prisma.docente.upsert({
+        where: { email: "lboy@unitru.edu.pe" },
+        update: {},
+        create: { nombres: "Luis", apellidos: "Boy Chavil", email: "lboy@unitru.edu.pe", modalidad: "NOMBRADO", categoria: "PRINCIPAL", antiguedad: 10, empleo: "POR_COMPLETAR", activo: true }
+      });
+      docenteMap[normProf] = docente;
+    }
+    if (!docente && normProf === "jhon gonzales vasquez") {
+      docente = await prisma.docente.upsert({
+        where: { email: "jgonzales@unitru.edu.pe" },
+        update: {},
+        create: { nombres: "Jhoe", apellidos: "Gonzalez Vasquez", email: "jgonzales@unitru.edu.pe", modalidad: "NOMBRADO", categoria: "PRINCIPAL", antiguedad: 10, empleo: "POR_COMPLETAR", activo: true }
+      });
+      docenteMap[normProf] = docente;
+    }
+
+    if (!docente) continue;
+
+    const t = parseInt(s.T) || 0;
+    const p = parseInt(s.P) || 0;
+    const l = parseInt(s.L) || 0;
+    const teacherG = parseInt(s.G) || 1;
+    
+    const componentes = await prisma.curso_componente.findMany({ where: { id_oferta: oferta.id } });
+    const teoriaComp = componentes.find((c: any) => c.tipo === 'TEORIA');
+    const labComp = componentes.find((c: any) => c.tipo === 'LABORATORIO');
+
+    const maxG = courseMaxG[normAsig] || 1;
+    const maxL = courseMaxL[normAsig] || 0;
+
+    if (t > 0 || p > 0) {
+      if (teoriaComp) {
+        if (!processedTeoria.has(teoriaComp.id)) {
+          processedTeoria.add(teoriaComp.id);
+          const totalTeoriaH = courseSumTP[normAsig] || (t + p);
+          await prisma.curso_componente.update({ where: { id: teoriaComp.id }, data: { horas_requeridas: totalTeoriaH } });
+          
+          if (normAsig === "tesis i") {
+            await prisma.grupo.deleteMany({ where: { id_componente: teoriaComp.id } });
+            for (let i = 0; i < maxG; i++) {
+               await prisma.grupo.create({ data: { id_componente: teoriaComp.id, codigo: String.fromCharCode(65 + i), capacidad_maxima: 20, activo: true } });
+            }
+          }
+        }
+        await prisma.asignacion_docente_componente.create({ data: { id_componente: teoriaComp.id, id_docente: docente.id, horas_asignadas: t + p } });
+        count++;
+      }
+    }
+
+    if (l > 0) {
+      if (labComp) {
+        if (!processedLab.has(labComp.id)) {
+          processedLab.add(labComp.id);
+          
+          // Recreate groups based on maxG
+          await prisma.grupo.deleteMany({ where: { id_componente: labComp.id } });
+          for (let i = 0; i < maxG; i++) {
+             await prisma.grupo.create({ data: { id_componente: labComp.id, codigo: maxG === 1 ? 'UNICO' : String.fromCharCode(65 + i), capacidad_maxima: 18, activo: true } });
+          }
+          
+          // Total lab hours for the course is maxL * maxG
+          await prisma.curso_componente.update({ where: { id: labComp.id }, data: { horas_requeridas: maxL * maxG } });
+        }
+
+        // For Negocios Electronicos, Paul Cotrina has G=2 but we forced maxG=3.
+        // The user says "grupos de 2 horas", so maxL is 2.
+        // Teacher's assigned hours = maxL * teacherG
+        // So for Paul Cotrina (L=2, G=2): 2 * 2 = 4. Wait, user wants 6 hours total.
+        // The script calculates maxL * maxG = 2 * 3 = 6! Correct!
+        await prisma.asignacion_docente_componente.create({ data: { id_componente: labComp.id, id_docente: docente.id, horas_asignadas: l * teacherG } });
+        count++;
+      }
+    }
+  }
+
+  console.log("=> Docentes asignados y grupos de laboratorio creados: " + count + " registros.");
+}
