@@ -2,13 +2,13 @@ import { TipoCurso } from '@prisma/client';
 
 export const ambientesSeed = [
   "Audiovisuales",
-  "Pabellón Ing. Industrial",
-  "Pabellón Ing. Industrial (I I - 2)",
-  "Pabellón Ing. Industrial (I-4)",
+  "Pabellon Industrial",
+  "Pabellon Ind I-2",
+  "Pabellon Ind I-4",
   "Posgrado A-303",
   "Posgrado A-307",
   "Posgrado A-311",
-  "Taller de Confecciones - Ing. Industrial"
+  "Taller Confecciones"
 ];
 
 

@@ -146,11 +146,13 @@ async function main() {
     const docenteMap: Record<string, any> = {};
     const hashDocente = await bcrypt.hash('Docente123!', 12);
 
-    for (const def of docentesDef) {
+    for (const [index, def] of docentesDef.entries()) {
+      const codigoIbm = `IBM-${String(index + 1).padStart(3, '0')}`;
       const doc = await prisma.docente.upsert({
         where: { email: def.email },
-        update: {},
+        update: { codigo_ibm: codigoIbm },
         create: {
+          codigo_ibm: codigoIbm,
           nombres: def.nombres,
           apellidos: def.apellidos,
           email: def.email,
@@ -440,7 +442,7 @@ async function syncAndAssignTeachers(prisma: any) {
       docente = await prisma.docente.upsert({
         where: { email: "mcardoso@unitru.edu.pe" },
         update: {},
-        create: { nombres: "Martha", apellidos: "Cardoso", email: "mcardoso@unitru.edu.pe", modalidad: "NOMBRADO", categoria: "ASOCIADO", antiguedad: 5, empleo: "POR_COMPLETAR", activo: true }
+        create: { nombres: "Martha", apellidos: "Cardoso", email: "mcardoso@unitru.edu.pe", modalidad: "NOMBRADO", categoria: "ASOCIADO", antiguedad: 5, activo: true }
       });
       docenteMap[normProf] = docente;
     }
@@ -448,7 +450,7 @@ async function syncAndAssignTeachers(prisma: any) {
       docente = await prisma.docente.upsert({
         where: { email: "lboy@unitru.edu.pe" },
         update: {},
-        create: { nombres: "Luis", apellidos: "Boy Chavil", email: "lboy@unitru.edu.pe", modalidad: "NOMBRADO", categoria: "PRINCIPAL", antiguedad: 10, empleo: "POR_COMPLETAR", activo: true }
+        create: { nombres: "Luis", apellidos: "Boy Chavil", email: "lboy@unitru.edu.pe", modalidad: "NOMBRADO", categoria: "PRINCIPAL", antiguedad: 10, activo: true }
       });
       docenteMap[normProf] = docente;
     }
@@ -456,7 +458,7 @@ async function syncAndAssignTeachers(prisma: any) {
       docente = await prisma.docente.upsert({
         where: { email: "jgonzales@unitru.edu.pe" },
         update: {},
-        create: { nombres: "Jhoe", apellidos: "Gonzalez Vasquez", email: "jgonzales@unitru.edu.pe", modalidad: "NOMBRADO", categoria: "PRINCIPAL", antiguedad: 10, empleo: "POR_COMPLETAR", activo: true }
+        create: { nombres: "Jhoe", apellidos: "Gonzalez Vasquez", email: "jgonzales@unitru.edu.pe", modalidad: "NOMBRADO", categoria: "PRINCIPAL", antiguedad: 10, activo: true }
       });
       docenteMap[normProf] = docente;
     }
