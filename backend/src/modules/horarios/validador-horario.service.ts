@@ -181,16 +181,29 @@ export class ValidadorHorario {
           estado: { in: ['BORRADOR', 'CONFIRMADO', 'PUBLICADO'] },
           NOT: { id_docente: idDocente },
         },
-        include: { componente: true }
+        include: {
+          componente: {
+            include: {
+              oferta: {
+                include: {
+                  curso: true,
+                },
+              },
+            },
+          },
+          ambiente: true,
+        }
       });
 
       if (conflictoAmbiente) {
-        const esLabActual = componente?.tipo === 'LABORATORIO';
-        const esLabConflicto = conflictoAmbiente.componente.tipo === 'LABORATORIO';
         const esAmbienteLab = ambiente?.tipo === 'LABORATORIO';
+        const cursoOcupante = conflictoAmbiente.componente.oferta.curso.nombre;
 
-        // EXCEPCIÓN: Se permite compartir si es ambiente de laboratorio y ambos son componentes de LABORATORIO
-        if (!(esAmbienteLab && esLabActual && esLabConflicto)) {
+        if (esAmbienteLab) {
+          conflictos.push(
+            `Laboratorio ocupado en esa hora y el curso que lo está ocupando: ${cursoOcupante}`
+          );
+        } else {
           conflictos.push(
             `Conflicto: El ambiente ${ambiente?.codigo || sel.idAmbiente} ya está ocupado el ${sel.diaSemana} a las ${sel.horaInicio}`
           );
