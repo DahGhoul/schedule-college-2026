@@ -8,13 +8,68 @@ function formatearFranjaHora(horaInicio: string): string {
   return `${Number(horas)}:${minutos} - ${Number(horaFinal)}:${minutos}`;
 }
 
+function obtenerClaveFusionPdf(bloque: any): string {
+  return `${bloque.dia_semana}-${bloque.id_docente}-${bloque.componente.id_oferta}-${bloque.componente.tipo}`;
+}
+
+function formatearEtiquetaCeldaPdf(registro: any, bloque: any): string {
+  const ambienteEtiqueta = bloque?.ambiente?.codigo || 'Solic.';
+  if (!registro) {
+    return ambienteEtiqueta;
+  }
+
+  return [String(registro.indice), registro.cursoNombre, ambienteEtiqueta].filter(Boolean).join('\n');
+}
+
+function calcularFusionPdf(
+  contexto: Record<string, Array<{ bloque: any }>>,
+  dia: string,
+  horaIndex: number,
+  horas: string[],
+  bloque: any
+): number {
+  const clave = obtenerClaveFusionPdf(bloque);
+  let span = 1;
+
+  for (let siguienteIndex = horaIndex + 1; siguienteIndex < horas.length; siguienteIndex++) {
+    const siguienteEntradas = contexto[`${dia}-${horas[siguienteIndex]}`] ?? [];
+    if (siguienteEntradas.length !== 1) break;
+
+    const siguienteBloque = siguienteEntradas[0].bloque;
+    if (obtenerClaveFusionPdf(siguienteBloque) !== clave) break;
+
+    span += 1;
+  }
+
+  return span;
+}
+
+function dibujarCajaInfoPeriodo(
+  doc: PDFDocumentWithTable,
+  leftColX: number,
+  topMargin: number,
+  width: number,
+  height: number,
+  lineas: string[]
+) {
+  doc.roundedRect(leftColX - 6, topMargin - 6, width, height, 4).stroke('#CBD5E1');
+  const lineHeight = Math.max(10, Math.floor((height - 20) / Math.max(lineas.length, 1)));
+  lineas.forEach((linea, index) => {
+    const y = topMargin + (index * lineHeight);
+    doc.fontSize(index === 0 ? 10 : 8).font(index === 0 ? 'Helvetica-Bold' : 'Helvetica').text(linea, leftColX, y, {
+      width: width - 12,
+      align: 'center',
+    });
+  });
+}
+
 export class GeneradorPdfService {
   static async generarHorarioPdf(idPeriodo: number, idCiclo: number): Promise<Buffer> {
     const periodo = await prisma.periodo_academico.findUnique({ where: { id: idPeriodo } });
     const ciclo = await prisma.ciclo.findUnique({ where: { id: idCiclo } });
     
     const doc = new PDFDocument({ 
-      margin: 40, 
+      margin: 30, 
       size: 'A4',
       layout: 'landscape'
     });
@@ -61,22 +116,24 @@ export class GeneradorPdfService {
       '#EFF6FF', '#F5F5F4', '#F0FDFA', '#FAF0FF', '#FDF2F8'
     ];
 
-    const leftColX = 30;
-    const rightColX = 220;
-    const topMargin = 30;
-    const pageWidth = doc.page.width - 60;
+    const leftColX = 40;
+    const rightColX = 285;
+    const topMargin = 40;
+    const pageWidth = doc.page.width - 80;
+    const headerBoxWidth = 205;
+    const headerBoxHeight = 118;
 
     // --- 1. CABECERA ---
-    doc.fontSize(10).font('Helvetica-Bold').text('UNIVERSIDAD NACIONAL DE TRUJILLO', leftColX, topMargin, { width: 170, align: 'center' });
-    doc.fontSize(9).text('FACULTAD DE INGENIERÍA', leftColX, topMargin + 12, { width: 170, align: 'center' });
-    doc.text('ESCUELA DE INGENIERÍA DE SISTEMAS', leftColX, topMargin + 24, { width: 170, align: 'center' });
-    
-    doc.fontSize(8).font('Helvetica');
-    doc.font('Helvetica-Bold').text(`DOCENTE: ${docente?.apellidos}, ${docente?.nombres}`, leftColX, topMargin + 45);
-    doc.font('Helvetica').text(`CATEGORÍA: ${docente?.categoria}`, leftColX, topMargin + 55);
-    doc.text(`MODALIDAD: ${docente?.modalidad}`, leftColX, topMargin + 65);
-    doc.text(`SEMESTRE: ${periodo?.nombre}`, leftColX, topMargin + 75);
-    doc.text(`FECHA: ${new Date().toLocaleDateString('es-PE')}`, leftColX, topMargin + 85);
+    dibujarCajaInfoPeriodo(doc, leftColX, topMargin, headerBoxWidth, headerBoxHeight, [
+      'UNIVERSIDAD NACIONAL DE TRUJILLO',
+      'FACULTAD DE INGENIERÍA',
+      'ESCUELA DE INGENIERÍA DE SISTEMAS',
+      `DOCENTE: ${docente?.apellidos}, ${docente?.nombres}`,
+      `CATEGORÍA: ${docente?.categoria}`,
+      `MODALIDAD: ${docente?.modalidad}`,
+      `SEMESTRE: ${periodo?.nombre}`,
+      `FECHA: ${new Date().toLocaleDateString('es-PE')}`,
+    ]);
 
     // --- 2. TABLA DETALLE ---
     const detailHeaders = ['N°', 'ASIGNATURA', 'CICLO', 'T', 'L', 'GRP', 'TOT'];
@@ -161,29 +218,54 @@ export class GeneradorPdfService {
       include: { componente: { include: { oferta: true } }, ambiente: true }
     });
 
+    const celdasPorSlot: Record<string, Array<{ bloque: any; info: any }>> = {};
+    for (const bloque of bloques as any[]) {
+      const info = mapaCursos[bloque.componente.oferta.id_curso];
+      const slotKey = `${bloque.dia_semana}-${bloque.hora_inicio}`;
+      const entradas = celdasPorSlot[slotKey] ?? [];
+      entradas.push({ bloque, info });
+      celdasPorSlot[slotKey] = entradas;
+    }
+
+    const slotsOcupados = new Set<string>();
     let y = horarioTop + 15;
-    horas.forEach((hora) => {
+    horas.forEach((hora, horaIndex) => {
       doc.rect(leftColX, y, gridColWidth, gridRowHeight).stroke('#E2E8F0');
       doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(7).text(formatearFranjaHora(hora), leftColX, y + 8, { width: gridColWidth, align: 'center' });
 
       dias.forEach((dia, dIdx) => {
         const x = leftColX + (dIdx + 1) * gridColWidth;
-        const celdasEnHora = bloques.filter(b => b.dia_semana === dia && b.hora_inicio === hora);
+        const slotKey = `${dia}-${hora}`;
+        if (slotsOcupados.has(slotKey)) {
+          return;
+        }
+
+        const celdasEnHora = celdasPorSlot[slotKey] ?? [];
         
         doc.rect(x, y, gridColWidth, gridRowHeight).stroke('#E2E8F0');
         if (celdasEnHora.length > 0) {
-          const numCols = Math.min(celdasEnHora.length, 2);
-          const colW = (gridColWidth - 2) / numCols;
+          const celda = celdasEnHora[0];
+          const bloque = celda.bloque;
+          const info = celda.info;
+          const puedeFusionar = celdasEnHora.length === 1;
+          const span = puedeFusionar ? calcularFusionPdf(celdasPorSlot, dia, horaIndex, horas, bloque) : 1;
+          const altoCelda = gridRowHeight * span;
 
-          celdasEnHora.slice(0, 2).forEach((bloque, bIdx) => {
-            const entryX = x + 1 + (bIdx * colW);
-            const info = mapaCursos[bloque.componente.id_oferta];
-            doc.rect(entryX, y + 1, colW, gridRowHeight - 2).fill(info?.color || '#FFFFFF');
-            
-            doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(7).text(String(info?.indice || '?'), entryX, y + 3, { width: colW, align: 'center' });
-            const ambienteCodigo = (bloque as any).ambiente?.codigo || 'Solic.';
-            doc.fontSize(5).font('Helvetica').text(`(${ambienteCodigo})`, entryX, y + 12, { width: colW, align: 'center' });
+          doc.rect(x, y, gridColWidth, altoCelda).fill(info?.color || '#FFFFFF').stroke('#E2E8F0');
+
+          const texto = formatearEtiquetaCeldaPdf(info, bloque);
+          const textoY = y + Math.max(3, (altoCelda - 12) / 2);
+          doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(6).text(texto, x + 2, textoY, {
+            width: gridColWidth - 4,
+            align: 'center',
+            lineBreak: true
           });
+
+          if (span > 1) {
+            for (let offset = 1; offset < span; offset++) {
+              slotsOcupados.add(`${dia}-${horas[horaIndex + offset]}`);
+            }
+          }
         }
       });
       y += gridRowHeight;
@@ -198,18 +280,17 @@ export class GeneradorPdfService {
     const headerBoxWidth = 205;
     const headerBoxHeight = 118;
 
-    doc.roundedRect(leftColX - 6, topMargin - 6, headerBoxWidth, headerBoxHeight, 4).stroke('#CBD5E1');
-    doc.fontSize(10).font('Helvetica-Bold').text('UNIVERSIDAD NACIONAL DE TRUJILLO', leftColX, topMargin, { width: headerBoxWidth - 12, align: 'center' });
-    doc.fontSize(9).text('FACULTAD DE INGENIERÍA', leftColX, topMargin + 12, { width: headerBoxWidth - 12, align: 'center' });
-    doc.text('ESCUELA DE INGENIERÍA DE SISTEMAS', leftColX, topMargin + 24, { width: headerBoxWidth - 12, align: 'center' });
-
-    doc.fontSize(8).font('Helvetica');
-    doc.text(`CICLO: ${ciclo?.numero}°`, leftColX, topMargin + 45, { width: headerBoxWidth - 12, align: 'center' });
-    doc.text('SECCIÓN: ÚNICA', leftColX, topMargin + 55, { width: headerBoxWidth - 12, align: 'center' });
-    doc.text(`AÑO ACADÉMICO: ${new Date().getFullYear()}`, leftColX, topMargin + 65, { width: headerBoxWidth - 12, align: 'center' });
-    doc.text(`SEMESTRE: ${periodo?.nombre}`, leftColX, topMargin + 75, { width: headerBoxWidth - 12, align: 'center' });
-    doc.text(`INICIO DEL CICLO: ${periodo?.fecha_inicio ? new Date(periodo.fecha_inicio).toLocaleDateString('es-PE') : '-'}`, leftColX, topMargin + 85, { width: headerBoxWidth - 12, align: 'center' });
-    doc.text(`TÉRMINO DEL CICLO: ${periodo?.fecha_fin ? new Date(periodo.fecha_fin).toLocaleDateString('es-PE') : '-'}`, leftColX, topMargin + 95, { width: headerBoxWidth - 12, align: 'center' });
+    dibujarCajaInfoPeriodo(doc, leftColX, topMargin, headerBoxWidth, headerBoxHeight, [
+      'UNIVERSIDAD NACIONAL DE TRUJILLO',
+      'FACULTAD DE INGENIERÍA',
+      'ESCUELA DE INGENIERÍA DE SISTEMAS',
+      `CICLO: ${ciclo?.numero}°`,
+      'SECCIÓN: ÚNICA',
+      `AÑO ACADÉMICO: ${new Date().getFullYear()}`,
+      `SEMESTRE: ${periodo?.nombre}`,
+      `INICIO DEL CICLO: ${periodo?.fecha_inicio ? new Date(periodo.fecha_inicio).toLocaleDateString('es-PE') : '-'}`,
+      `TÉRMINO DEL CICLO: ${periodo?.fecha_fin ? new Date(periodo.fecha_fin).toLocaleDateString('es-PE') : '-'}`,
+    ]);
 
     const detailHeaders = ['N°', 'PROFESOR', 'ASIGNATURA', 'T', 'P', 'L', 'G', 'T.HORAS', 'DEPARTAMENTO'];
     const colWidths = [14, 144, 92, 16, 16, 16, 16, 24, 59];
@@ -245,6 +326,7 @@ export class GeneradorPdfService {
     });
 
     const contexto = crearContextoHorarioCiclo(bloques as any);
+    const slotsOcupados = new Set<string>();
 
     for (const info of contexto.registros) {
       const rowData = [
@@ -296,29 +378,45 @@ export class GeneradorPdfService {
     });
 
     let y = horarioTop + 15;
-    horas.forEach((hora) => {
+    horas.forEach((hora, horaIndex) => {
       doc.rect(leftColX, y, gridColWidth, gridRowHeight).stroke('#E2E8F0');
       doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(7).text(formatearFranjaHora(hora), leftColX, y + 8, { width: gridColWidth, align: 'center' });
 
       dias.forEach((dia, dIdx) => {
         const x = leftColX + (dIdx + 1) * gridColWidth;
-        const entradas = contexto.celdas[`${dia}-${hora}`] ?? [];
+        const slotKey = `${dia}-${hora}`;
+        if (slotsOcupados.has(slotKey)) {
+          return;
+        }
 
-        doc.rect(x, y, gridColWidth, gridRowHeight).stroke('#E2E8F0');
-        if (entradas.length > 0) {
-          const numCols = Math.min(entradas.length, 2);
-          const colW = (gridColWidth - 2) / numCols;
-          
-          entradas.slice(0, 2).forEach((entrada, eIdx) => {
-            const entryX = x + 1 + (eIdx * colW);
-            doc.rect(entryX, y + 1, colW, gridRowHeight - 2).fill(`#${entrada.registro.color.slice(2)}`);
-            const texto = formatearEtiquetaCelda(entrada.registro, entrada.bloque);
-            doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(6).text(texto, entryX, y + 3, { 
-              width: colW, 
-              align: 'center',
-              lineBreak: true
-            });
-          });
+        const entradas = contexto.celdas[slotKey] ?? [];
+
+        if (entradas.length === 0) {
+          doc.rect(x, y, gridColWidth, gridRowHeight).stroke('#E2E8F0');
+          return;
+        }
+
+        const celda = entradas[0];
+        const bloque = celda.bloque;
+        const info = celda.registro;
+        const puedeFusionar = entradas.length === 1;
+        const span = puedeFusionar ? calcularFusionPdf(contexto.celdas, dia, horaIndex, horas, bloque) : 1;
+        const altoCelda = gridRowHeight * span;
+
+        doc.rect(x, y, gridColWidth, altoCelda).fill(`#${info.color.slice(2)}`).stroke('#E2E8F0');
+
+        const texto = formatearEtiquetaCeldaPdf(info, bloque);
+        const textoY = y + Math.max(3, (altoCelda - 12) / 2);
+        doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(6).text(texto, x + 2, textoY, {
+          width: gridColWidth - 4,
+          align: 'center',
+          lineBreak: true
+        });
+
+        if (span > 1) {
+          for (let offset = 1; offset < span; offset++) {
+            slotsOcupados.add(`${dia}-${horas[horaIndex + offset]}`);
+          }
         }
       });
 
@@ -330,7 +428,7 @@ export class GeneradorPdfService {
     const periodo = await prisma.periodo_academico.findUnique({ where: { id: idPeriodo } });
     const ambiente = await prisma.ambiente.findUnique({ where: { id: idAmbiente } });
     
-    const doc = new PDFDocument({ margin: 30, size: 'A4', layout: 'portrait' });
+    const doc = new PDFDocument({ margin: 30, size: 'A4', layout: 'landscape' });
     const chunks: Buffer[] = [];
     doc.on('data', (c: Buffer) => chunks.push(c));
     
@@ -365,22 +463,23 @@ export class GeneradorPdfService {
 
   private static async generarPaginaAmbiente(doc: PDFDocumentWithTable, idPeriodo: number, idAmbiente: number, periodo: any, ambiente: any) {
     const coloresPasteles = ['#F0F9FF', '#F5F3FF', '#ECFDF5', '#FFFBEB', '#FFF1F2', '#EFF6FF', '#F5F5F4', '#F0FDFA', '#FAF0FF', '#FDF2F8'];
-    const leftColX = 30;
-    const rightColX = 220;
-    const topMargin = 30;
-    const pageWidth = doc.page.width - 60;
+    const leftColX = 40;
+    const rightColX = 285;
+    const topMargin = 40;
+    const pageWidth = doc.page.width - 80;
     const headerBoxWidth = 205;
+    const headerBoxHeight = 118;
 
     // 1. CABECERA
-    doc.fontSize(10).font('Helvetica-Bold').text('UNIVERSIDAD NACIONAL DE TRUJILLO', leftColX, topMargin);
-    doc.fontSize(9).text('FACULTAD DE INGENIERÍA', leftColX, topMargin + 12);
-    doc.text('ESCUELA DE INGENIERÍA DE SISTEMAS', leftColX, topMargin + 24);
-    
-    doc.fontSize(8).font('Helvetica');
-    doc.font('Helvetica-Bold').text(`AMBIENTE: ${ambiente?.codigo} (${ambiente?.tipo})`, leftColX, topMargin + 45, { width: headerBoxWidth - 12, align: 'center' });
-    doc.font('Helvetica').text(`CAPACIDAD: ${ambiente?.capacidad} personas`, leftColX, topMargin + 55, { width: headerBoxWidth - 12, align: 'center' });
-    doc.text(`SEMESTRE: ${periodo?.nombre}`, leftColX, topMargin + 65, { width: headerBoxWidth - 12, align: 'center' });
-    doc.text(`FECHA: ${new Date().toLocaleDateString('es-PE')}`, leftColX, topMargin + 75, { width: headerBoxWidth - 12, align: 'center' });
+    dibujarCajaInfoPeriodo(doc, leftColX, topMargin, headerBoxWidth, headerBoxHeight, [
+      'UNIVERSIDAD NACIONAL DE TRUJILLO',
+      'FACULTAD DE INGENIERÍA',
+      'ESCUELA DE INGENIERÍA DE SISTEMAS',
+      `AMBIENTE: ${ambiente?.codigo} (${ambiente?.tipo})`,
+      `CAPACIDAD: ${ambiente?.capacidad} personas`,
+      `SEMESTRE: ${periodo?.nombre}`,
+      `FECHA: ${new Date().toLocaleDateString('es-PE')}`,
+    ]);
 
     // 2. TABLA DETALLE
     const detailHeaders = ['N°', 'PROFESOR', 'ASIGNATURA', 'CICLO', 'TIPO', 'G', 'TOT'];
@@ -415,6 +514,7 @@ export class GeneradorPdfService {
           indice: indexDocente++,
           color: coloresPasteles[(indexDocente - 2) % coloresPasteles.length],
           nombre: `${b.docente.apellidos}, ${b.docente.nombres.substring(0,1)}.`,
+          nombreCompleto: `${b.docente.apellidos}, ${b.docente.nombres}`,
           cursoNombre: b.componente.oferta.curso.nombre,
           ciclo: b.componente.oferta.id_ciclo,
           tipo: b.componente.tipo,
@@ -438,6 +538,19 @@ export class GeneradorPdfService {
       currentY += 10;
     }
 
+    function formatearEtiquetaCeldaAmbiente(registro: any, bloque: any): string {
+      return [String(registro.indice), registro.nombreCompleto || registro.nombre, bloque.componente.oferta.curso.nombre].filter(Boolean).join('\n');
+    }
+
+    const celdasPorSlot: Record<string, Array<{ bloque: any; info: any }>> = {};
+    for (const bloque of bloques as any[]) {
+      const info = mapaDocenteCurso[`${bloque.id_docente}-${bloque.componente.id_oferta}`];
+      const slotKey = `${bloque.dia_semana}-${bloque.hora_inicio}`;
+      const entradas = celdasPorSlot[slotKey] ?? [];
+      entradas.push({ bloque, info });
+      celdasPorSlot[slotKey] = entradas;
+    }
+
     // 3. HORARIO
     const horarioTop = Math.max(currentY + 20, 140);
     const dias = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
@@ -454,29 +567,44 @@ export class GeneradorPdfService {
       doc.fillColor('white').text(dia, x, horarioTop + 3, { width: gridColWidth, align: 'center' });
     });
 
+    const slotsOcupados = new Set<string>();
     let y = horarioTop + 15;
-    horas.forEach((hora) => {
+    horas.forEach((hora, horaIndex) => {
       doc.rect(leftColX, y, gridColWidth, gridRowHeight).stroke('#E2E8F0');
       doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(7).text(formatearFranjaHora(hora), leftColX, y + 8, { width: gridColWidth, align: 'center' });
       dias.forEach((dia, dIdx) => {
         const x = leftColX + (dIdx + 1) * gridColWidth;
-        const celdasEnHora = bloques.filter(b => b.dia_semana === dia && b.hora_inicio === hora);
+        const slotKey = `${dia}-${hora}`;
+        if (slotsOcupados.has(slotKey)) {
+          return;
+        }
+
+        const celdasEnHora = celdasPorSlot[slotKey] ?? [];
         
         doc.rect(x, y, gridColWidth, gridRowHeight).stroke('#E2E8F0');
         if (celdasEnHora.length > 0) {
-          const numCols = Math.min(celdasEnHora.length, 2);
-          const colW = (gridColWidth - 2) / numCols;
+          const celda = celdasEnHora[0];
+          const bloque = celda.bloque;
+          const info = celda.info;
+          const puedeFusionar = celdasEnHora.length === 1;
+          const span = puedeFusionar ? calcularFusionPdf(celdasPorSlot, dia, horaIndex, horas, bloque) : 1;
+          const altoCelda = gridRowHeight * span;
 
-          celdasEnHora.slice(0, 2).forEach((bloque, bIdx) => {
-            const entryX = x + 1 + (bIdx * colW);
-            const info = mapaDocenteCurso[`${bloque.id_docente}-${bloque.componente.id_oferta}`];
-            doc.rect(entryX, y + 1, colW, gridRowHeight - 2).fill(info?.color || '#FFFFFF');
-            
-            doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(7).text(String(info?.indice || '?'), entryX, y + 3, { width: colW, align: 'center' });
-            // Verificamos si existe la propiedad ambiente antes de acceder a ella
-            const ambienteCodigo = (bloque as any).ambiente?.codigo || 'Solic.';
-            doc.fontSize(5).font('Helvetica').text(`(${ambienteCodigo})`, entryX, y + 12, { width: colW, align: 'center' });
+          doc.rect(x, y, gridColWidth, altoCelda).fill(info?.color || '#FFFFFF').stroke('#E2E8F0');
+
+          const texto = formatearEtiquetaCeldaAmbiente(info, bloque);
+          const textoY = y + Math.max(3, (altoCelda - 12) / 2);
+          doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(6).text(texto, x + 2, textoY, {
+            width: gridColWidth - 4,
+            align: 'center',
+            lineBreak: true
           });
+
+          if (span > 1) {
+            for (let offset = 1; offset < span; offset++) {
+              slotsOcupados.add(`${dia}-${horas[horaIndex + offset]}`);
+            }
+          }
         }
       });
       y += gridRowHeight;
