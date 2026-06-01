@@ -2,6 +2,12 @@ import { prisma } from '@/lib/prisma';
 import PDFDocument from 'pdfkit';
 import { crearContextoHorarioCiclo, formatearEtiquetaCelda } from './horario-ciclo.utils';
 
+function formatearFranjaHora(horaInicio: string): string {
+  const [horas, minutos] = horaInicio.split(':');
+  const horaFinal = String(Number(horas) + 1).padStart(2, '0');
+  return `${Number(horas)}:${minutos} - ${Number(horaFinal)}:${minutos}`;
+}
+
 export class GeneradorPdfService {
   static async generarHorarioPdf(idPeriodo: number, idCiclo: number): Promise<Buffer> {
     const periodo = await prisma.periodo_academico.findUnique({ where: { id: idPeriodo } });
@@ -158,7 +164,7 @@ export class GeneradorPdfService {
     let y = horarioTop + 15;
     horas.forEach((hora) => {
       doc.rect(leftColX, y, gridColWidth, gridRowHeight).stroke('#E2E8F0');
-      doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(7).text(hora, leftColX, y + 8, { width: gridColWidth, align: 'center' });
+      doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(7).text(formatearFranjaHora(hora), leftColX, y + 8, { width: gridColWidth, align: 'center' });
 
       dias.forEach((dia, dIdx) => {
         const x = leftColX + (dIdx + 1) * gridColWidth;
@@ -292,7 +298,7 @@ export class GeneradorPdfService {
     let y = horarioTop + 15;
     horas.forEach((hora) => {
       doc.rect(leftColX, y, gridColWidth, gridRowHeight).stroke('#E2E8F0');
-      doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(7).text(hora, leftColX, y + 8, { width: gridColWidth, align: 'center' });
+      doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(7).text(formatearFranjaHora(hora), leftColX, y + 8, { width: gridColWidth, align: 'center' });
 
       dias.forEach((dia, dIdx) => {
         const x = leftColX + (dIdx + 1) * gridColWidth;
@@ -451,7 +457,7 @@ export class GeneradorPdfService {
     let y = horarioTop + 15;
     horas.forEach((hora) => {
       doc.rect(leftColX, y, gridColWidth, gridRowHeight).stroke('#E2E8F0');
-      doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(7).text(hora, leftColX, y + 8, { width: gridColWidth, align: 'center' });
+      doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(7).text(formatearFranjaHora(hora), leftColX, y + 8, { width: gridColWidth, align: 'center' });
       dias.forEach((dia, dIdx) => {
         const x = leftColX + (dIdx + 1) * gridColWidth;
         const celdasEnHora = bloques.filter(b => b.dia_semana === dia && b.hora_inicio === hora);
