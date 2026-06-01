@@ -36,8 +36,29 @@ export class PublicadorHorarios {
               hora_inicio: sel.horaInicio,
               estado: { in: ['CONFIRMADO', 'PUBLICADO'] },
             },
+            include: {
+              componente: {
+                include: {
+                  oferta: {
+                    include: {
+                      curso: true,
+                    },
+                  },
+                },
+              },
+              ambiente: true,
+            },
           });
           if (conflicto) {
+            const esAmbienteLab = conflicto.ambiente?.tipo === 'LABORATORIO';
+            const cursoOcupante = conflicto.componente.oferta.curso.nombre;
+
+            if (esAmbienteLab) {
+              throw new Error(
+                `Laboratorio ocupado en esa hora y el curso que lo está ocupando: ${cursoOcupante}`
+              );
+            }
+
             throw new Error(
               `Conflicto: El ambiente ya está ocupado el ${sel.diaSemana} a las ${sel.horaInicio}`
             );
