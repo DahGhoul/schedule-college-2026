@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import PDFDocument from 'pdfkit';
-import { crearContextoHorarioCiclo, formatearEtiquetaCelda } from './horario-ciclo.utils';
+import { crearContextoHorarioCiclo, formatearEtiquetaCelda, obtenerColorCurso } from './horario-ciclo.utils';
 
 function formatearFranjaHora(horaInicio: string): string {
   const [horas, minutos] = horaInicio.split(':');
@@ -111,11 +111,6 @@ export class GeneradorPdfService {
   }
 
   private static async generarPaginaDocente(doc: PDFDocumentWithTable, idPeriodo: number, idDocente: number, periodo: any, docente: any) {
-    const coloresPasteles = [
-      '#F0F9FF', '#F5F3FF', '#ECFDF5', '#FFFBEB', '#FFF1F2',
-      '#EFF6FF', '#F5F5F4', '#F0FDFA', '#FAF0FF', '#FDF2F8'
-    ];
-
     const leftColX = 40;
     const rightColX = 285;
     const topMargin = 40;
@@ -167,9 +162,10 @@ export class GeneradorPdfService {
     for (const asig of asignaciones) {
       const cursoId = asig.componente.oferta.id_curso;
       if (!mapaCursos[cursoId]) {
+        const colorCurso = obtenerColorCurso(indexCurso).slice(2);
         mapaCursos[cursoId] = {
           indice: indexCurso++,
-          color: coloresPasteles[(indexCurso - 2) % coloresPasteles.length],
+          color: colorCurso,
           nombre: asig.componente.oferta.curso.nombre,
           ciclo: asig.componente.oferta.id_ciclo,
           teo: 0,
@@ -190,7 +186,7 @@ export class GeneradorPdfService {
       currentX = rightColX;
       doc.font('Helvetica').fontSize(6).fillColor('black');
       rowData.forEach((val, i) => {
-        doc.rect(currentX, currentY, colWidths[i], 10).fill(info.color).stroke('#E2E8F0');
+        doc.rect(currentX, currentY, colWidths[i], 10).fill(`#${info.color}`).stroke('#E2E8F0');
         doc.fillColor('#334155').text(val, currentX, currentY + 2, { width: colWidths[i], align: 'center', ellipsis: true });
         currentX += colWidths[i];
       });
@@ -454,7 +450,7 @@ export class GeneradorPdfService {
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
       for (let i = 0; i < ambientes.length; i++) {
-        if (i > 0) doc.addPage();
+        if (i > 0) doc.addPage({ layout: 'landscape' });
         await this.generarPaginaAmbiente(doc, idPeriodo, ambientes[i].id, periodo, ambientes[i]);
       }
       doc.end();
@@ -462,7 +458,6 @@ export class GeneradorPdfService {
   }
 
   private static async generarPaginaAmbiente(doc: PDFDocumentWithTable, idPeriodo: number, idAmbiente: number, periodo: any, ambiente: any) {
-    const coloresPasteles = ['#F0F9FF', '#F5F3FF', '#ECFDF5', '#FFFBEB', '#FFF1F2', '#EFF6FF', '#F5F5F4', '#F0FDFA', '#FAF0FF', '#FDF2F8'];
     const leftColX = 40;
     const rightColX = 285;
     const topMargin = 40;
@@ -505,14 +500,19 @@ export class GeneradorPdfService {
     });
 
     const mapaDocenteCurso: Record<string, any> = {};
+    const coloresPorCurso = new Map<number, string>();
     let indexDocente = 1;
 
     bloques.forEach(b => {
+      const cursoId = b.componente.oferta.id_curso;
       const key = `${b.id_docente}-${b.componente.id_oferta}`;
       if (!mapaDocenteCurso[key]) {
+        if (!coloresPorCurso.has(cursoId)) {
+          coloresPorCurso.set(cursoId, obtenerColorCurso(coloresPorCurso.size + 1).slice(2));
+        }
         mapaDocenteCurso[key] = {
           indice: indexDocente++,
-          color: coloresPasteles[(indexDocente - 2) % coloresPasteles.length],
+          color: coloresPorCurso.get(cursoId) ?? obtenerColorCurso(1).slice(2),
           nombre: `${b.docente.apellidos}, ${b.docente.nombres.substring(0,1)}.`,
           nombreCompleto: `${b.docente.apellidos}, ${b.docente.nombres}`,
           cursoNombre: b.componente.oferta.curso.nombre,
@@ -531,7 +531,7 @@ export class GeneradorPdfService {
       currentX = rightColX;
       doc.font('Helvetica').fontSize(6).fillColor('black');
       rowData.forEach((val, i) => {
-        doc.rect(currentX, currentY, colWidths[i], 10).fill(info.color).stroke('#E2E8F0');
+        doc.rect(currentX, currentY, colWidths[i], 10).fill(`#${info.color}`).stroke('#E2E8F0');
         doc.fillColor('#334155').text(val, currentX, currentY + 2, { width: colWidths[i], align: i === 1 || i === 2 ? 'left' : 'center', ellipsis: true });
         currentX += colWidths[i];
       });
@@ -732,7 +732,7 @@ export class GeneradorPdfService {
       orderBy: { apellidos: 'asc' }
     });
 
-    const doc = new PDFDocument({ margin: 30, size: 'A4', layout: 'portrait' });
+    const doc = new PDFDocument({ margin: 30, size: 'A4', layout: 'landscape' });
     const chunks: Buffer[] = [];
     doc.on('data', (c: Buffer) => chunks.push(c));
 
@@ -741,7 +741,7 @@ export class GeneradorPdfService {
       doc.on('error', reject);
 
       for (let i = 0; i < docentes.length; i++) {
-        if (i > 0) doc.addPage();
+        if (i > 0) doc.addPage({ layout: 'landscape' });
         await this.generarPaginaDocente(doc, idPeriodo, docentes[i].id, periodo, docentes[i]);
       }
       doc.end();

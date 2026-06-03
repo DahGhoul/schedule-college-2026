@@ -167,7 +167,7 @@ export class ReportesService {
     );
 
     return new Promise((resolve, reject) => {
-      const doc = new PDFDocument({ margin: 50, size: 'A4' });
+      const doc = new PDFDocument({ margin: 50, size: 'A4', layout: 'landscape' });
       const chunks: Buffer[] = [];
       doc.on('data', (c: Buffer) => chunks.push(c));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
@@ -272,7 +272,7 @@ export class ReportesService {
     });
 
     return new Promise((resolve, reject) => {
-      const doc = new PDFDocument({ margin: 50, size: 'A4' });
+      const doc = new PDFDocument({ margin: 50, size: 'A4', layout: 'landscape' });
       const chunks: Buffer[] = [];
       doc.on('data', (c: Buffer) => chunks.push(c));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
