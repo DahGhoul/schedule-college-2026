@@ -80,16 +80,19 @@ export function MatrizDisponibilidad({ matriz, alHacerClickCelda, bloqueado = fa
                     key={idx}
                     className={cn(
                       'border-r border-gray-200 px-1 py-1.5 text-center min-w-[130px] min-h-[55px] transition-all',
-                      colores[celda.estado]
+                      colores[celda.estado],
+                      bloqueado && celda.estado !== 'BLOQUEO_INSTITUCIONAL' && 'cursor-not-allowed opacity-70'
                     )}
                     onClick={() => {
-                      if (bloqueado && celda.estado === 'LIBRE') return;
+                      if (bloqueado) return;
                       alHacerClickCelda(celda.diaSemana, celda.horaInicio, celda.estado, celda.info);
                     }}
                     title={`${celda.diaSemana} ${celda.horaInicio} - ${
-                      celda.estado === 'DOCENTE_OTRO_AMBIENTE' ? 'Ocupado en otro ambiente' :
-                      (bloqueado && celda.estado === 'LIBRE') ? 'Fuera de tu ventana de atención' :
-                      celda.estado
+                      bloqueado
+                        ? 'Fuera de tu ventana de atención'
+                        : celda.estado === 'DOCENTE_OTRO_AMBIENTE'
+                        ? 'Ocupado en otro ambiente'
+                        : celda.estado
                     }`}
                   >
                     <div className="flex items-center justify-center min-h-[36px] transition-all duration-150">
@@ -180,6 +183,11 @@ export function MatrizDisponibilidad({ matriz, alHacerClickCelda, bloqueado = fa
           <span>Restricción institucional</span>
         </span>
       </div>
+      {bloqueado && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          No puede realizar cambios porque no tiene una ventana de atención asignada.
+        </div>
+      )}
     </div>
   );
 }

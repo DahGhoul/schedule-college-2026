@@ -7,11 +7,13 @@ import { CampoTexto } from '@/components/ui/CampoTexto';
 import { NotificacionToast } from '@/components/ui/NotificacionToast';
 import { School, Lock, Mail, ChevronRight, GraduationCap } from 'lucide-react';
 import Link from 'next/link';
+import { Eye, EyeOff } from 'lucide-react';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [mostrarPassword, setMostrarPassword] = useState(false);
   const [cargando, setCargando] = useState(false);
   const router = useRouter();
   const { iniciarSesion, estaAutenticado, token, cargarSesion } = useAuthStore();
@@ -130,7 +132,7 @@ export default function LoginPage() {
                   />
                 </div>
 
-                <div className="relative group">
+                {/*<div className="relative group">
                   <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#003366] transition-colors">
                     <Lock className="w-5 h-5" />
                   </div>
@@ -142,6 +144,32 @@ export default function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                   />
+                </div>*/}
+                <div className="relative group">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#003366] transition-colors z-10">
+                    <Lock className="w-5 h-5" />
+                  </div>
+
+                  <input
+                    type={mostrarPassword ? 'text' : 'password'}
+                    required
+                    placeholder="Contraseña"
+                    className="w-full pl-12 pr-14 py-4 bg-slate-50 border-transparent rounded-2xl focus:bg-white focus:ring-2 focus:ring-[#003366]/10 focus:border-[#003366] text-gray-900 placeholder:text-gray-400 transition-all outline-none [&::-ms-reveal]:hidden [&::-ms-clear]:hidden"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => setMostrarPassword(!mostrarPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#003366] transition-colors z-10"
+                  >
+                    {mostrarPassword ? (
+                      <EyeOff className="w-5 h-5" />
+                    ) : (
+                      <Eye className="w-5 h-5" />
+                    )}
+                  </button>
                 </div>
               </div>
 

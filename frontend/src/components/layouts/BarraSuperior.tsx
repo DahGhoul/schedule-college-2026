@@ -8,7 +8,7 @@ export function BarraSuperior() {
   const { usuario, cerrarSesion } = useAuthStore();
 
   return (
-    <header className="bg-white/80 backdrop-blur-md border-b border-gray-100 h-16 flex items-center justify-between px-8 sticky top-0 z-10">
+    <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100 h-16 flex items-center justify-between px-8">
       <div className="flex items-center gap-4">
         <div>
           <h1 className="text-lg font-bold text-gray-800 tracking-tight">

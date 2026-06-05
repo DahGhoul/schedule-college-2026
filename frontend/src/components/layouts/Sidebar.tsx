@@ -47,7 +47,7 @@ export function Sidebar() {
     { href: '/dashboard/ambientes', etiqueta: 'Infraestructura/Aulas', Icono: School },
     { href: '/dashboard/cursos', etiqueta: 'Catálogo de Cursos', Icono: BookOpen },
     { href: '/dashboard/configuracion/restricciones', etiqueta: 'Reglas del Sistema', Icono: Settings },
-    { href: '/dashboard/configuracion/dias-no-laborables', etiqueta: 'Feriados/No Laborables', Icono: CalendarOff },
+    //{ href: '/dashboard/configuracion/dias-no-laborables', etiqueta: 'Feriados/No Laborables', Icono: CalendarOff },
   ];
 
   const enlacesDirector = [
@@ -57,7 +57,7 @@ export function Sidebar() {
     { href: '/dashboard/director/oferta-ciclos', etiqueta: 'Oferta por Ciclos', Icono: LayoutGrid },
     { href: '/dashboard/director/carga-horaria', etiqueta: 'Asignación de Carga', Icono: Clock },
     { href: '/dashboard/director/solicitudes-aula', etiqueta: 'Solicitudes de Aula', Icono: MapPin },
-    { href: '/dashboard/horarios', etiqueta: 'Generador Horarios', Icono: Calendar },
+    //{ href: '/dashboard/horarios', etiqueta: 'Generador Horarios', Icono: Calendar },
     { href: '/dashboard/horarios/publicar', etiqueta: 'Publicar Horarios', Icono: Send },
   ];
 
@@ -79,7 +79,7 @@ export function Sidebar() {
     { href: '/dashboard/docente/carga-no-lectiva', etiqueta: 'Carga No Lectiva', Icono: FileText },
     { href: '/dashboard/horarios/seleccion', etiqueta: 'Elegir mi Horario', Icono: CheckSquare },
     { href: '/dashboard/horarios/vista-docente', etiqueta: 'Ver mi Horario', Icono: Eye },
-    { href: '/dashboard/notificaciones/preferencias', etiqueta: 'Mis Notificaciones', Icono: BellRing },
+    //{ href: '/dashboard/notificaciones/preferencias', etiqueta: 'Mis Notificaciones', Icono: BellRing },
   ];
 
   let enlaces = enlacesDocente;

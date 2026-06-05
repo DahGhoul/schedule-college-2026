@@ -349,6 +349,12 @@ export default function SeleccionHorarioPage() {
         </div>
       )}
 
+      {esBloqueado && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800 shadow-sm">
+          No puede realizar cambios porque no tiene una ventana de atención asignada.
+        </div>
+      )}
+
       {/* Main Grid Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
@@ -455,7 +461,7 @@ export default function SeleccionHorarioPage() {
               <ConfirmacionHorario
                 docenteId={docenteId}
                 idPeriodo={idPeriodo}
-                deshabilitado={validacion ? !validacion.valido : false}
+                deshabilitado={esBloqueado || (validacion ? !validacion.valido : false)}
                 alConfirmar={() => {
                   queryClient.invalidateQueries({ queryKey: ['selecciones-temporales', docenteId] });
                   queryClient.invalidateQueries({ queryKey: ['validacion-seleccion', docenteId, idPeriodo] });

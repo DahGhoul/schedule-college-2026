@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { DedicacionDocente } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 // Función para generar una contraseña temporal aleatoria

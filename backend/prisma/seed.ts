@@ -39,6 +39,9 @@ async function main() {
     await prisma.disponibilidad_ambiente.deleteMany();
     await prisma.ambiente.deleteMany();
     await prisma.usuario.deleteMany();
+    
+    await prisma.atencion_docente.deleteMany();
+
     await prisma.docente.deleteMany();
     await prisma.curso.deleteMany();
 
