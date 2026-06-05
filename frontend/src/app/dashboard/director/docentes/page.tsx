@@ -20,12 +20,16 @@ export default function GestionDocentesPage() {
   const [toast, setToast] = useState<{ mensaje: string; tipo: 'exito' | 'error' } | null>(null);
 
   const [formData, setFormData] = useState({
+    codigo_ibm: '',
+    dni: '',
     nombres: '',
     apellidos: '',
     email: '',
     telefono: '',
+    empleo: '',
     modalidad: 'NOMBRADO',
     categoria: 'PRINCIPAL',
+    dedicacion: 'TIEMPO_COMPLETO_40H',
     antiguedad: 0,
     horas_max_semana: 40,
     crear_usuario: true
@@ -33,16 +37,21 @@ export default function GestionDocentesPage() {
 
   const resetForm = () => {
     setFormData({
+      codigo_ibm: '',
+      dni: '',
       nombres: '',
       apellidos: '',
       email: '',
       telefono: '',
+      empleo: '',
       modalidad: 'NOMBRADO',
       categoria: 'PRINCIPAL',
+      dedicacion: 'TIEMPO_COMPLETO_40H',
       antiguedad: 0,
       horas_max_semana: 40,
       crear_usuario: true
     });
+
     setDocenteSeleccionado(null);
   };
 
@@ -55,11 +64,22 @@ export default function GestionDocentesPage() {
 
   const mutationCrear = useMutation({
     mutationFn: (datos: any) => docentesService.crear(datos),
-    onSuccess: () => {
-      setToast({ mensaje: 'Docente creado correctamente', tipo: 'exito' });
+    onSuccess: (response: any) => {
+      const password = response.data?.passwordTemporal;
+
+      setToast({
+        mensaje: password
+          ? `Docente creado. Contraseña temporal: ${password}`
+          : 'Docente creado correctamente',
+        tipo: 'exito'
+      });
+
       setModalAbierto(false);
       resetForm();
-      queryClient.invalidateQueries({ queryKey: ['docentes'] });
+
+      queryClient.invalidateQueries({
+        queryKey: ['docentes']
+      });
     },
     onError: (error: any) => {
       setToast({ mensaje: error.response?.data?.error || 'Error al crear docente', tipo: 'error' });
@@ -92,17 +112,23 @@ export default function GestionDocentesPage() {
 
   const abrirEditar = (docente: any) => {
     setDocenteSeleccionado(docente);
+
     setFormData({
-      nombres: docente.nombres,
-      apellidos: docente.apellidos,
-      email: docente.email,
+      codigo_ibm: docente.codigo_ibm || '',
+      dni: docente.dni || '',
+      nombres: docente.nombres || '',
+      apellidos: docente.apellidos || '',
+      email: docente.email || '',
       telefono: docente.telefono || '',
-      modalidad: docente.modalidad,
-      categoria: docente.categoria,
-      antiguedad: docente.antiguedad,
+      empleo: docente.empleo || '',
+      modalidad: docente.modalidad || 'NOMBRADO',
+      categoria: docente.categoria || 'PRINCIPAL',
+      dedicacion: docente.dedicacion || 'TIEMPO_COMPLETO_40H',
+      antiguedad: docente.antiguedad || 0,
       horas_max_semana: docente.horas_max_semana || 40,
       crear_usuario: false
     });
+
     setModalAbierto(true);
   };
 
@@ -222,7 +248,34 @@ export default function GestionDocentesPage() {
         >
           <form onSubmit={manejarSubmit} className="space-y-6">
 
+            {/* DATOS PERSONALES */}
             <div className="grid grid-cols-2 gap-4">
+
+              <CampoTexto
+                label="Código IBM"
+                value={formData.codigo_ibm}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    codigo_ibm: e.target.value
+                  })
+                }
+              />
+
+              <CampoTexto
+                label="DNI"
+                value={formData.dni}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    dni: e.target.value
+                  })
+                }
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+
               <CampoTexto
                 label="Nombres"
                 required
@@ -248,19 +301,45 @@ export default function GestionDocentesPage() {
               />
             </div>
 
+            <div className="grid grid-cols-2 gap-4">
+
+              <CampoTexto
+                label="Email Institucional"
+                type="email"
+                required
+                value={formData.email}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    email: e.target.value
+                  })
+                }
+              />
+
+              <CampoTexto
+                label="Teléfono"
+                value={formData.telefono}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    telefono: e.target.value
+                  })
+                }
+              />
+            </div>
+
             <CampoTexto
-              label="Email Institucional"
-              type="email"
-              required
-              value={formData.email}
+              label="Empleo / Cargo"
+              value={formData.empleo}
               onChange={(e) =>
                 setFormData({
                   ...formData,
-                  email: e.target.value
+                  empleo: e.target.value
                 })
               }
             />
 
+            {/* CONFIGURACIÓN DOCENTE */}
             <div className="grid grid-cols-2 gap-4">
 
               <Selector
@@ -296,6 +375,48 @@ export default function GestionDocentesPage() {
               />
             </div>
 
+            <Selector
+              label="Dedicación"
+              value={formData.dedicacion}
+              onChange={(e: any) =>
+                setFormData({
+                  ...formData,
+                  dedicacion: e.target.value
+                })
+              }
+              opciones={[
+                {
+                  valor: 'TIEMPO_COMPLETO_40H',
+                  etiqueta: 'Tiempo Completo 40H'
+                },
+                {
+                  valor: 'DEDICACION_EXCLUSIVA_40H',
+                  etiqueta: 'Dedicación Exclusiva 40H'
+                },
+                {
+                  valor: 'TIEMPO_PARCIAL_20H',
+                  etiqueta: 'Tiempo Parcial 20H'
+                },
+                {
+                  valor: 'TIEMPO_PARCIAL_16H',
+                  etiqueta: 'Tiempo Parcial 16H'
+                },
+                {
+                  valor: 'TIEMPO_PARCIAL_12H',
+                  etiqueta: 'Tiempo Parcial 12H'
+                },
+                {
+                  valor: 'TIEMPO_PARCIAL_10H',
+                  etiqueta: 'Tiempo Parcial 10H'
+                },
+                {
+                  valor: 'TIEMPO_PARCIAL_8H',
+                  etiqueta: 'Tiempo Parcial 8H'
+                }
+              ]}
+            />
+
+            {/* HORAS */}
             <div className="grid grid-cols-2 gap-4">
 
               <CampoTexto
@@ -323,6 +444,7 @@ export default function GestionDocentesPage() {
               />
             </div>
 
+            {/* USUARIO */}
             {!docenteSeleccionado && (
               <div className="flex items-center gap-2 py-2">
                 <input
@@ -337,13 +459,21 @@ export default function GestionDocentesPage() {
                   }
                   className="w-4 h-4 text-unt-primary border-slate-300 rounded focus:ring-unt-primary"
                 />
-                <label htmlFor="crear_usuario" className="text-sm font-medium text-slate-600 cursor-pointer">
-                  Crear cuenta de acceso automáticamente (Contraseña: 123)
+
+                <label
+                  htmlFor="crear_usuario"
+                  className="text-sm font-medium text-slate-600 cursor-pointer"
+                >
+                  Crear cuenta de acceso automáticamente
+                  <span className="block text-xs text-slate-400">
+                    Se generará una contraseña temporal automáticamente
+                  </span>
                 </label>
               </div>
             )}
 
             <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
+
               <Boton
                 variante="secundario"
                 type="button"
@@ -358,8 +488,13 @@ export default function GestionDocentesPage() {
                 disabled={mutationCrear.isPending || mutationEditar.isPending}
                 className="rounded-xl px-8"
               >
-                {mutationCrear.isPending || mutationEditar.isPending ? 'Guardando...' : docenteSeleccionado ? 'Actualizar' : 'Guardar Docente'}
+                {mutationCrear.isPending || mutationEditar.isPending
+                  ? 'Guardando...'
+                  : docenteSeleccionado
+                    ? 'Actualizar'
+                    : 'Guardar Docente'}
               </Boton>
+
             </div>
           </form>
         </Modal>

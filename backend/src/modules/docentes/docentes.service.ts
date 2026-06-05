@@ -1,5 +1,8 @@
 import { prisma } from '@/lib/prisma';
-import { DedicacionDocente } from '@prisma/client';
+import {
+  DedicacionDocente,
+  Prisma,
+} from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 // Función para generar una contraseña temporal aleatoria
@@ -32,31 +35,77 @@ export class DocentesService {
   }
 
   static async crear(datos: any) {
-    const codigoIbm = typeof datos.codigo_ibm === 'string' && datos.codigo_ibm.trim().length > 0
-      ? datos.codigo_ibm.trim()
-      : `IBM-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const normalizarTexto = (valor?: string | null) => {
+      if (!valor) return null;
+
+      const limpio = valor.trim();
+
+      return limpio.length > 0 ? limpio : null;
+    };
+
+    const codigoIbm =
+      normalizarTexto(datos.codigo_ibm) ??
+      `IBM-${Date.now()}`;
+
+    const data: Prisma.docenteCreateInput = {
+      codigo_ibm: codigoIbm,
+
+      dni: normalizarTexto(datos.dni),
+
+      nombres: datos.nombres.trim(),
+
+      apellidos: datos.apellidos.trim(),
+
+      email: datos.email.trim().toLowerCase(),
+
+      empleo: normalizarTexto(datos.empleo),
+
+      telefono: normalizarTexto(datos.telefono),
+
+      modalidad: datos.modalidad,
+
+      categoria: datos.categoria,
+
+      dedicacion:
+        (datos.dedicacion as DedicacionDocente) ??
+        DedicacionDocente.TIEMPO_COMPLETO_40H,
+
+      antiguedad: datos.antiguedad ?? 0,
+
+      horas_max_semana:
+        datos.horas_max_semana ?? 40,
+
+      activo: true,
+    };
+
+    // Relación sede
+    if (datos.id_sede_principal) {
+      data.sede_principal = {
+        connect: {
+          id: Number(datos.id_sede_principal),
+        },
+      };
+    }
 
     const docente = await prisma.docente.create({
-      data: {
-        codigo_ibm: codigoIbm,
-        nombres: datos.nombres,
-        apellidos: datos.apellidos,
-        email: datos.email,
-        telefono: datos.telefono,
-        modalidad: datos.modalidad,
-        categoria: datos.categoria,
-        antiguedad: datos.antiguedad ?? 0,
-        horas_max_semana: datos.horas_max_semana ?? 40,
-      },
+      data,
     });
 
     let passwordTemporal: string | null = null;
+
     if (datos.crear_usuario) {
-      passwordTemporal = datos.password || generarPasswordTemporal();
-      const hash = await bcrypt.hash(passwordTemporal, 12);
+      passwordTemporal =
+        datos.password ||
+        generarPasswordTemporal();
+
+      const hash = await bcrypt.hash(
+        passwordTemporal,
+        12
+      );
+
       await prisma.usuario.create({
         data: {
-          email: datos.email,
+          email: docente.email,
           hash_contrasena: hash,
           rol: 'DOCENTE',
           id_docente: docente.id,
@@ -64,45 +113,66 @@ export class DocentesService {
       });
     }
 
-    // Inicializar disponibilidad del docente (horario completo disponible)
-    const dias = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES'];
-    const horas = [
-      { inicio: '07:00', fin: '08:00' },
-      { inicio: '08:00', fin: '09:00' },
-      { inicio: '09:00', fin: '10:00' },
-      { inicio: '10:00', fin: '11:00' },
-      { inicio: '11:00', fin: '12:00' },
-      { inicio: '14:00', fin: '15:00' },
-      { inicio: '15:00', fin: '16:00' },
-      { inicio: '16:00', fin: '17:00' },
-      { inicio: '17:00', fin: '18:00' },
-      { inicio: '18:00', fin: '19:00' },
-      { inicio: '19:00', fin: '20:00' },
-      { inicio: '20:00', fin: '21:00' },
-      { inicio: '21:00', fin: '22:00' },
+    // Disponibilidad inicial
+    const dias = [
+      'LUNES',
+      'MARTES',
+      'MIERCOLES',
+      'JUEVES',
+      'VIERNES',
     ];
 
-    for (const dia of dias) {
-      for (const hora of horas) {
-        await prisma.disponibilidad_docente.create({
-          data: {
-            id_docente: docente.id,
-            dia_semana: dia,
-            hora_inicio: hora.inicio,
-            hora_fin: hora.fin,
-            disponible: true,
-          },
-        });
-      }
-    }
+    const horas = [
+      ['07:00', '08:00'],
+      ['08:00', '09:00'],
+      ['09:00', '10:00'],
+      ['10:00', '11:00'],
+      ['11:00', '12:00'],
+      ['14:00', '15:00'],
+      ['15:00', '16:00'],
+      ['16:00', '17:00'],
+      ['17:00', '18:00'],
+      ['18:00', '19:00'],
+      ['19:00', '20:00'],
+      ['20:00', '21:00'],
+      ['21:00', '22:00'],
+    ];
 
-    return { ...docente, passwordTemporal };
+    await prisma.disponibilidad_docente.createMany({
+      data: dias.flatMap((dia) =>
+        horas.map(([inicio, fin]) => ({
+          id_docente: docente.id,
+          dia_semana: dia,
+          hora_inicio: inicio,
+          hora_fin: fin,
+          disponible: true,
+        }))
+      ),
+    });
+
+    return {
+      ...docente,
+      passwordTemporal,
+    };
   }
 
   static async actualizar(id: number, datos: any) {
-    // Filtrar campos que no pertenecen al modelo docente
-    const { crear_usuario, password, ...datosLimpios } = datos;
-    return prisma.docente.update({ where: { id }, data: datosLimpios });
+    const {
+      crear_usuario,
+      password,
+      ...resto
+    } = datos;
+
+    return prisma.docente.update({
+      where: { id },
+      data: {
+        ...resto,
+
+        dedicacion: resto.dedicacion
+          ? (resto.dedicacion as DedicacionDocente)
+          : undefined,
+      },
+    });
   }
 
   static async eliminar(id: number) {
