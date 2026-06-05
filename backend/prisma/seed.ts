@@ -1,5 +1,3 @@
-import * as fs from 'fs';
-import * as path from 'path';
 import fs from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
@@ -27,6 +25,12 @@ async function main() {
   console.log('=== INICIO DE SEMILLA DE HORARIOS ===');
 
   try {
+    // ============================================================
+    // 0. AÑADIR COLUMNAS FALTANTES SI NO EXISTEN
+    // ============================================================
+    await prisma.$executeRaw`ALTER TABLE docente ADD COLUMN IF NOT EXISTS dni VARCHAR(20) UNIQUE;`;
+    await prisma.$executeRaw`ALTER TABLE docente ADD COLUMN IF NOT EXISTS empleo VARCHAR(150);`;
+
     // ============================================================
     // 1. PERÍODO ACADÉMICO
     // ============================================================
@@ -211,7 +215,7 @@ async function main() {
           id_periodo: periodo.id,
           id_curso: curso.id,
           id_ciclo: cicloObj.id,
-          tipo_curso: def.tipo,
+          tipo_curso: def.tipo as TipoCurso,
           estado: 'BORRADOR',
         },
       });

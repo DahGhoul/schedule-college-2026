@@ -2,6 +2,8 @@ import { prisma } from '@/lib/prisma';
 import PDFDocument from 'pdfkit';
 import { crearContextoHorarioCiclo, formatearEtiquetaCelda, obtenerColorCurso } from './horario-ciclo.utils';
 
+const BORDER_COLOR = '#94A3B8'; // Darker grey border
+
 function formatearFranjaHora(horaInicio: string): string {
   const [horas, minutos] = horaInicio.split(':');
   const horaFinal = String(Number(horas) + 1).padStart(2, '0');
@@ -9,16 +11,43 @@ function formatearFranjaHora(horaInicio: string): string {
 }
 
 function obtenerClaveFusionPdf(bloque: any): string {
-  return `${bloque.dia_semana}-${bloque.id_docente}-${bloque.componente.id_oferta}-${bloque.componente.tipo}`;
+  // Include group ID to prevent merging different groups
+  const grupoId = bloque.grupo?.id ?? '';
+  return `${bloque.dia_semana}-${bloque.id_docente}-${bloque.componente.id_oferta}-${bloque.componente.tipo}-${grupoId}`;
 }
 
 function formatearEtiquetaCeldaPdf(registro: any, bloque: any): string {
   const ambienteEtiqueta = bloque?.ambiente?.codigo || 'Solic.';
-  if (!registro) {
-    return ambienteEtiqueta;
+  let cursoNombre = '';
+  if (registro?.nombre) {
+    const palabras = registro.nombre.split(' ');
+    if (palabras.length > 3) {
+      cursoNombre = palabras.map(p => p.charAt(0).toUpperCase()).join('');
+    } else {
+      cursoNombre = registro.nombre;
+    }
+  } else if (bloque?.componente?.oferta?.curso?.nombre) {
+    const palabras = bloque.componente.oferta.curso.nombre.split(' ');
+    if (palabras.length > 3) {
+      cursoNombre = palabras.map(p => p.charAt(0).toUpperCase()).join('');
+    } else {
+      cursoNombre = bloque.componente.oferta.curso.nombre;
+    }
   }
 
-  return [String(registro.indice), registro.cursoNombre, ambienteEtiqueta].filter(Boolean).join('\n');
+  const esTeoria = bloque?.componente?.tipo === 'TEORIA';
+  const grupoEtiqueta = (!esTeoria && bloque?.grupo?.codigo) ? `Gr. ${bloque.grupo.codigo}` : '';
+
+  if (!registro) {
+    return [cursoNombre, ambienteEtiqueta].filter(Boolean).join('\n');
+  }
+
+  const partes = [String(registro.indice), cursoNombre];
+  if (grupoEtiqueta) {
+    partes.push(grupoEtiqueta);
+  }
+  partes.push(ambienteEtiqueta);
+  return partes.filter(Boolean).join('\n');
 }
 
 function calcularFusionPdf(
@@ -52,7 +81,7 @@ function dibujarCajaInfoPeriodo(
   height: number,
   lineas: string[]
 ) {
-  doc.roundedRect(leftColX - 6, topMargin - 6, width, height, 4).stroke('#CBD5E1');
+  doc.roundedRect(leftColX - 6, topMargin - 6, width, height, 4).stroke(BORDER_COLOR);
   const lineHeight = Math.max(10, Math.floor((height - 20) / Math.max(lineas.length, 1)));
   lineas.forEach((linea, index) => {
     const y = topMargin + (index * lineHeight);
@@ -80,7 +109,6 @@ export class GeneradorPdfService {
     return new Promise((resolve, reject) => {
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
-
       this.generarPaginaCiclo(doc, idPeriodo, idCiclo, periodo, ciclo).then(() => {
         doc.end();
       });
@@ -103,7 +131,6 @@ export class GeneradorPdfService {
     return new Promise((resolve, reject) => {
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
-
       this.generarPaginaDocente(doc, idPeriodo, idDocente, periodo, docente).then(() => {
         doc.end();
       });
@@ -112,13 +139,12 @@ export class GeneradorPdfService {
 
   private static async generarPaginaDocente(doc: PDFDocumentWithTable, idPeriodo: number, idDocente: number, periodo: any, docente: any) {
     const leftColX = 40;
-    const rightColX = 285;
     const topMargin = 40;
     const pageWidth = doc.page.width - 80;
-    const headerBoxWidth = 205;
-    const headerBoxHeight = 118;
+    const headerBoxWidth = pageWidth * 0.3; // Reduced to 30%
+    const headerBoxHeight = 110; // Reduced height
 
-    // --- 1. CABECERA ---
+    // --- PÁGINA 1: CABECERA (IZQUIERDA) + TABLA DE DETALLE (DERECHA) ---
     dibujarCajaInfoPeriodo(doc, leftColX, topMargin, headerBoxWidth, headerBoxHeight, [
       'UNIVERSIDAD NACIONAL DE TRUJILLO',
       'FACULTAD DE INGENIERÍA',
@@ -130,13 +156,23 @@ export class GeneradorPdfService {
       `FECHA: ${new Date().toLocaleDateString('es-PE')}`,
     ]);
 
-    // --- 2. TABLA DETALLE ---
     const detailHeaders = ['N°', 'ASIGNATURA', 'CICLO', 'T', 'L', 'GRP', 'TOT'];
-    const colWidths = [15, 180, 30, 20, 20, 30, 25];
+    const availableTableWidth = pageWidth - headerBoxWidth - 20;
+    const colWidths = [
+      availableTableWidth * 0.05, 
+      availableTableWidth * 0.45, 
+      availableTableWidth * 0.10, 
+      availableTableWidth * 0.08, 
+      availableTableWidth * 0.08, 
+      availableTableWidth * 0.12, 
+      availableTableWidth * 0.12
+    ];
+    const tableStartX = leftColX + headerBoxWidth + 20;
     let currentY = topMargin;
     
+    // Draw table header
     doc.font('Helvetica-Bold').fontSize(7);
-    let currentX = rightColX;
+    let currentX = tableStartX;
     detailHeaders.forEach((h, i) => {
       doc.rect(currentX, currentY, colWidths[i], 12).fill('#1E293B').stroke('#1E293B');
       doc.fillColor('white').text(h, currentX, currentY + 3, { width: colWidths[i], align: 'center' });
@@ -159,7 +195,7 @@ export class GeneradorPdfService {
     const mapaCursos: Record<number, { indice: number; color: string; nombre: string; ciclo: number; teo: number; lab: number; grupos: number; total: number }> = {};
     let indexCurso = 1;
 
-    for (const asig of asignaciones) {
+    for (const asig of asignaciones as any[]) {
       const cursoId = asig.componente.oferta.id_curso;
       if (!mapaCursos[cursoId]) {
         const colorCurso = obtenerColorCurso(indexCurso).slice(2);
@@ -180,25 +216,27 @@ export class GeneradorPdfService {
       mapaCursos[cursoId].total += asig.horas_asignadas;
     }
 
-    for (const cid in mapaCursos) {
-      const info = mapaCursos[cid];
+    for (const key in mapaCursos) {
+      const info = mapaCursos[key];
       const rowData = [String(info.indice), info.nombre, `${info.ciclo}°`, String(info.teo), String(info.lab), String(info.grupos), String(info.total)];
-      currentX = rightColX;
+      currentX = tableStartX;
       doc.font('Helvetica').fontSize(6).fillColor('black');
       rowData.forEach((val, i) => {
-        doc.rect(currentX, currentY, colWidths[i], 10).fill(`#${info.color}`).stroke('#E2E8F0');
+        doc.rect(currentX, currentY, colWidths[i], 10).fill(`#${info.color}`).stroke(BORDER_COLOR);
         doc.fillColor('#334155').text(val, currentX, currentY + 2, { width: colWidths[i], align: 'center', ellipsis: true });
         currentX += colWidths[i];
       });
       currentY += 10;
     }
 
-    // --- 3. HORARIO ---
-    const horarioTop = Math.max(currentY + 20, 140);
-    const dias = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
+    // --- PÁGINA 2: HORARIO COMPLETO (ocupa todo el ancho) ---
+    doc.addPage({ size: 'A4', layout: 'landscape', margin: 30 });
+
+    const horarioTop = 40;
+    const dias = ['LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES', 'SÁBADO'];
     const horas = ['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'];
-    const gridColWidth = pageWidth / 7;
-    const gridRowHeight = 20;
+    const gridColWidth = (doc.page.width - 80) / 7;
+    const gridRowHeight = 32; // Increased height a bit more
 
     doc.font('Helvetica-Bold').fontSize(8);
     doc.rect(leftColX, horarioTop, gridColWidth, 15).fill('#334155').stroke('#334155');
@@ -226,9 +264,8 @@ export class GeneradorPdfService {
     const slotsOcupados = new Set<string>();
     let y = horarioTop + 15;
     horas.forEach((hora, horaIndex) => {
-      doc.rect(leftColX, y, gridColWidth, gridRowHeight).stroke('#E2E8F0');
+      doc.rect(leftColX, y, gridColWidth, gridRowHeight).stroke(BORDER_COLOR);
       doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(7).text(formatearFranjaHora(hora), leftColX, y + 8, { width: gridColWidth, align: 'center' });
-
       dias.forEach((dia, dIdx) => {
         const x = leftColX + (dIdx + 1) * gridColWidth;
         const slotKey = `${dia}-${hora}`;
@@ -238,23 +275,26 @@ export class GeneradorPdfService {
 
         const celdasEnHora = celdasPorSlot[slotKey] ?? [];
         
-        doc.rect(x, y, gridColWidth, gridRowHeight).stroke('#E2E8F0');
+        doc.rect(x, y, gridColWidth, gridRowHeight).stroke(BORDER_COLOR);
         if (celdasEnHora.length > 0) {
-          const celda = celdasEnHora[0];
-          const bloque = celda.bloque;
-          const info = celda.info;
+          // Check if all have same curso/docente to merge vertically
           const puedeFusionar = celdasEnHora.length === 1;
-          const span = puedeFusionar ? calcularFusionPdf(celdasPorSlot, dia, horaIndex, horas, bloque) : 1;
+          const primerBloque = celdasEnHora[0].bloque;
+          const span = puedeFusionar ? calcularFusionPdf(celdasPorSlot, dia, horaIndex, horas, primerBloque) : 1;
           const altoCelda = gridRowHeight * span;
 
-          doc.rect(x, y, gridColWidth, altoCelda).fill(info?.color || '#FFFFFF').stroke('#E2E8F0');
+        doc.rect(x, y, gridColWidth, altoCelda).fill(celdasEnHora[0].info?.color || '#FFFFFF').stroke(BORDER_COLOR);
 
-          const texto = formatearEtiquetaCeldaPdf(info, bloque);
-          const textoY = y + Math.max(3, (altoCelda - 12) / 2);
-          doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(6).text(texto, x + 2, textoY, {
-            width: gridColWidth - 4,
-            align: 'center',
-            lineBreak: true
+          // Draw each entry separated and vertically centered
+          const entryHeight = altoCelda / celdasEnHora.length;
+          celdasEnHora.forEach((celda, idx) => {
+            const texto = formatearEtiquetaCeldaPdf(celda.info, celda.bloque);
+            const textoY = y + idx * entryHeight + (entryHeight / 2) - 8; // Vertical center
+            doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(6).text(texto, x + 2, textoY, {
+              width: gridColWidth - 4,
+              align: 'center',
+              lineBreak: true
+            });
           });
 
           if (span > 1) {
@@ -271,11 +311,11 @@ export class GeneradorPdfService {
   private static async generarPaginaCiclo(doc: PDFDocumentWithTable, idPeriodo: number, idCiclo: number, periodo: any, ciclo: any) {
     const topMargin = 40;
     const leftColX = 40;
-    const rightColX = 285;
     const pageWidth = doc.page.width - 80;
-    const headerBoxWidth = 205;
-    const headerBoxHeight = 118;
+    const headerBoxWidth = pageWidth * 0.3; // Reduced to 30%
+    const headerBoxHeight = 110; // Reduced height
 
+    // --- PÁGINA 1: CABECERA (IZQUIERDA) + TABLA DE DETALLE (DERECHA) ---
     dibujarCajaInfoPeriodo(doc, leftColX, topMargin, headerBoxWidth, headerBoxHeight, [
       'UNIVERSIDAD NACIONAL DE TRUJILLO',
       'FACULTAD DE INGENIERÍA',
@@ -288,10 +328,22 @@ export class GeneradorPdfService {
       `TÉRMINO DEL CICLO: ${periodo?.fecha_fin ? new Date(periodo.fecha_fin).toLocaleDateString('es-PE') : '-'}`,
     ]);
 
-    const detailHeaders = ['N°', 'PROFESOR', 'ASIGNATURA', 'T', 'P', 'L', 'G', 'T.HORAS', 'DEPARTAMENTO'];
-    const colWidths = [14, 144, 92, 16, 16, 16, 16, 24, 59];
+    const detailHeaders = ['N°', 'PROFESOR', 'ASIGNATURA', 'T', 'P', 'L', 'G', 'T.H', 'DEPARTAMENTO'];
+    const availableTableWidth = pageWidth - headerBoxWidth - 20;
+    const colWidths = [
+      availableTableWidth * 0.04, 
+      availableTableWidth * 0.22, 
+      availableTableWidth * 0.30, 
+      availableTableWidth * 0.06, 
+      availableTableWidth * 0.06, 
+      availableTableWidth * 0.06, 
+      availableTableWidth * 0.06, 
+      availableTableWidth * 0.08, 
+      availableTableWidth * 0.12
+    ];
+    const tableStartX = leftColX + headerBoxWidth + 20;
     let currentY = topMargin;
-    let currentX = rightColX;
+    let currentX = tableStartX;
 
     doc.font('Helvetica-Bold').fontSize(7);
     detailHeaders.forEach((h, i) => {
@@ -321,7 +373,7 @@ export class GeneradorPdfService {
       ]
     });
 
-    const contexto = crearContextoHorarioCiclo(bloques as any);
+    const contexto = crearContextoHorarioCiclo(bloques as any[]);
     const slotsOcupados = new Set<string>();
 
     for (const info of contexto.registros) {
@@ -337,14 +389,14 @@ export class GeneradorPdfService {
         info.departamento
       ];
 
-      currentX = rightColX;
+      currentX = tableStartX;
       doc.font('Helvetica').fontSize(6).fillColor('black');
       rowData.forEach((val, i) => {
-        doc.rect(currentX, currentY, colWidths[i], 10).fill(`#${info.color.slice(2)}`).stroke('#E2E8F0');
+        doc.rect(currentX, currentY, colWidths[i], 10).fill(`#${info.color.slice(2)}`).stroke(BORDER_COLOR);
         doc.fillColor('#334155').text(val, currentX, currentY + 2, {
           width: colWidths[i],
           height: 10,
-          align: 'center',
+          align: i === 1 || i === 2 ? 'left' : 'center',
           ellipsis: true,
           lineBreak: false
         });
@@ -353,15 +405,18 @@ export class GeneradorPdfService {
       currentY += 10;
     }
 
-    const horarioTop = Math.max(currentY + 24, topMargin + headerBoxHeight + 18);
-    const dias = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
+    // --- PÁGINA 2: HORARIO COMPLETO (ocupa todo el ancho) ---
+    doc.addPage({ size: 'A4', layout: 'landscape', margin: 30 });
+
+    const horarioTop = 40;
+    const dias = ['LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES', 'SÁBADO'];
     const horas = [
       '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00',
       '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'
     ];
 
-    const gridColWidth = Math.min((doc.page.width - (leftColX * 2)) / 7, 125);
-    const gridRowHeight = 20;
+    const gridColWidth = (doc.page.width - 80) / 7;
+    const gridRowHeight = 32; // Increased height a bit more
 
     doc.font('Helvetica-Bold').fontSize(8);
     doc.rect(leftColX, horarioTop, gridColWidth, 15).fill('#334155').stroke('#334155');
@@ -375,7 +430,7 @@ export class GeneradorPdfService {
 
     let y = horarioTop + 15;
     horas.forEach((hora, horaIndex) => {
-      doc.rect(leftColX, y, gridColWidth, gridRowHeight).stroke('#E2E8F0');
+      doc.rect(leftColX, y, gridColWidth, gridRowHeight).stroke(BORDER_COLOR);
       doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(7).text(formatearFranjaHora(hora), leftColX, y + 8, { width: gridColWidth, align: 'center' });
 
       dias.forEach((dia, dIdx) => {
@@ -388,25 +443,27 @@ export class GeneradorPdfService {
         const entradas = contexto.celdas[slotKey] ?? [];
 
         if (entradas.length === 0) {
-          doc.rect(x, y, gridColWidth, gridRowHeight).stroke('#E2E8F0');
+          doc.rect(x, y, gridColWidth, gridRowHeight).stroke(BORDER_COLOR);
           return;
         }
 
-        const celda = entradas[0];
-        const bloque = celda.bloque;
-        const info = celda.registro;
         const puedeFusionar = entradas.length === 1;
-        const span = puedeFusionar ? calcularFusionPdf(contexto.celdas, dia, horaIndex, horas, bloque) : 1;
+        const primerBloque = entradas[0].bloque;
+        const span = puedeFusionar ? calcularFusionPdf(contexto.celdas, dia, horaIndex, horas, primerBloque) : 1;
         const altoCelda = gridRowHeight * span;
 
-        doc.rect(x, y, gridColWidth, altoCelda).fill(`#${info.color.slice(2)}`).stroke('#E2E8F0');
+        doc.rect(x, y, gridColWidth, altoCelda).fill(`#${entradas[0].registro.color.slice(2)}`).stroke(BORDER_COLOR);
 
-        const texto = formatearEtiquetaCeldaPdf(info, bloque);
-        const textoY = y + Math.max(3, (altoCelda - 12) / 2);
-        doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(6).text(texto, x + 2, textoY, {
-          width: gridColWidth - 4,
-          align: 'center',
-          lineBreak: true
+        // Draw each entry separated and vertically centered
+        const entryHeight = altoCelda / entradas.length;
+        entradas.forEach((celda, idx) => {
+          const texto = formatearEtiquetaCeldaPdf(celda.registro, celda.bloque);
+          const textoY = y + idx * entryHeight + (entryHeight / 2) - 8; // Vertical center
+          doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(6).text(texto, x + 2, textoY, {
+            width: gridColWidth - 4,
+            align: 'center',
+            lineBreak: true
+          });
         });
 
         if (span > 1) {
@@ -450,7 +507,7 @@ export class GeneradorPdfService {
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
       for (let i = 0; i < ambientes.length; i++) {
-        if (i > 0) doc.addPage({ layout: 'landscape' });
+        if (i > 0) doc.addPage({ size: 'A4', layout: 'landscape', margin: 30 });
         await this.generarPaginaAmbiente(doc, idPeriodo, ambientes[i].id, periodo, ambientes[i]);
       }
       doc.end();
@@ -459,13 +516,12 @@ export class GeneradorPdfService {
 
   private static async generarPaginaAmbiente(doc: PDFDocumentWithTable, idPeriodo: number, idAmbiente: number, periodo: any, ambiente: any) {
     const leftColX = 40;
-    const rightColX = 285;
     const topMargin = 40;
     const pageWidth = doc.page.width - 80;
-    const headerBoxWidth = 205;
-    const headerBoxHeight = 118;
+    const headerBoxWidth = pageWidth * 0.3; // Reduced to 30%
+    const headerBoxHeight = 100; // Reduced height
 
-    // 1. CABECERA
+    // --- PÁGINA 1: CABECERA (IZQUIERDA) + TABLA DE DETALLE (DERECHA) ---
     dibujarCajaInfoPeriodo(doc, leftColX, topMargin, headerBoxWidth, headerBoxHeight, [
       'UNIVERSIDAD NACIONAL DE TRUJILLO',
       'FACULTAD DE INGENIERÍA',
@@ -476,13 +532,22 @@ export class GeneradorPdfService {
       `FECHA: ${new Date().toLocaleDateString('es-PE')}`,
     ]);
 
-    // 2. TABLA DETALLE
     const detailHeaders = ['N°', 'PROFESOR', 'ASIGNATURA', 'CICLO', 'TIPO', 'G', 'TOT'];
-    const colWidths = [15, 90, 130, 30, 30, 20, 25];
+    const availableTableWidth = pageWidth - headerBoxWidth - 20;
+    const colWidths = [
+      availableTableWidth * 0.05, 
+      availableTableWidth * 0.25, 
+      availableTableWidth * 0.35, 
+      availableTableWidth * 0.08, 
+      availableTableWidth * 0.08, 
+      availableTableWidth * 0.08, 
+      availableTableWidth * 0.11
+    ];
+    const tableStartX = leftColX + headerBoxWidth + 20;
     let currentY = topMargin;
     
     doc.font('Helvetica-Bold').fontSize(7);
-    let currentX = rightColX;
+    let currentX = tableStartX;
     detailHeaders.forEach((h, i) => {
       doc.rect(currentX, currentY, colWidths[i], 12).fill('#1E293B').stroke('#1E293B');
       doc.fillColor('white').text(h, currentX, currentY + 3, { width: colWidths[i], align: 'center' });
@@ -503,7 +568,7 @@ export class GeneradorPdfService {
     const coloresPorCurso = new Map<number, string>();
     let indexDocente = 1;
 
-    bloques.forEach(b => {
+    (bloques as any[]).forEach(b => {
       const cursoId = b.componente.oferta.id_curso;
       const key = `${b.id_docente}-${b.componente.id_oferta}`;
       if (!mapaDocenteCurso[key]) {
@@ -528,18 +593,47 @@ export class GeneradorPdfService {
     for (const key in mapaDocenteCurso) {
       const info = mapaDocenteCurso[key];
       const rowData = [String(info.indice), info.nombre, info.cursoNombre, `${info.ciclo}°`, info.tipo, info.grupo, String(info.total)];
-      currentX = rightColX;
+      currentX = tableStartX;
       doc.font('Helvetica').fontSize(6).fillColor('black');
       rowData.forEach((val, i) => {
-        doc.rect(currentX, currentY, colWidths[i], 10).fill(`#${info.color}`).stroke('#E2E8F0');
+        doc.rect(currentX, currentY, colWidths[i], 10).fill(`#${info.color}`).stroke(BORDER_COLOR);
         doc.fillColor('#334155').text(val, currentX, currentY + 2, { width: colWidths[i], align: i === 1 || i === 2 ? 'left' : 'center', ellipsis: true });
         currentX += colWidths[i];
       });
       currentY += 10;
     }
 
+    // --- PÁGINA 2: HORARIO COMPLETO (ocupa todo el ancho) ---
+    doc.addPage({ size: 'A4', layout: 'landscape', margin: 30 });
+
     function formatearEtiquetaCeldaAmbiente(registro: any, bloque: any): string {
-      return [String(registro.indice), registro.nombreCompleto || registro.nombre, bloque.componente.oferta.curso.nombre].filter(Boolean).join('\n');
+      let cursoNombre = '';
+      if (registro?.cursoNombre) {
+        const palabras = registro.cursoNombre.split(' ');
+        if (palabras.length > 3) {
+          cursoNombre = palabras.map(p => p.charAt(0).toUpperCase()).join('');
+        } else {
+          cursoNombre = registro.cursoNombre;
+        }
+      } else if (bloque?.componente?.oferta?.curso?.nombre) {
+        const palabras = bloque.componente.oferta.curso.nombre.split(' ');
+        if (palabras.length > 3) {
+          cursoNombre = palabras.map(p => p.charAt(0).toUpperCase()).join('');
+        } else {
+          cursoNombre = bloque.componente.oferta.curso.nombre;
+        }
+      }
+
+      const esTeoria = bloque?.componente?.tipo === 'TEORIA';
+      const grupoEtiqueta = (!esTeoria && bloque?.grupo?.codigo) ? `Gr. ${bloque.grupo.codigo}` : '';
+      const ambienteEtiqueta = bloque?.ambiente?.codigo || 'Solic.';
+
+      const partes = [String(registro.indice), cursoNombre];
+      if (grupoEtiqueta) {
+        partes.push(grupoEtiqueta);
+      }
+      partes.push(ambienteEtiqueta);
+      return partes.filter(Boolean).join('\n');
     }
 
     const celdasPorSlot: Record<string, Array<{ bloque: any; info: any }>> = {};
@@ -551,12 +645,11 @@ export class GeneradorPdfService {
       celdasPorSlot[slotKey] = entradas;
     }
 
-    // 3. HORARIO
-    const horarioTop = Math.max(currentY + 20, 140);
-    const dias = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
+    const horarioTop = 40;
+    const dias = ['LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES', 'SÁBADO'];
     const horas = ['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'];
-    const gridColWidth = pageWidth / 7;
-    const gridRowHeight = 20;
+    const gridColWidth = (doc.page.width - 80) / 7;
+    const gridRowHeight = 32; // Increased height a bit more
 
     doc.font('Helvetica-Bold').fontSize(8);
     doc.rect(leftColX, horarioTop, gridColWidth, 15).fill('#334155').stroke('#334155');
@@ -570,7 +663,7 @@ export class GeneradorPdfService {
     const slotsOcupados = new Set<string>();
     let y = horarioTop + 15;
     horas.forEach((hora, horaIndex) => {
-      doc.rect(leftColX, y, gridColWidth, gridRowHeight).stroke('#E2E8F0');
+      doc.rect(leftColX, y, gridColWidth, gridRowHeight).stroke(BORDER_COLOR);
       doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(7).text(formatearFranjaHora(hora), leftColX, y + 8, { width: gridColWidth, align: 'center' });
       dias.forEach((dia, dIdx) => {
         const x = leftColX + (dIdx + 1) * gridColWidth;
@@ -581,23 +674,26 @@ export class GeneradorPdfService {
 
         const celdasEnHora = celdasPorSlot[slotKey] ?? [];
         
-        doc.rect(x, y, gridColWidth, gridRowHeight).stroke('#E2E8F0');
+        doc.rect(x, y, gridColWidth, gridRowHeight).stroke(BORDER_COLOR);
         if (celdasEnHora.length > 0) {
-          const celda = celdasEnHora[0];
-          const bloque = celda.bloque;
-          const info = celda.info;
+          // Check if all have same curso/docente to merge vertically
           const puedeFusionar = celdasEnHora.length === 1;
-          const span = puedeFusionar ? calcularFusionPdf(celdasPorSlot, dia, horaIndex, horas, bloque) : 1;
+          const primerBloque = celdasEnHora[0].bloque;
+          const span = puedeFusionar ? calcularFusionPdf(celdasPorSlot, dia, horaIndex, horas, primerBloque) : 1;
           const altoCelda = gridRowHeight * span;
 
-          doc.rect(x, y, gridColWidth, altoCelda).fill(info?.color || '#FFFFFF').stroke('#E2E8F0');
+          doc.rect(x, y, gridColWidth, altoCelda).fill(celdasEnHora[0].info?.color || '#FFFFFF').stroke(BORDER_COLOR);
 
-          const texto = formatearEtiquetaCeldaAmbiente(info, bloque);
-          const textoY = y + Math.max(3, (altoCelda - 12) / 2);
-          doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(6).text(texto, x + 2, textoY, {
-            width: gridColWidth - 4,
-            align: 'center',
-            lineBreak: true
+          // Draw each entry separated and vertically centered
+          const entryHeight = altoCelda / celdasEnHora.length;
+          celdasEnHora.forEach((celda, idx) => {
+            const texto = formatearEtiquetaCeldaAmbiente(celda.info, celda.bloque);
+            const textoY = y + idx * entryHeight + (entryHeight / 2) - 8; // Vertical center
+            doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(6).text(texto, x + 2, textoY, {
+              width: gridColWidth - 4,
+              align: 'center',
+              lineBreak: true
+            });
           });
 
           if (span > 1) {
@@ -616,7 +712,7 @@ export class GeneradorPdfService {
     const ciclos = await prisma.ciclo.findMany({ 
       where: { 
         id_periodo: idPeriodo,
-        ofertas: { some: {} } // Solo ciclos con oferta
+        ofertas: { some: {} }
       },
       orderBy: { numero: 'asc' } 
     });
@@ -628,9 +724,8 @@ export class GeneradorPdfService {
     return new Promise(async (resolve, reject) => {
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
-
       for (let i = 0; i < ciclos.length; i++) {
-        if (i > 0) doc.addPage({ layout: 'landscape' });
+        if (i > 0) doc.addPage({ size: 'A4', layout: 'landscape', margin: 30 });
         await this.generarPaginaCiclo(doc, idPeriodo, ciclos[i].id, periodo, ciclos[i]);
       }
       doc.end();
@@ -654,7 +749,6 @@ export class GeneradorPdfService {
       ]
     });
 
-    // Lógica de agrupación de bloques contiguos
     const bloquesAgrupados: any[] = [];
     if (bloques.length > 0) {
       let actual = { ...bloques[0] };
@@ -682,7 +776,6 @@ export class GeneradorPdfService {
     return new Promise((resolve, reject) => {
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
-
       doc.fontSize(14).font('Helvetica-Bold').text(`REPORTE DE AUDITORÍA - ${dia}`, { align: 'center' });
       doc.fontSize(10).font('Helvetica').text(`Periodo: ${periodo?.nombre} | Fecha: ${new Date().toLocaleDateString()}`, { align: 'center' });
       doc.moveDown(2);
@@ -715,7 +808,7 @@ export class GeneradorPdfService {
         ];
 
         row.forEach((val, i) => {
-          doc.rect(colX[i], currentY, colX[i+1] - colX[i], 15).stroke('#E2E8F0');
+          doc.rect(colX[i], currentY, colX[i+1] - colX[i], 15).stroke(BORDER_COLOR);
           doc.text(val, colX[i] + 2, currentY + 4, { width: colX[i+1] - colX[i] - 4, align: i === 1 || i === 2 ? 'left' : 'center', ellipsis: true });
         });
         currentY += 15;
@@ -739,7 +832,6 @@ export class GeneradorPdfService {
     return new Promise(async (resolve, reject) => {
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
-
       for (let i = 0; i < docentes.length; i++) {
         if (i > 0) doc.addPage({ layout: 'landscape' });
         await this.generarPaginaDocente(doc, idPeriodo, docentes[i].id, periodo, docentes[i]);
