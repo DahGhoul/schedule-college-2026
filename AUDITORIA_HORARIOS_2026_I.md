@@ -15,6 +15,20 @@ Objetivo: dejar una lista operativa de lo que ya existe en el sistema, lo que ex
 | Falta revisar | Falta confirmar que el comando de seed se ejecute sin errores en entorno limpio y que sea idempotente en una corrida repetida. | [backend/package.json](backend/package.json), [backend/docker-entrypoint.sh](backend/docker-entrypoint.sh) |
 | Bloqueado | La validación real del seed falla en este entorno porque no existe la variable DATABASE_URL. | [backend/prisma/seed.ts](backend/prisma/seed.ts), [backend/prisma/schema.prisma](backend/prisma/schema.prisma) |
 
+#### Comando único para re-seed rápido en Docker
+
+Si el stack ya está levantado con `docker compose up --build -d`, el re-seed se ejecuta con un solo comando desde la raíz del proyecto:
+
+```bash
+docker compose exec -T backend npx prisma db seed
+```
+
+Notas operativas:
+
+- Este comando corre el seed dentro del contenedor `backend`, así evita el problema de `tsx` o dependencias faltantes en el host Windows.
+- Si el contenedor `backend` no está levantado, primero hay que arrancar el stack con `docker compose up -d` o `docker compose up --build -d`.
+- El seed actual limpia y recrea los datos del periodo 2026-I, así que conviene usarlo solo cuando se quiera refrescar la base de pruebas.
+
 ### Carga horaria
 
 | Estado | Hallazgo | Archivo |

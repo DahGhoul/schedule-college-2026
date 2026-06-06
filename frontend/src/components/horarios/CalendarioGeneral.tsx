@@ -20,6 +20,12 @@ const HORAS = Array.from({ length: 15 }, (_, i) => {
   return `${h.toString().padStart(2, '0')}:00`;
 });
 
+function formatearFranjaHora(horaInicio: string): string {
+  const horaBase = parseInt(horaInicio.split(':')[0], 10);
+  const horaFin = horaBase + 1;
+  return `${horaBase}:00 - ${horaFin}:00`;
+}
+
 export function CalendarioGeneral({ idPeriodo, filtroTipo, filtroId, ambienteAsignacionId = null, modo = 'EDICION' }: Props) {
   const queryClient = useQueryClient();
   const [errorToast, setErrorToast] = useState<{ mensaje: string; id: number } | null>(null);
@@ -220,7 +226,7 @@ export function CalendarioGeneral({ idPeriodo, filtroTipo, filtroId, ambienteAsi
               return (
                 <tr key={hora} className="group hover:bg-slate-50 transition-colors">
                   <td className="p-2 text-[11px] font-bold text-gray-600 text-center border-r border-b border-gray-100 align-middle w-32 bg-slate-50/30">
-                    {hora} - {horaFin}
+                    {formatearFranjaHora(hora)}
                   </td>
                   {DIAS.map((dia) => {
                     const clasesEnCelda = getCelda(dia, hora);

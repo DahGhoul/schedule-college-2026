@@ -1,5 +1,19 @@
 import { TipoCurso } from '@prisma/client';
 
+interface OfertaSeed {
+  ciclo: number;
+  codigo: string;
+  nombre: string;
+  creditos: number;
+  tipo: TipoCurso;
+  T: number;
+  P: number;
+  L: number;
+  gruposLab?: number;
+  profesor?: string;
+  asignaciones?: Array<{ profesor: string; T: number; P: number; L: number; G: number }>;
+}
+
 export const ambientesSeed = [
   "Audiovisuales",
   "Pabellón Ing. Industrial",
@@ -59,7 +73,7 @@ export const docentesSeed = [
 ];
 
 
-export const ofertasSeed = [
+export const ofertasSeed: OfertaSeed[] = [
   {
     "ciclo": 1,
     "codigo": "1939",
