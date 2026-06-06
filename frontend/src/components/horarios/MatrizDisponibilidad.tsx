@@ -26,6 +26,10 @@ interface MatrizProps {
   } | null;
   alHacerClickCelda: (dia: string, hora: string, estado: string, info?: any) => void;
   bloqueado?: boolean;
+  bloqueoAlmuerzo?: {
+    inicio: string;
+    fin: string;
+  } | null;
 }
 
 const colores: Record<string, string> = {
@@ -36,7 +40,19 @@ const colores: Record<string, string> = {
   DOCENTE_OTRO_AMBIENTE: 'bg-indigo-50 border-2 border-indigo-200 text-indigo-800 transition-all duration-150 cursor-pointer hover:scale-[1.02] hover:shadow-sm relative shadow-sm opacity-90',
 };
 
-export function MatrizDisponibilidad({ matriz, alHacerClickCelda, bloqueado = false }: MatrizProps) {
+const obtenerHoraEntera = (valor: string) => parseInt(valor.split(':')[0], 10);
+
+const esBloqueoDeAlmuerzo = (horaInicio: string, bloqueoAlmuerzo?: { inicio: string; fin: string } | null) => {
+  if (!bloqueoAlmuerzo?.inicio || !bloqueoAlmuerzo?.fin) return false;
+
+  const hora = obtenerHoraEntera(horaInicio);
+  const inicio = obtenerHoraEntera(bloqueoAlmuerzo.inicio);
+  const fin = obtenerHoraEntera(bloqueoAlmuerzo.fin);
+
+  return hora >= inicio && hora < fin;
+};
+
+export function MatrizDisponibilidad({ matriz, alHacerClickCelda, bloqueado = false, bloqueoAlmuerzo }: MatrizProps) {
   if (!matriz) {
     return (
       <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50/50 p-12 text-center shadow-inner">
@@ -75,33 +91,39 @@ export function MatrizDisponibilidad({ matriz, alHacerClickCelda, bloqueado = fa
                   <td className="border-r border-gray-200 px-4 py-3 text-center font-semibold bg-slate-50/50 text-gray-500 w-32">
                     {fila.horaInicio} - {horaFin}
                   </td>
-                  {fila.celdas.map((celda, idx) => (
+                  {fila.celdas.map((celda, idx) => {
+                    const esAlmuerzo = celda.estado === 'LIBRE' && esBloqueoDeAlmuerzo(celda.horaInicio, bloqueoAlmuerzo);
+                    const estadoVisible = esAlmuerzo ? 'BLOQUEO_INSTITUCIONAL' : celda.estado;
+
+                    return (
                   <td
                     key={idx}
                     className={cn(
                       'border-r border-gray-200 px-1 py-1.5 text-center min-w-[130px] min-h-[55px] transition-all',
-                      colores[celda.estado],
-                      bloqueado && celda.estado !== 'BLOQUEO_INSTITUCIONAL' && 'cursor-not-allowed opacity-70'
+                      colores[estadoVisible],
+                      bloqueado && estadoVisible !== 'BLOQUEO_INSTITUCIONAL' && 'cursor-not-allowed opacity-70'
                     )}
                     onClick={() => {
                       if (bloqueado) return;
-                      alHacerClickCelda(celda.diaSemana, celda.horaInicio, celda.estado, celda.info);
+                      alHacerClickCelda(celda.diaSemana, celda.horaInicio, estadoVisible, celda.info);
                     }}
                     title={`${celda.diaSemana} ${celda.horaInicio} - ${
                       bloqueado
                         ? 'Fuera de tu ventana de atención'
+                        : esAlmuerzo
+                        ? 'Bloqueo de almuerzo según configuración'
                         : celda.estado === 'DOCENTE_OTRO_AMBIENTE'
                         ? 'Ocupado en otro ambiente'
                         : celda.estado
                     }`}
                   >
                     <div className="flex items-center justify-center min-h-[36px] transition-all duration-150">
-                      {celda.estado === 'LIBRE' && (
+                      {estadoVisible === 'LIBRE' && (
                         <span className="text-emerald-500 font-bold text-sm opacity-0 group-hover:opacity-100 transition-opacity duration-150">
                           +
                         </span>
                       )}
-                      {celda.estado === 'OCUPADO' && (
+                      {estadoVisible === 'OCUPADO' && (
                         <div className="flex flex-col items-center justify-center p-0.5">
                           <span className="text-[10px] font-semibold text-rose-500 tracking-tight">
                             Ocupado
@@ -113,7 +135,7 @@ export function MatrizDisponibilidad({ matriz, alHacerClickCelda, bloqueado = fa
                           )}
                         </div>
                       )}
-                      {celda.estado === 'SELECCION_TEMPORAL' && (
+                      {estadoVisible === 'SELECCION_TEMPORAL' && (
                         <div className="flex flex-col items-center justify-center p-1 text-center w-full min-h-[40px]">
                           <span className="text-[10px] font-bold text-amber-900 leading-tight truncate max-w-[110px]" title={celda.info?.curso}>
                             {celda.info?.curso}
@@ -131,7 +153,7 @@ export function MatrizDisponibilidad({ matriz, alHacerClickCelda, bloqueado = fa
                           </span>
                         </div>
                       )}
-                      {celda.estado === 'DOCENTE_OTRO_AMBIENTE' && (
+                      {estadoVisible === 'DOCENTE_OTRO_AMBIENTE' && (
                         <div className="flex flex-col items-center justify-center p-1 text-center w-full min-h-[40px]">
                           <span className="text-[10px] font-bold text-indigo-900 leading-tight truncate max-w-[110px]" title={celda.info?.curso}>
                             {celda.info?.curso}
@@ -144,14 +166,15 @@ export function MatrizDisponibilidad({ matriz, alHacerClickCelda, bloqueado = fa
                           </span>
                         </div>
                       )}
-                      {celda.estado === 'BLOQUEO_INSTITUCIONAL' && (
+                      {estadoVisible === 'BLOQUEO_INSTITUCIONAL' && (
                         <span className="text-[10px] font-medium text-slate-400">
-                          Bloqueado
+                          {esAlmuerzo ? 'Almuerzo' : 'Bloqueado'}
                         </span>
                       )}
                     </div>
                   </td>
-                ))}
+                    );
+                  })}
               </tr>
               );
             })}
@@ -180,7 +203,7 @@ export function MatrizDisponibilidad({ matriz, alHacerClickCelda, bloqueado = fa
         </span>
         <span className="flex items-center gap-2">
           <span className="w-4 h-4 rounded bg-slate-50 border border-slate-200"></span>
-          <span>Restricción institucional</span>
+          <span>Restricción institucional / almuerzo</span>
         </span>
       </div>
       {bloqueado && (

@@ -68,6 +68,7 @@ async function main() {
       { clave: 'HORAS_MAX_DIARIAS', valor: '9' },
       { clave: 'BLOQUEO_ALMUERZO_INICIO', valor: '13:00' },
       { clave: 'BLOQUEO_ALMUERZO_FIN', valor: '14:00' },
+      { clave: 'TIEMPO_ATENCION_VENTANA', valor: '30' },
     ];
     for (const r of restricciones) {
       await prisma.configuracion.upsert({

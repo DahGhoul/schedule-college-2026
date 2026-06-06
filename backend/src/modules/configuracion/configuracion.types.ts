@@ -4,6 +4,7 @@ export interface RestriccionInstitucional {
   horasMaximasDiarias: number; // 8
   bloqueoAlmuerzoInicio: string; // "12:00"
   bloqueoAlmuerzoFin: string;   // "13:00"
+  tiempoAtencionVentana: number; // 30 (minutos)
 }
 
 export interface DiaNoLaborable {

@@ -9,6 +9,7 @@ import { useWebSocket } from '@/hooks/useWebSocket';
 import { periodosService } from '@/services/periodos.service';
 import { ambientesService } from '@/services/ambientes.service';
 import { docentesService } from '@/services/docentes.service';
+import { configuracionService } from '@/services/configuracion.service';
 import { horariosService } from '@/services/horarios.service';
 import { gruposService } from '@/services/grupos.service';
 import { MatrizDisponibilidad } from '@/components/horarios/MatrizDisponibilidad';
@@ -59,6 +60,11 @@ export default function RegistroManualHorariosPage() {
   const { data: ambientes } = useQuery({
     queryKey: ['ambientes-secretaria'],
     queryFn: () => ambientesService.listar().then((res) => res.data),
+  });
+
+  const { data: restricciones } = useQuery({
+    queryKey: ['restricciones'],
+    queryFn: () => configuracionService.obtenerRestricciones().then((res) => res.data),
   });
 
   const { data: progreso } = useQuery({
@@ -137,6 +143,11 @@ export default function RegistroManualHorariosPage() {
   const manejarClickCelda = async (dia: string, hora: string, estado: string, info?: any) => {
     if (!docenteId) {
       setMensaje({ texto: 'Por favor, seleccione un docente primero.', tipo: 'error' });
+      return;
+    }
+
+    if (estado === 'BLOQUEO_INSTITUCIONAL') {
+      setMensaje({ texto: 'Ese horario está bloqueado por la franja de almuerzo configurada.', tipo: 'error' });
       return;
     }
 
@@ -446,7 +457,15 @@ export default function RegistroManualHorariosPage() {
             </div>
 
             <div className="min-h-[600px] overflow-x-auto custom-scrollbar pt-4">
-              <MatrizDisponibilidad matriz={matriz || null} alHacerClickCelda={manejarClickCelda} />
+              <MatrizDisponibilidad
+                matriz={matriz || null}
+                alHacerClickCelda={manejarClickCelda}
+                bloqueoAlmuerzo={
+                  restricciones?.bloqueoAlmuerzoInicio && restricciones?.bloqueoAlmuerzoFin
+                    ? { inicio: restricciones.bloqueoAlmuerzoInicio, fin: restricciones.bloqueoAlmuerzoFin }
+                    : null
+                }
+              />
             </div>
           </div>
 

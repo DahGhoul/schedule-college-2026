@@ -17,7 +17,7 @@ export class ConfiguracionController {
   static async actualizarRestricciones(req: Request, res: Response) {
     try {
       const datos = restriccionesSchema.parse(req.body);
-      await ConfiguracionService.actualizarRestricciones(datos as any);
+      await ConfiguracionService.actualizarRestricciones(datos);
       res.json({ mensaje: 'Restricciones actualizadas' });
     } catch (error: any) {
       if (error.name === 'ZodError') {

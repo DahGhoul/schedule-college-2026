@@ -27,7 +27,7 @@ export function PanelValidaciones({ validacion }: PanelValidacionesProps) {
       {validacion.advertencias.map((adv, idx) => (
         <div key={idx} className="flex items-start gap-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl animate-in fade-in slide-in-from-left-2">
           <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-          <p className="text-[11px] font-medium text-amber-100 leading-tight">
+          <p className="text-[11px] font-medium text-amber-400 leading-tight">
             {adv}
           </p>
         </div>

@@ -21,14 +21,14 @@ export function IndicadorProgresoHoras({ progreso }: IndicadorProgresoHorasProps
           <div key={idx} className="space-y-1.5">
             <div className="flex justify-between items-center px-0.5">
               <div className="flex flex-col">
-                <span className="text-[11px] font-bold text-white/90 leading-tight truncate max-w-[140px]">
+                <span className="text-[11px] font-medium text-slate-800 leading-tight truncate max-w-[140px]">
                   {item.nombreCurso}
                 </span>
-                <span className="text-[9px] font-medium text-white/40 uppercase tracking-widest">
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
                   {item.tipoComponente}
                 </span>
               </div>
-              <span className="text-[10px] font-black text-white/60 tabular-nums">
+              <span className="text-[10px] font-black text-slate-800 tabular-nums">
                 {item.horasAsignadas} / {item.horasRequeridas}h
               </span>
             </div>

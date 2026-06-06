@@ -16,6 +16,7 @@ const schema = z.object({
   HORAS_MAX_DIARIAS: z.string().refine((v) => !isNaN(Number(v)) && Number(v) >= 1 && Number(v) <= 16, '1-16'),
   BLOQUEO_ALMUERZO_INICIO: z.string().regex(/^\d{2}:\d{2}$/),
   BLOQUEO_ALMUERZO_FIN: z.string().regex(/^\d{2}:\d{2}$/),
+  TIEMPO_ATENCION_VENTANA: z.string().refine((v) => !isNaN(Number(v)) && Number(v) >= 1 && Number(v) <= 60, '1-60'),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -39,6 +40,7 @@ export default function RestriccionesPage() {
       HORAS_MAX_DIARIAS: String(restricciones.horasMaximasDiarias),
       BLOQUEO_ALMUERZO_INICIO: restricciones.bloqueoAlmuerzoInicio,
       BLOQUEO_ALMUERZO_FIN: restricciones.bloqueoAlmuerzoFin,
+      TIEMPO_ATENCION_VENTANA: String(restricciones.tiempoAtencionVentana),
     } : undefined,
   });
 
@@ -50,14 +52,23 @@ export default function RestriccionesPage() {
         HORAS_MAX_DIARIAS: String(restricciones.horasMaximasDiarias),
         BLOQUEO_ALMUERZO_INICIO: restricciones.bloqueoAlmuerzoInicio,
         BLOQUEO_ALMUERZO_FIN: restricciones.bloqueoAlmuerzoFin,
+        TIEMPO_ATENCION_VENTANA: String(restricciones.tiempoAtencionVentana),
       });
     }
   }, [restricciones, reset]);
 
   const mutation = useMutation({
-    mutationFn: (datos: FormData) => configuracionService.actualizarRestricciones(datos),
+    mutationFn: (datos: FormData) =>
+      configuracionService.actualizarRestricciones(datos),
+
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['restricciones'] });
+      queryClient.invalidateQueries({
+        queryKey: ['restricciones'],
+      });
+
+      setTimeout(() => {
+        mutation.reset();
+      }, 3000);
     },
   });
 
@@ -74,6 +85,7 @@ export default function RestriccionesPage() {
         <CampoTexto label="Horas máximas diarias por docente" type="number" {...register('HORAS_MAX_DIARIAS')} error={errors.HORAS_MAX_DIARIAS?.message} />
         <CampoTexto label="Bloqueo almuerzo inicio" {...register('BLOQUEO_ALMUERZO_INICIO')} error={errors.BLOQUEO_ALMUERZO_INICIO?.message} />
         <CampoTexto label="Bloqueo almuerzo fin" {...register('BLOQUEO_ALMUERZO_FIN')} error={errors.BLOQUEO_ALMUERZO_FIN?.message} />
+        <CampoTexto label="Franja de ventanas de atencion (minutos)" {...register('TIEMPO_ATENCION_VENTANA')} error={errors.TIEMPO_ATENCION_VENTANA?.message} />
 
         {mutation.isSuccess && <NotificacionToast mensaje="Restricciones actualizadas" tipo="exito" />}
         {mutation.isError && <NotificacionToast mensaje="Error al guardar" tipo="error" />}

@@ -44,7 +44,8 @@ export class VentanasService {
     fechaInicio: string,
     fechaFin: string,
     horaInicio: string,
-    horaFin: string
+    horaFin: string,
+    duracionMinutos: number
   ) {
     const inicio = new Date(`${fechaInicio}T12:00:00Z`);
     const fin = new Date(`${fechaFin}T12:00:00Z`);
@@ -65,9 +66,9 @@ export class VentanasService {
       const diaSemana = cursor.getDay();
       if (diaSemana !== 0 && diaSemana !== 6) {
         let orden = 1;
-        for (let t = franjaInicio; t + 30 <= franjaFin; t += 30) {
+        for (let t = franjaInicio; t + duracionMinutos <= franjaFin; t += duracionMinutos) {
           const hora_inicio = this.toHora(t);
-          const hora_fin = this.toHora(t + 30);
+          const hora_fin = this.toHora(t + duracionMinutos);
           slots.push({ fecha: new Date(cursor), hora_inicio, hora_fin, orden });
           orden += 1;
         }
@@ -166,7 +167,23 @@ export class VentanasService {
       return { totalDocentes: 0, totalSlots: 0, ventanas: [] };
     }
 
-    const slots = this.generarSlots(fechaInicio, fechaFin, horaInicio, horaFin);
+    const configuracion = await prisma.configuracion.findMany({
+      where: {
+        id_periodo: idPeriodo,
+      },
+    });
+
+    const mapaConfig: Record<string, string> = {};
+
+    configuracion.forEach((c) => {
+      mapaConfig[c.clave] = c.valor;
+    });
+
+    const duracionVentana = parseInt(
+      mapaConfig['TIEMPO_ATENCION_VENTANA'] || '30'
+    );
+
+    const slots = this.generarSlots(fechaInicio, fechaFin, horaInicio, horaFin, duracionVentana);
     if (slots.length < docentes.length) {
       throw new Error('No hay suficientes slots para cubrir a todos los docentes');
     }
@@ -317,6 +334,22 @@ export class VentanasService {
       await prisma.ventana_atencion.deleteMany({ where: { id_periodo: idPeriodo } });
     }
 
+    const configuraciones = await prisma.configuracion.findMany({
+      where: {
+        id_periodo: idPeriodo,
+      },
+    });
+
+    const mapaConfig: Record<string, string> = {};
+
+    configuraciones.forEach((c) => {
+      mapaConfig[c.clave] = c.valor;
+    });
+
+    const duracionVentana = parseInt(
+      mapaConfig['TIEMPO_ATENCION_VENTANA'] || '30'
+    );    
+
     let fechaActual = this.parseFechaLocal(fechaInicio);
     let horaActual = 8;
     let minutoActual = 0;
@@ -329,7 +362,7 @@ export class VentanasService {
         if (count === 0) continue;
 
         const h_inicio = `${String(horaActual).padStart(2, '0')}:${String(minutoActual).padStart(2, '0')}`;
-        minutoActual += 30;
+        minutoActual += duracionVentana;
         if (minutoActual >= 60) {
           horaActual += 1;
           minutoActual = 0;

@@ -24,13 +24,14 @@ export class ConfiguracionService {
       horasMaximasDiarias: parseInt(mapa['HORAS_MAX_DIARIAS'] || '8'),
       bloqueoAlmuerzoInicio: mapa['BLOQUEO_ALMUERZO_INICIO'] || '12:00',
       bloqueoAlmuerzoFin: mapa['BLOQUEO_ALMUERZO_FIN'] || '13:00',
+      tiempoAtencionVentana: parseInt(mapa['TIEMPO_ATENCION_VENTANA'] || '30'),
     };
   }
 
   /**
    * Actualiza las restricciones (crea o actualiza las claves)
    */
-  static async actualizarRestricciones(datos: Record<string, string>): Promise<void> {
+  static async actualizarRestricciones(datos: Record<string, string | number>): Promise<void> {
     const periodo = await prisma.periodo_academico.findFirst({
       where: { estado: 'ACTIVO' },
     });
@@ -38,9 +39,26 @@ export class ConfiguracionService {
 
     for (const [clave, valor] of Object.entries(datos)) {
       await prisma.configuracion.upsert({
-        where: { id_periodo_clave: { id_periodo: periodo.id, clave } },
-        update: { valor },
-        create: { id_periodo: periodo.id, clave, valor },
+        where: {
+          id_periodo_clave: {
+            id_periodo: periodo.id,
+            clave,
+          },
+        },
+
+        update: {
+          valor: String(valor),
+        },
+
+        create: {
+          id_periodo: periodo.id,
+          clave,
+          valor: String(valor),
+          tipo:
+            typeof valor === 'number'
+              ? 'NUMERO'
+              : 'TEXTO',
+        },
       });
     }
   }
