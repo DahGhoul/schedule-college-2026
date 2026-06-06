@@ -15,8 +15,7 @@ function obtenerClaveFusionPdf(bloque: any): string {
   return `${bloque.dia_semana}-${bloque.id_docente}-${bloque.componente.id_oferta}-${bloque.componente.tipo}-${bloque.grupo?.id ?? ''}-${bloque.id_ambiente ?? ''}`;
 }
 
-function formatearEtiquetaCeldaPdf(registro: any, bloque: any): string {
-  const ambienteEtiqueta = bloque?.ambiente?.codigo || 'Solic.';
+function formatearEtiquetaCeldaPdf(registro: any, bloque: any, esHorarioDocente: boolean = false): string {
   let cursoNombre = '';
   if (registro?.nombre) {
     const palabras = registro.nombre.split(' ');
@@ -37,15 +36,25 @@ function formatearEtiquetaCeldaPdf(registro: any, bloque: any): string {
   const esTeoria = bloque?.componente?.tipo === 'TEORIA';
   const grupoEtiqueta = (!esTeoria && bloque?.grupo?.codigo) ? `Gr. ${bloque.grupo.codigo}` : '';
 
+  if (esHorarioDocente) {
+    // Para horario de docente: mostrar índice, ciclo (número real), tipo y ambiente
+    const cicloNumero = bloque?.componente?.oferta?.ciclo?.numero;
+    const cicloEtiqueta = cicloNumero ? `${cicloNumero}°` : '';
+    const tipoEtiqueta = bloque?.componente?.tipo ? bloque.componente.tipo.substring(0, 3) : '';
+    const ambienteEtiqueta = bloque?.ambiente?.codigo || 'Solic.';
+    
+    const partes = [String(registro?.indice || ''), cicloEtiqueta, tipoEtiqueta, ambienteEtiqueta];
+    return partes.filter(Boolean).join('\n');
+  }
+
   if (!registro) {
-    return [cursoNombre, ambienteEtiqueta].filter(Boolean).join('\n');
+    return [cursoNombre].filter(Boolean).join('\n');
   }
 
   const partes = [String(registro.indice), cursoNombre];
   if (grupoEtiqueta) {
     partes.push(grupoEtiqueta);
   }
-  partes.push(ambienteEtiqueta);
   return partes.filter(Boolean).join('\n');
 }
 
@@ -63,7 +72,11 @@ function calcularFusionPdf(
     const siguienteEntradas = contexto[`${dia}-${horas[siguienteIndex]}`] ?? [];
     if (siguienteEntradas.length !== 1) break;
 
-    const siguienteBloque = siguienteEntradas[0].bloque;
+    // Obtener el bloque de la siguiente entrada (funciona para ambos formatos)
+    const siguienteBloque = 'bloque' in siguienteEntradas[0] 
+      ? siguienteEntradas[0].bloque 
+      : siguienteEntradas[0];
+    
     if (obtenerClaveFusionPdf(siguienteBloque) !== clave) break;
 
     span += 1;
@@ -140,8 +153,8 @@ export class GeneradorPdfService {
     const leftColX = 40;
     const topMargin = 40;
     const pageWidth = doc.page.width - 80;
-    const headerBoxWidth = pageWidth * 0.3; // Reduced to 30%
-    const headerBoxHeight = 110; // Reduced height
+    const headerBoxWidth = pageWidth * 0.3;
+    const headerBoxHeight = 110;
 
     // --- PÁGINA 1: CABECERA (IZQUIERDA) + TABLA DE DETALLE (DERECHA) ---
     dibujarCajaInfoPeriodo(doc, leftColX, topMargin, headerBoxWidth, headerBoxHeight, [
@@ -155,12 +168,13 @@ export class GeneradorPdfService {
       `FECHA: ${new Date().toLocaleDateString('es-PE')}`,
     ]);
 
-    const detailHeaders = ['N°', 'ASIGNATURA', 'CICLO', 'T', 'L', 'GRP', 'TOT'];
+    const detailHeaders = ['N°', 'ASIGNATURA', 'CICLO', 'T', 'P', 'L', 'G', 'T.H'];
     const availableTableWidth = pageWidth - headerBoxWidth - 20;
     const colWidths = [
       availableTableWidth * 0.05, 
-      availableTableWidth * 0.45, 
+      availableTableWidth * 0.30, 
       availableTableWidth * 0.10, 
+      availableTableWidth * 0.08, 
       availableTableWidth * 0.08, 
       availableTableWidth * 0.08, 
       availableTableWidth * 0.12, 
@@ -179,63 +193,84 @@ export class GeneradorPdfService {
     });
     currentY += 12;
 
-    const asignaciones = await prisma.asignacion_docente_componente.findMany({
-      where: { id_docente: idDocente, componente: { oferta: { id_periodo: idPeriodo } } },
+    // Query all bloques for this teacher and period
+    const bloques = await prisma.bloque_horario.findMany({
+      where: {
+        id_periodo: idPeriodo,
+        id_docente: idDocente,
+        estado: { in: ['BORRADOR', 'CONFIRMADO', 'PUBLICADO'] }
+      },
       include: {
+        docente: true,
+        ambiente: true,
+        grupo: true,
         componente: { 
           include: { 
-            oferta: { include: { curso: true } },
-            grupos: true
+            oferta: { 
+              include: { 
+                curso: true,
+                ciclo: true  // Important: include ciclo to get the numero
+              } 
+            } 
           } 
         }
-      }
+      },
+      orderBy: [
+        { dia_semana: 'asc' },
+        { hora_inicio: 'asc' },
+        { id_componente: 'asc' },
+        { id_grupo: 'asc' }
+      ]
     });
 
-    const mapaCursos: Record<number, { indice: number; color: string; nombre: string; ciclo: number; teo: number; lab: number; grupos: number; total: number }> = {};
-    let indexCurso = 1;
+    // Use the same context creator as cycle schedule
+    const contexto = crearContextoHorarioCiclo(bloques as any[]);
+    const slotsOcupados = new Set<string>();
 
-    for (const asig of asignaciones as any[]) {
-      const cursoId = asig.componente.oferta.id_curso;
-      if (!mapaCursos[cursoId]) {
-        const colorCurso = obtenerColorCurso(indexCurso).slice(2);
-        mapaCursos[cursoId] = {
-          indice: indexCurso++,
-          color: colorCurso,
-          nombre: asig.componente.oferta.curso.nombre,
-          ciclo: asig.componente.oferta.id_ciclo,
-          teo: 0,
-          lab: 0,
-          grupos: 0,
-          total: 0
-        };
-      }
-      if (asig.componente.tipo === 'TEORIA') mapaCursos[cursoId].teo += asig.horas_asignadas;
-      else mapaCursos[cursoId].lab += asig.horas_asignadas;
-      mapaCursos[cursoId].grupos += asig.componente.grupos.length;
-      mapaCursos[cursoId].total += asig.horas_asignadas;
-    }
+    // Fill detail table
+    for (const info of contexto.registros) {
+      // Encontrar el ciclo a partir de los bloques de este registro (curso + docente)
+      const bloqueDelRegistro = bloques.find(b => 
+        b.componente.oferta.id_curso === info.cursoId && 
+        b.id_docente === idDocente
+      );
+      const cicloNumero = bloqueDelRegistro?.componente.oferta.ciclo?.numero;
+      
+      const rowData = [
+        String(info.indice),
+        info.cursoNombre,
+        cicloNumero ? `${cicloNumero}°` : '',
+        String(info.teoria),
+        String(info.practica),
+        String(info.laboratorio),
+        info.grupoCodigo,
+        String(info.totalHoras)
+      ];
 
-    for (const key in mapaCursos) {
-      const info = mapaCursos[key];
-      const rowData = [String(info.indice), info.nombre, `${info.ciclo}°`, String(info.teo), String(info.lab), String(info.grupos), String(info.total)];
       currentX = tableStartX;
       doc.font('Helvetica').fontSize(6).fillColor('black');
       rowData.forEach((val, i) => {
-        doc.rect(currentX, currentY, colWidths[i], 10).fill(`#${info.color}`).stroke(BORDER_COLOR);
-        doc.fillColor('#334155').text(val, currentX, currentY + 2, { width: colWidths[i], align: 'center', ellipsis: true });
+        doc.rect(currentX, currentY, colWidths[i], 10).fill(`#${info.color.slice(2)}`).stroke(BORDER_COLOR);
+        doc.fillColor('#334155').text(val, currentX, currentY + 2, {
+          width: colWidths[i],
+          height: 10,
+          align: i === 1 ? 'left' : 'center',
+          ellipsis: true,
+          lineBreak: false
+        });
         currentX += colWidths[i];
       });
       currentY += 10;
     }
 
-    // --- PÁGINA 2: HORARIO COMPLETO (ocupa todo el ancho) ---
+    // --- PÁGINA 2: HORARIO COMPLETO ---
     doc.addPage({ size: 'A4', layout: 'landscape', margin: 30 });
 
     const horarioTop = 40;
-    const dias = ['LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES', 'SÁBADO'];
+    const dias = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
     const horas = ['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'];
     const gridColWidth = (doc.page.width - 80) / 7;
-    const gridRowHeight = 32; // Increased height a bit more
+    const gridRowHeight = 32;
 
     doc.font('Helvetica-Bold').fontSize(8);
     doc.rect(leftColX, horarioTop, gridColWidth, 15).fill('#334155').stroke('#334155');
@@ -246,21 +281,6 @@ export class GeneradorPdfService {
       doc.fillColor('white').text(dia, x, horarioTop + 3, { width: gridColWidth, align: 'center' });
     });
 
-    const bloques = await prisma.bloque_horario.findMany({
-      where: { id_periodo: idPeriodo, id_docente: idDocente },
-      include: { componente: { include: { oferta: true } }, ambiente: true }
-    });
-
-    const celdasPorSlot: Record<string, Array<{ bloque: any; info: any }>> = {};
-    for (const bloque of bloques as any[]) {
-      const info = mapaCursos[bloque.componente.oferta.id_curso];
-      const slotKey = `${bloque.dia_semana}-${bloque.hora_inicio}`;
-      const entradas = celdasPorSlot[slotKey] ?? [];
-      entradas.push({ bloque, info });
-      celdasPorSlot[slotKey] = entradas;
-    }
-
-    const slotsOcupados = new Set<string>();
     let y = horarioTop + 15;
     horas.forEach((hora, horaIndex) => {
       doc.rect(leftColX, y, gridColWidth, gridRowHeight).stroke(BORDER_COLOR);
@@ -272,33 +292,26 @@ export class GeneradorPdfService {
           return;
         }
 
-        // Draw grid with thicker lines
         doc.lineWidth(1.5);
-        // ALWAYS draw base grid cell border
         doc.rect(x, y, gridColWidth, gridRowHeight).stroke(BORDER_COLOR);
         
-        const celdasEnHora = celdasPorSlot[slotKey] ?? [];
+        const entradas = contexto.celdas[slotKey] ?? [];
         
-        if (celdasEnHora.length > 0) {
-          // Calculate span first
+        if (entradas.length > 0) {
           let span = 1;
-          if (celdasEnHora.length === 1) {
-            span = calcularFusionPdf(celdasPorSlot, dia, horaIndex, horas, celdasEnHora[0].bloque);
+          if (entradas.length === 1) {
+            span = calcularFusionPdf(contexto.celdas, dia, horaIndex, horas, entradas[0].bloque);
           }
           const altoCelda = gridRowHeight * span;
 
-          // Draw each block separately
-          const blockHeight = altoCelda / celdasEnHora.length;
-          celdasEnHora.forEach((celda, idx) => {
+          const blockHeight = altoCelda / entradas.length;
+          entradas.forEach((celda, idx) => {
             const blockTop = y + idx * blockHeight;
-            // Draw block background, then a slightly different (or same) border on top of grid
-            doc.rect(x, blockTop, gridColWidth, blockHeight).fill(celda.info?.color || '#FFFFFF').stroke(BORDER_COLOR);
+            doc.rect(x, blockTop, gridColWidth, blockHeight).fill(`#${celda.registro.color.slice(2)}`).stroke(BORDER_COLOR);
             
-            // Draw text vertically centered
-            const texto = formatearEtiquetaCeldaPdf(celda.info, celda.bloque);
-            // Calculate text height to center properly
+            const texto = formatearEtiquetaCeldaPdf(celda.registro, celda.bloque, true);
             const textWidth = gridColWidth - 4;
-            const textHeight = 20; // Approximate text height for 2-3 lines
+            const textHeight = 20;
             
             const textoY = blockTop + (blockHeight / 2) - (textHeight / 2);
             doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(5.5).text(texto, x + 2, textoY, {
@@ -306,11 +319,10 @@ export class GeneradorPdfService {
               align: 'center',
               lineBreak: true,
               height: blockHeight - 4,
-              ellipsis: false // Don't truncate text
+              ellipsis: false
             });
           });
 
-          // Mark slots as occupied for vertical merging
           if (span > 1) {
             for (let offset = 1; offset < span; offset++) {
               slotsOcupados.add(`${dia}-${horas[horaIndex + offset]}`);
@@ -376,7 +388,7 @@ export class GeneradorPdfService {
         docente: true,
         ambiente: true,
         grupo: true,
-        componente: { include: { oferta: { include: { curso: true } } } }
+        componente: { include: { oferta: { include: { curso: true, ciclo: true } } } }
       },
       orderBy: [
         { dia_semana: 'asc' },
@@ -423,7 +435,7 @@ export class GeneradorPdfService {
     doc.addPage({ size: 'A4', layout: 'landscape', margin: 30 });
 
     const horarioTop = 40;
-    const dias = ['LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES', 'SÁBADO'];
+    const dias = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
     const horas = [
       '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00',
       '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'
@@ -567,9 +579,9 @@ export class GeneradorPdfService {
       availableTableWidth * 0.25, 
       availableTableWidth * 0.35, 
       availableTableWidth * 0.08, 
+      availableTableWidth * 0.12, // MORE to TIPO
       availableTableWidth * 0.08, 
-      availableTableWidth * 0.08, 
-      availableTableWidth * 0.11
+      availableTableWidth * 0.07 // LESS to TOT
     ];
     const tableStartX = leftColX + headerBoxWidth + 20;
     let currentY = topMargin;
@@ -601,11 +613,11 @@ export class GeneradorPdfService {
       const key = `${b.id_docente}-${b.componente.id_oferta}`;
       if (!mapaDocenteCurso[key]) {
         if (!coloresPorCurso.has(cursoId)) {
-          coloresPorCurso.set(cursoId, obtenerColorCurso(coloresPorCurso.size + 1).slice(2));
+          coloresPorCurso.set(cursoId, '#' + obtenerColorCurso(coloresPorCurso.size + 1).slice(2));
         }
         mapaDocenteCurso[key] = {
           indice: indexDocente++,
-          color: coloresPorCurso.get(cursoId) ?? obtenerColorCurso(1).slice(2),
+          color: coloresPorCurso.get(cursoId) ?? '#' + obtenerColorCurso(1).slice(2),
           nombre: `${b.docente.apellidos}, ${b.docente.nombres.substring(0,1)}.`,
           nombreCompleto: `${b.docente.apellidos}, ${b.docente.nombres}`,
           cursoNombre: b.componente.oferta.curso.nombre,
@@ -624,7 +636,7 @@ export class GeneradorPdfService {
       currentX = tableStartX;
       doc.font('Helvetica').fontSize(6).fillColor('black');
       rowData.forEach((val, i) => {
-        doc.rect(currentX, currentY, colWidths[i], 10).fill(`#${info.color}`).stroke(BORDER_COLOR);
+        doc.rect(currentX, currentY, colWidths[i], 10).fill(info.color).stroke(BORDER_COLOR);
         doc.fillColor('#334155').text(val, currentX, currentY + 2, { width: colWidths[i], align: i === 1 || i === 2 ? 'left' : 'center', ellipsis: true });
         currentX += colWidths[i];
       });
@@ -654,13 +666,11 @@ export class GeneradorPdfService {
 
       const esTeoria = bloque?.componente?.tipo === 'TEORIA';
       const grupoEtiqueta = (!esTeoria && bloque?.grupo?.codigo) ? `Gr. ${bloque.grupo.codigo}` : '';
-      const ambienteEtiqueta = bloque?.ambiente?.codigo || 'Solic.';
 
       const partes = [String(registro.indice), cursoNombre];
       if (grupoEtiqueta) {
         partes.push(grupoEtiqueta);
       }
-      partes.push(ambienteEtiqueta);
       return partes.filter(Boolean).join('\n');
     }
 
@@ -674,7 +684,7 @@ export class GeneradorPdfService {
     }
 
     const horarioTop = 40;
-    const dias = ['LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES', 'SÁBADO'];
+    const dias = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
     const horas = ['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'];
     const gridColWidth = (doc.page.width - 80) / 7;
     const gridRowHeight = 32; // Increased height a bit more
@@ -864,7 +874,17 @@ export class GeneradorPdfService {
   static async generarGlobalPdf(idPeriodo: number): Promise<Buffer> {
     const periodo = await prisma.periodo_academico.findUnique({ where: { id: idPeriodo } });
     const docentes = await prisma.docente.findMany({
-      where: { asignaciones: { some: { componente: { oferta: { id_periodo: idPeriodo } } } } },
+      where: { 
+        asignaciones: { 
+          some: { 
+            componente: { 
+              oferta: { 
+                id_periodo: idPeriodo 
+              } 
+            } 
+          } 
+        } 
+      },
       orderBy: { apellidos: 'asc' }
     });
 
