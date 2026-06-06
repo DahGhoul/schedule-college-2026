@@ -1,5 +1,3 @@
-import * as fs from 'fs';
-import * as path from 'path';
 import fs from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
@@ -27,6 +25,12 @@ async function main() {
   console.log('=== INICIO DE SEMILLA DE HORARIOS ===');
 
   try {
+    // ============================================================
+    // 0. AÑADIR COLUMNAS FALTANTES SI NO EXISTEN
+    // ============================================================
+    await prisma.$executeRaw`ALTER TABLE docente ADD COLUMN IF NOT EXISTS dni VARCHAR(20) UNIQUE;`;
+    await prisma.$executeRaw`ALTER TABLE docente ADD COLUMN IF NOT EXISTS empleo VARCHAR(150);`;
+
     // ============================================================
     // 1. PERÍODO ACADÉMICO
     // ============================================================
@@ -149,11 +153,13 @@ async function main() {
     const docenteMap: Record<string, any> = {};
     const hashDocente = await bcrypt.hash('Docente123!', 12);
 
-    for (const def of docentesDef) {
+    for (const [index, def] of docentesDef.entries()) {
+      const codigoIbm = `IBM-${String(index + 1).padStart(3, '0')}`;
       const doc = await prisma.docente.upsert({
         where: { email: def.email },
-        update: {},
+        update: { codigo_ibm: codigoIbm },
         create: {
+          codigo_ibm: codigoIbm,
           nombres: def.nombres,
           apellidos: def.apellidos,
           email: def.email,
@@ -212,7 +218,7 @@ async function main() {
           id_periodo: periodo.id,
           id_curso: curso.id,
           id_ciclo: cicloObj.id,
-          tipo_curso: def.tipo,
+          tipo_curso: def.tipo as TipoCurso,
           estado: 'BORRADOR',
         },
       });
@@ -443,7 +449,7 @@ async function syncAndAssignTeachers(prisma: any) {
       docente = await prisma.docente.upsert({
         where: { email: "mcardoso@unitru.edu.pe" },
         update: {},
-        create: { nombres: "Martha", apellidos: "Cardoso", email: "mcardoso@unitru.edu.pe", modalidad: "NOMBRADO", categoria: "ASOCIADO", antiguedad: 5, empleo: "POR_COMPLETAR", activo: true }
+        create: { nombres: "Martha", apellidos: "Cardoso", email: "mcardoso@unitru.edu.pe", modalidad: "NOMBRADO", categoria: "ASOCIADO", antiguedad: 5, activo: true }
       });
       docenteMap[normProf] = docente;
     }
@@ -451,7 +457,7 @@ async function syncAndAssignTeachers(prisma: any) {
       docente = await prisma.docente.upsert({
         where: { email: "lboy@unitru.edu.pe" },
         update: {},
-        create: { nombres: "Luis", apellidos: "Boy Chavil", email: "lboy@unitru.edu.pe", modalidad: "NOMBRADO", categoria: "PRINCIPAL", antiguedad: 10, empleo: "POR_COMPLETAR", activo: true }
+        create: { nombres: "Luis", apellidos: "Boy Chavil", email: "lboy@unitru.edu.pe", modalidad: "NOMBRADO", categoria: "PRINCIPAL", antiguedad: 10, activo: true }
       });
       docenteMap[normProf] = docente;
     }
@@ -459,7 +465,7 @@ async function syncAndAssignTeachers(prisma: any) {
       docente = await prisma.docente.upsert({
         where: { email: "jgonzales@unitru.edu.pe" },
         update: {},
-        create: { nombres: "Jhoe", apellidos: "Gonzalez Vasquez", email: "jgonzales@unitru.edu.pe", modalidad: "NOMBRADO", categoria: "PRINCIPAL", antiguedad: 10, empleo: "POR_COMPLETAR", activo: true }
+        create: { nombres: "Jhoe", apellidos: "Gonzalez Vasquez", email: "jgonzales@unitru.edu.pe", modalidad: "NOMBRADO", categoria: "PRINCIPAL", antiguedad: 10, activo: true }
       });
       docenteMap[normProf] = docente;
     }

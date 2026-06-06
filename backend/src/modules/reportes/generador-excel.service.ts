@@ -472,7 +472,7 @@ export class GeneradorExcelService {
 
     const bloques = await prisma.bloque_horario.findMany({
       where: { id_periodo: idPeriodo, id_docente: idDocente },
-      include: { componente: { include: { oferta: true } }, ambiente: true }
+      include: { componente: { include: { oferta: { include: { curso: true } } } }, ambiente: true, grupo: true }
     });
 
     horas.forEach((h, i) => {
@@ -490,13 +490,13 @@ export class GeneradorExcelService {
         
         if (celdasEnHora.length > 0) {
           const texto = celdasEnHora.map(b => {
-            const info = mapaCursos[b.componente.id_oferta];
+            const info = mapaCursos[b.componente.oferta.id_curso];
             return `${info?.indice || '?'}\n(Aula: ${b.ambiente?.codigo || 'Solic.'})`;
           }).join('\n---\n');
           
           cell.value = texto;
-          const infoPrimero = mapaCursos[celdasEnHora[0].componente.id_oferta];
-          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + (infoPrimero?.color || 'FFFFFF').replace('#', '') } };
+          const infoPrimero = mapaCursos[celdasEnHora[0].componente.oferta.id_curso];
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + (infoPrimero?.color || 'FFFFFF') } };
           cell.font = { bold: true, size: 7 };
         }
         cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
