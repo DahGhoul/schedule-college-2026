@@ -11,9 +11,8 @@ function formatearFranjaHora(horaInicio: string): string {
 }
 
 function obtenerClaveFusionPdf(bloque: any): string {
-  // Include group ID to prevent merging different groups
-  const grupoId = bloque.grupo?.id ?? '';
-  return `${bloque.dia_semana}-${bloque.id_docente}-${bloque.componente.id_oferta}-${bloque.componente.tipo}-${grupoId}`;
+  // Super strict: only merge exact same everything
+  return `${bloque.dia_semana}-${bloque.id_docente}-${bloque.componente.id_oferta}-${bloque.componente.tipo}-${bloque.grupo?.id ?? ''}-${bloque.id_ambiente ?? ''}`;
 }
 
 function formatearEtiquetaCeldaPdf(registro: any, bloque: any): string {
@@ -273,30 +272,45 @@ export class GeneradorPdfService {
           return;
         }
 
+        // Draw grid with thicker lines
+        doc.lineWidth(1.5);
+        // ALWAYS draw base grid cell border
+        doc.rect(x, y, gridColWidth, gridRowHeight).stroke(BORDER_COLOR);
+        
         const celdasEnHora = celdasPorSlot[slotKey] ?? [];
         
-        doc.rect(x, y, gridColWidth, gridRowHeight).stroke(BORDER_COLOR);
         if (celdasEnHora.length > 0) {
-          // Check if all have same curso/docente to merge vertically
-          const puedeFusionar = celdasEnHora.length === 1;
-          const primerBloque = celdasEnHora[0].bloque;
-          const span = puedeFusionar ? calcularFusionPdf(celdasPorSlot, dia, horaIndex, horas, primerBloque) : 1;
+          // Calculate span first
+          let span = 1;
+          if (celdasEnHora.length === 1) {
+            span = calcularFusionPdf(celdasPorSlot, dia, horaIndex, horas, celdasEnHora[0].bloque);
+          }
           const altoCelda = gridRowHeight * span;
 
-        doc.rect(x, y, gridColWidth, altoCelda).fill(celdasEnHora[0].info?.color || '#FFFFFF').stroke(BORDER_COLOR);
-
-          // Draw each entry separated and vertically centered
-          const entryHeight = altoCelda / celdasEnHora.length;
+          // Draw each block separately
+          const blockHeight = altoCelda / celdasEnHora.length;
           celdasEnHora.forEach((celda, idx) => {
+            const blockTop = y + idx * blockHeight;
+            // Draw block background, then a slightly different (or same) border on top of grid
+            doc.rect(x, blockTop, gridColWidth, blockHeight).fill(celda.info?.color || '#FFFFFF').stroke(BORDER_COLOR);
+            
+            // Draw text vertically centered
             const texto = formatearEtiquetaCeldaPdf(celda.info, celda.bloque);
-            const textoY = y + idx * entryHeight + (entryHeight / 2) - 8; // Vertical center
-            doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(6).text(texto, x + 2, textoY, {
-              width: gridColWidth - 4,
+            // Calculate text height to center properly
+            const textWidth = gridColWidth - 4;
+            const textHeight = 20; // Approximate text height for 2-3 lines
+            
+            const textoY = blockTop + (blockHeight / 2) - (textHeight / 2);
+            doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(5.5).text(texto, x + 2, textoY, {
+              width: textWidth,
               align: 'center',
-              lineBreak: true
+              lineBreak: true,
+              height: blockHeight - 4,
+              ellipsis: false // Don't truncate text
             });
           });
 
+          // Mark slots as occupied for vertical merging
           if (span > 1) {
             for (let offset = 1; offset < span; offset++) {
               slotsOcupados.add(`${dia}-${horas[horaIndex + offset]}`);
@@ -440,35 +454,49 @@ export class GeneradorPdfService {
           return;
         }
 
+        // Draw grid with thicker lines
+        doc.lineWidth(1.5);
+        // ALWAYS draw base grid cell border
+        doc.rect(x, y, gridColWidth, gridRowHeight).stroke(BORDER_COLOR);
+        
         const entradas = contexto.celdas[slotKey] ?? [];
+        
+        if (entradas.length > 0) {
+          // Calculate span first
+          let span = 1;
+          if (entradas.length === 1) {
+            span = calcularFusionPdf(contexto.celdas, dia, horaIndex, horas, entradas[0].bloque);
+          }
+          const altoCelda = gridRowHeight * span;
 
-        if (entradas.length === 0) {
-          doc.rect(x, y, gridColWidth, gridRowHeight).stroke(BORDER_COLOR);
-          return;
-        }
-
-        const puedeFusionar = entradas.length === 1;
-        const primerBloque = entradas[0].bloque;
-        const span = puedeFusionar ? calcularFusionPdf(contexto.celdas, dia, horaIndex, horas, primerBloque) : 1;
-        const altoCelda = gridRowHeight * span;
-
-        doc.rect(x, y, gridColWidth, altoCelda).fill(`#${entradas[0].registro.color.slice(2)}`).stroke(BORDER_COLOR);
-
-        // Draw each entry separated and vertically centered
-        const entryHeight = altoCelda / entradas.length;
-        entradas.forEach((celda, idx) => {
-          const texto = formatearEtiquetaCeldaPdf(celda.registro, celda.bloque);
-          const textoY = y + idx * entryHeight + (entryHeight / 2) - 8; // Vertical center
-          doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(6).text(texto, x + 2, textoY, {
-            width: gridColWidth - 4,
-            align: 'center',
-            lineBreak: true
+          // Draw each block separately
+          const blockHeight = altoCelda / entradas.length;
+          entradas.forEach((celda, idx) => {
+            const blockTop = y + idx * blockHeight;
+            // Draw block background, then a slightly different (or same) border on top of grid
+            doc.rect(x, blockTop, gridColWidth, blockHeight).fill(`#${celda.registro.color.slice(2)}`).stroke(BORDER_COLOR);
+            
+            // Draw text vertically centered
+            const texto = formatearEtiquetaCeldaPdf(celda.registro, celda.bloque);
+            // Calculate text height to center properly
+            const textWidth = gridColWidth - 4;
+            const textHeight = 20; // Approximate text height for 2-3 lines
+            
+            const textoY = blockTop + (blockHeight / 2) - (textHeight / 2);
+            doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(5.5).text(texto, x + 2, textoY, {
+              width: textWidth,
+              align: 'center',
+              lineBreak: true,
+              height: blockHeight - 4,
+              ellipsis: false // Don't truncate text
+            });
           });
-        });
 
-        if (span > 1) {
-          for (let offset = 1; offset < span; offset++) {
-            slotsOcupados.add(`${dia}-${horas[horaIndex + offset]}`);
+          // Mark slots as occupied for vertical merging
+          if (span > 1) {
+            for (let offset = 1; offset < span; offset++) {
+              slotsOcupados.add(`${dia}-${horas[horaIndex + offset]}`);
+            }
           }
         }
       });
@@ -672,30 +700,45 @@ export class GeneradorPdfService {
           return;
         }
 
+        // Draw grid with thicker lines
+        doc.lineWidth(1.5);
+        // ALWAYS draw base grid cell border
+        doc.rect(x, y, gridColWidth, gridRowHeight).stroke(BORDER_COLOR);
+        
         const celdasEnHora = celdasPorSlot[slotKey] ?? [];
         
-        doc.rect(x, y, gridColWidth, gridRowHeight).stroke(BORDER_COLOR);
         if (celdasEnHora.length > 0) {
-          // Check if all have same curso/docente to merge vertically
-          const puedeFusionar = celdasEnHora.length === 1;
-          const primerBloque = celdasEnHora[0].bloque;
-          const span = puedeFusionar ? calcularFusionPdf(celdasPorSlot, dia, horaIndex, horas, primerBloque) : 1;
+          // Calculate span first
+          let span = 1;
+          if (celdasEnHora.length === 1) {
+            span = calcularFusionPdf(celdasPorSlot, dia, horaIndex, horas, celdasEnHora[0].bloque);
+          }
           const altoCelda = gridRowHeight * span;
 
-          doc.rect(x, y, gridColWidth, altoCelda).fill(celdasEnHora[0].info?.color || '#FFFFFF').stroke(BORDER_COLOR);
-
-          // Draw each entry separated and vertically centered
-          const entryHeight = altoCelda / celdasEnHora.length;
+          // Draw each block separately
+          const blockHeight = altoCelda / celdasEnHora.length;
           celdasEnHora.forEach((celda, idx) => {
+            const blockTop = y + idx * blockHeight;
+            // Draw block background, then a slightly different (or same) border on top of grid
+            doc.rect(x, blockTop, gridColWidth, blockHeight).fill(celda.info?.color || '#FFFFFF').stroke(BORDER_COLOR);
+            
+            // Draw text vertically centered
             const texto = formatearEtiquetaCeldaAmbiente(celda.info, celda.bloque);
-            const textoY = y + idx * entryHeight + (entryHeight / 2) - 8; // Vertical center
-            doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(6).text(texto, x + 2, textoY, {
-              width: gridColWidth - 4,
+            // Calculate text height to center properly
+            const textWidth = gridColWidth - 4;
+            const textHeight = 20; // Approximate text height for 2-3 lines
+            
+            const textoY = blockTop + (blockHeight / 2) - (textHeight / 2);
+            doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(5.5).text(texto, x + 2, textoY, {
+              width: textWidth,
               align: 'center',
-              lineBreak: true
+              lineBreak: true,
+              height: blockHeight - 4,
+              ellipsis: false // Don't truncate text
             });
           });
 
+          // Mark slots as occupied for vertical merging
           if (span > 1) {
             for (let offset = 1; offset < span; offset++) {
               slotsOcupados.add(`${dia}-${horas[horaIndex + offset]}`);
