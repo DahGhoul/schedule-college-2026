@@ -83,7 +83,7 @@ export default function SeleccionHorarioPage() {
 
   const { data: restricciones } = useQuery({
     queryKey: ['restricciones'],
-    queryFn: () => configuracionService.obtenerRestricciones().then((res) => res.data),
+    queryFn: () => configuracionService.obtenerRestricciones().then((res) => res.data.data || res.data),
   });
 
   const { data: progreso } = useQuery({
@@ -462,8 +462,11 @@ export default function SeleccionHorarioPage() {
               alHacerClickCelda={manejarClickCelda}
               bloqueado={esBloqueado}
               bloqueoAlmuerzo={
-                restricciones?.bloqueoAlmuerzoInicio && restricciones?.bloqueoAlmuerzoFin
-                  ? { inicio: restricciones.bloqueoAlmuerzoInicio, fin: restricciones.bloqueoAlmuerzoFin }
+                (restricciones?.franjaInicio ? restricciones : restricciones?.data)?.bloqueoAlmuerzoInicio && (restricciones?.franjaInicio ? restricciones : restricciones?.data)?.bloqueoAlmuerzoFin
+                  ? { 
+                      inicio: (restricciones?.franjaInicio ? restricciones : restricciones?.data).bloqueoAlmuerzoInicio, 
+                      fin: (restricciones?.franjaInicio ? restricciones : restricciones?.data).bloqueoAlmuerzoFin 
+                    }
                   : null
               }
             />
