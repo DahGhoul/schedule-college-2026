@@ -64,7 +64,8 @@ export class VentanasService {
 
     while (cursor <= fin) {
       const diaSemana = cursor.getDay();
-      if (diaSemana !== 0 && diaSemana !== 6) {
+      // Permitir de Lunes (1) a Sábado (6). Domingo es 0.
+      if (diaSemana !== 0) {
         let orden = 1;
         for (let t = franjaInicio; t + duracionMinutos <= franjaFin; t += duracionMinutos) {
           const hora_inicio = this.toHora(t);

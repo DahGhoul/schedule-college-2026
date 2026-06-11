@@ -67,6 +67,12 @@ export class HorariosService {
     horaInicio: string;
     horaFin: string;
   }) {
+    const diasValidos = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
+    const diaNormalizado = datos.diaSemana.toUpperCase();
+    if (!diasValidos.includes(diaNormalizado)) {
+      throw new Error(`Día de la semana no válido: ${datos.diaSemana}`);
+    }
+
     const [docente, componente, ambiente, grupo] = await Promise.all([
       prisma.docente.findUnique({ where: { id: datos.idDocente } }),
       prisma.curso_componente.findUnique({

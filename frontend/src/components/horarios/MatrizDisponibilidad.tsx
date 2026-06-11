@@ -33,11 +33,11 @@ interface MatrizProps {
 }
 
 const colores: Record<string, string> = {
-  LIBRE: 'bg-emerald-50/40 hover:bg-emerald-100/70 border border-emerald-100 hover:border-emerald-300 transition-all duration-150 cursor-pointer hover:scale-[1.02] hover:shadow-sm group relative',
+  LIBRE: 'bg-emerald-50/40 hover:bg-emerald-100/70 border border-emerald-100 hover:border-emerald-300 transition-all duration-75 cursor-pointer hover:scale-[1.01] group relative',
   OCUPADO: 'bg-rose-50/60 border border-rose-100/80 text-rose-500/80 cursor-not-allowed',
-  SELECCION_TEMPORAL: 'bg-amber-50 border-2 border-amber-300 text-amber-800 transition-all duration-150 cursor-pointer hover:scale-[1.02] hover:shadow-sm relative shadow-sm',
+  SELECCION_TEMPORAL: 'bg-amber-50 border-2 border-amber-300 text-amber-800 transition-all duration-75 cursor-pointer hover:scale-[1.01] relative shadow-sm',
   BLOQUEO_INSTITUCIONAL: 'bg-slate-50 border border-slate-200/60 text-slate-400/80 cursor-not-allowed',
-  DOCENTE_OTRO_AMBIENTE: 'bg-indigo-50 border-2 border-indigo-200 text-indigo-800 transition-all duration-150 cursor-pointer hover:scale-[1.02] hover:shadow-sm relative shadow-sm opacity-90',
+  DOCENTE_OTRO_AMBIENTE: 'bg-indigo-50 border-2 border-indigo-200 text-indigo-800 transition-all duration-75 cursor-pointer hover:scale-[1.01] relative shadow-sm opacity-90',
 };
 
 const obtenerHoraEntera = (valor: string) => parseInt(valor.split(':')[0], 10);
@@ -72,114 +72,96 @@ export function MatrizDisponibilidad({ matriz, alHacerClickCelda, bloqueado = fa
   return (
     <div className="space-y-4">
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-        <table className="min-w-full border-collapse text-left text-xs">
-          <thead>
-            <tr className="bg-gray-50/80 border-b border-gray-200">
-              <th className="border-r border-gray-200 px-4 py-3 font-semibold text-gray-500 text-center w-32">Hora</th>
-              {dias.map((dia) => (
-                <th key={dia} className="border-r border-gray-200 px-4 py-3 font-semibold text-gray-600 text-center uppercase tracking-wider">
-                  {dia}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-150">
-            {matriz.filas.map((fila) => {
-              const horaFin = `${(parseInt(fila.horaInicio.split(':')[0]) + 1).toString().padStart(2, '0')}:00`;
-              return (
-                <tr key={fila.horaInicio} className="hover:bg-slate-50/30 transition-colors">
-                  <td className="border-r border-gray-200 px-4 py-3 text-center font-semibold bg-slate-50/50 text-gray-500 w-32">
-                    {fila.horaInicio} - {horaFin}
-                  </td>
-                  {fila.celdas.map((celda, idx) => {
-                    const esAlmuerzo = celda.estado === 'LIBRE' && esBloqueoDeAlmuerzo(celda.horaInicio, bloqueoAlmuerzo);
-                    const estadoVisible = esAlmuerzo ? 'BLOQUEO_INSTITUCIONAL' : celda.estado;
-
-                    return (
-                  <td
-                    key={idx}
-                    className={cn(
-                      'border-r border-gray-200 px-1 py-1.5 text-center min-w-[130px] min-h-[55px] transition-all',
-                      colores[estadoVisible],
-                      bloqueado && estadoVisible !== 'BLOQUEO_INSTITUCIONAL' && 'cursor-not-allowed opacity-70'
-                    )}
-                    onClick={() => {
-                      if (bloqueado) return;
-                      alHacerClickCelda(celda.diaSemana, celda.horaInicio, estadoVisible, celda.info);
-                    }}
-                    title={`${celda.diaSemana} ${celda.horaInicio} - ${
-                      bloqueado
-                        ? 'Fuera de tu ventana de atención'
-                        : esAlmuerzo
-                        ? 'Bloqueo de almuerzo según configuración'
-                        : celda.estado === 'DOCENTE_OTRO_AMBIENTE'
-                        ? 'Ocupado en otro ambiente'
-                        : celda.estado
-                    }`}
-                  >
-                    <div className="flex items-center justify-center min-h-[36px] transition-all duration-150">
-                      {estadoVisible === 'LIBRE' && (
-                        <span className="text-emerald-500 font-bold text-sm opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                          +
-                        </span>
-                      )}
-                      {estadoVisible === 'OCUPADO' && (
-                        <div className="flex flex-col items-center justify-center p-0.5">
-                          <span className="text-[10px] font-semibold text-rose-500 tracking-tight">
-                            Ocupado
-                          </span>
-                          {celda.info?.detalle && (
-                            <span className="text-[8px] text-rose-400/90 font-medium truncate max-w-[110px]" title={celda.info.detalle}>
-                              {celda.info.detalle}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                      {estadoVisible === 'SELECCION_TEMPORAL' && (
-                        <div className="flex flex-col items-center justify-center p-1 text-center w-full min-h-[40px]">
-                          <span className="text-[10px] font-bold text-amber-900 leading-tight truncate max-w-[110px]" title={celda.info?.curso}>
-                            {celda.info?.curso}
-                          </span>
-                          <span className="text-[8.5px] font-semibold text-amber-700 mt-0.5 leading-none">
-                            {celda.info?.tipoComponente} • Gr. {celda.info?.grupo}
-                          </span>
-                          <span className={cn(
-                            "text-[8px] font-bold px-2 py-0.5 rounded-full mt-1.5 leading-none shadow-sm",
-                            celda.info?.confirmado
-                              ? "bg-emerald-100 text-emerald-800 border border-emerald-250"
-                              : "bg-amber-105 text-amber-800 border border-amber-250"
-                          )}>
-                            {celda.info?.confirmado ? 'Confirmado' : 'Borrador'}
-                          </span>
-                        </div>
-                      )}
-                      {estadoVisible === 'DOCENTE_OTRO_AMBIENTE' && (
-                        <div className="flex flex-col items-center justify-center p-1 text-center w-full min-h-[40px]">
-                          <span className="text-[10px] font-bold text-indigo-900 leading-tight truncate max-w-[110px]" title={celda.info?.curso}>
-                            {celda.info?.curso}
-                          </span>
-                          <span className="text-[8.5px] font-semibold text-indigo-600 mt-0.5 leading-none">
-                            {celda.info?.tipoComponente} • Gr. {celda.info?.grupo}
-                          </span>
-                          <span className="text-[8px] font-bold px-2 py-0.5 rounded-full mt-1.5 bg-indigo-100 text-indigo-800 border border-indigo-250 leading-none shadow-sm">
-                            Aula: {celda.info?.ambienteCodigo}
-                          </span>
-                        </div>
-                      )}
-                      {estadoVisible === 'BLOQUEO_INSTITUCIONAL' && (
-                        <span className="text-[10px] font-medium text-slate-400">
-                          {esAlmuerzo ? 'Almuerzo' : 'Bloqueado'}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                    );
-                  })}
+        <div className="overflow-x-auto">
+          <table className="min-w-full border-collapse text-left text-xs table-fixed">
+            <thead>
+              <tr className="bg-gray-50/80 border-b border-gray-200">
+                <th className="border-r border-gray-200 px-2 py-3 font-semibold text-gray-500 text-center w-24">Hora</th>
+                {dias.map((dia) => (
+                  <th key={dia} className="border-r border-gray-200 px-1 py-3 font-semibold text-gray-600 text-center uppercase tracking-wider">
+                    {dia}
+                  </th>
+                ))}
               </tr>
-              );
-            })}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-gray-150">
+              {matriz.filas.map((fila) => {
+                const horaFin = `${(parseInt(fila.horaInicio.split(':')[0]) + 1).toString().padStart(2, '0')}:00`;
+                return (
+                  <tr key={fila.horaInicio} className="hover:bg-slate-50/30 transition-colors">
+                    <td className="border-r border-gray-200 px-2 py-3 text-center font-semibold bg-slate-50/50 text-gray-500 w-24">
+                      {fila.horaInicio}
+                    </td>
+                    {fila.celdas.map((celda, idx) => {
+                      const esAlmuerzo = celda.estado === 'LIBRE' && esBloqueoDeAlmuerzo(celda.horaInicio, bloqueoAlmuerzo);
+                      const estadoVisible = esAlmuerzo ? 'BLOQUEO_INSTITUCIONAL' : celda.estado;
+
+                      return (
+                        <td
+                          key={idx}
+                          className={cn(
+                            'border-r border-gray-200 px-0.5 py-1 text-center min-h-[50px] transition-all',
+                            colores[estadoVisible],
+                            bloqueado && estadoVisible !== 'BLOQUEO_INSTITUCIONAL' && 'cursor-not-allowed opacity-70'
+                          )}
+                          onClick={() => {
+                            if (bloqueado) return;
+                            alHacerClickCelda(celda.diaSemana, celda.horaInicio, estadoVisible, celda.info);
+                          }}
+                        >
+                          <div className="flex items-center justify-center min-h-[32px]">
+                            {estadoVisible === 'LIBRE' && (
+                              <span className="text-emerald-500 font-bold text-sm opacity-0 group-hover:opacity-100 transition-opacity duration-75">
+                                +
+                              </span>
+                            )}
+                            {estadoVisible === 'OCUPADO' && (
+                              <div className="flex flex-col items-center justify-center p-0.5">
+                                <span className="text-[9px] font-semibold text-rose-500 tracking-tight leading-none">
+                                  Ocupado
+                                </span>
+                                {celda.info?.detalle && (
+                                  <span className="text-[7.5px] text-rose-400/90 font-medium truncate max-w-[90px] mt-0.5" title={celda.info.detalle}>
+                                    {celda.info.detalle}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                            {estadoVisible === 'SELECCION_TEMPORAL' && (
+                              <div className="flex flex-col items-center justify-center p-0.5 text-center w-full">
+                                <span className="text-[9px] font-bold text-amber-900 leading-tight truncate max-w-[95px]" title={celda.info?.curso}>
+                                  {celda.info?.curso}
+                                </span>
+                                <span className="text-[8px] font-semibold text-amber-700 leading-none mt-0.5">
+                                  {celda.info?.tipoComponente} • Gr. {celda.info?.grupo}
+                                </span>
+                              </div>
+                            )}
+                            {estadoVisible === 'DOCENTE_OTRO_AMBIENTE' && (
+                              <div className="flex flex-col items-center justify-center p-0.5 text-center w-full">
+                                <span className="text-[9px] font-bold text-indigo-900 leading-tight truncate max-w-[95px]" title={celda.info?.curso}>
+                                  {celda.info?.curso}
+                                </span>
+                                <span className="text-[8px] font-semibold text-indigo-600 leading-none mt-0.5">
+                                  Aula: {celda.info?.ambienteCodigo}
+                                </span>
+                              </div>
+                            )}
+                            {estadoVisible === 'BLOQUEO_INSTITUCIONAL' && (
+                              <span className="text-[9px] font-medium text-slate-400">
+                                Almuerzo
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
       <div className="flex flex-wrap gap-4 px-3 py-2 text-xs font-medium text-gray-500 bg-gray-50/50 rounded-xl border border-gray-150">
         <span className="flex items-center gap-2">
