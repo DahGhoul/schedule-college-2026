@@ -57,11 +57,6 @@ services:
       REDIS_URL: "redis://redis:6379"
       JWT_SECRET: "prod-secret-change-me"
       NODE_ENV: development
-      SMTP_HOST: "smtp.gmail.com"
-      SMTP_PORT: "587"
-      SMTP_USER: "" # Cambia esto por tu correo electrónico
-      SMTP_PASS: "" # Cambia esto por tu contraseña de aplicación
-
   frontend:
     build:
       context: ./frontend
