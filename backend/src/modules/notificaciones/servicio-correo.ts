@@ -1,27 +1,21 @@
-import nodemailer from 'nodemailer';
+import sgMail from '@sendgrid/mail';
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.SMTP_PORT || '587'),
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
+sgMail.setApiKey(process.env.SENDGRID_API_KEY as string);
 
 export class ServicioCorreo {
   static async enviar(destinatario: string, asunto: string, contenido: string): Promise<boolean> {
     try {
-      await transporter.sendMail({
-        from: `"Horarios UNT" <${process.env.SMTP_USER}>`,
+      const msg = {
         to: destinatario,
+        from: process.env.FROM_EMAIL as string, // Ej: 'noreply@tudominio.com' (verificado en SendGrid)
         subject: asunto,
         html: contenido,
-      });
+      };
+
+      await sgMail.send(msg);
       return true;
     } catch (error) {
-      console.error('Error enviando correo:', error);
+      console.error('Error enviando correo con SendGrid:', error);
       return false;
     }
   }

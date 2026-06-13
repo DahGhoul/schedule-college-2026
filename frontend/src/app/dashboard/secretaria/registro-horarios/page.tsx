@@ -177,39 +177,79 @@ export default function RegistroManualHorariosPage() {
 
       const horaFin = `${(parseInt(hora) + 1).toString().padStart(2, '0')}:00`;
       try {
+        // Optimistic UI update
+        queryClient.setQueryData(['matriz-disponibilidad', ambienteId, idPeriodo, docenteId, componenteSeleccionado], (old: any) => {
+          if (!old) return old;
+          return {
+            ...old,
+            filas: old.filas.map((f: any) => {
+              if (f.horaInicio !== hora) return f;
+              return {
+                ...f,
+                celdas: f.celdas.map((c: any) => {
+                  if (c.diaSemana !== dia) return c;
+                  return { ...c, estado: 'SELECCION_TEMPORAL', info: { curso: 'Procesando...', tipoComponente: '', grupo: '' } };
+                })
+              };
+            })
+          };
+        });
+
         await seleccionarCelda({
           idDocente: docenteId,
           idComponente: componenteSeleccionado,
           idGrupo: grupoSeleccionado,
           idAmbiente: ambienteId,
-          diaSemana: dia,
+          diaSemana: dia.toUpperCase(),
           horaInicio: hora,
           horaFin,
           sesionId,
         });
+        
         actualizarMatriz();
         queryClient.invalidateQueries({ queryKey: ['validacion-seleccion', docenteId, idPeriodo] });
-        queryClient.invalidateQueries({ queryKey: ['progreso', docenteId] });
+        queryClient.invalidateQueries({ queryKey: ['progreso-secretaria', docenteId] });
         queryClient.invalidateQueries({ queryKey: ['selecciones-temporales', docenteId] });
         setMensaje({ texto: 'Celda asignada temporalmente.', tipo: 'success' });
       } catch (err: any) {
+        actualizarMatriz();
         setMensaje({ texto: err.response?.data?.error || 'Error al seleccionar', tipo: 'error' });
       }
     } else if (estado === 'SELECCION_TEMPORAL' || estado === 'DOCENTE_OTRO_AMBIENTE') {
       try {
+        // Optimistic UI update for deselection
+        queryClient.setQueryData(['matriz-disponibilidad', ambienteId, idPeriodo, docenteId, componenteSeleccionado], (old: any) => {
+          if (!old) return old;
+          return {
+            ...old,
+            filas: old.filas.map((f: any) => {
+              if (f.horaInicio !== hora) return f;
+              return {
+                ...f,
+                celdas: f.celdas.map((c: any) => {
+                  if (c.diaSemana !== dia) return c;
+                  return { ...c, estado: 'LIBRE', info: undefined };
+                })
+              };
+            })
+          };
+        });
+
         await deseleccionarCelda({
           idDocente: docenteId,
           idAmbiente: info?.idAmbiente || ambienteId || undefined,
-          diaSemana: dia,
+          diaSemana: dia.toUpperCase(),
           horaInicio: hora,
           sesionId: info?.sesionId || sesionId,
         });
+        
         actualizarMatriz();
         queryClient.invalidateQueries({ queryKey: ['validacion-seleccion', docenteId, idPeriodo] });
-        queryClient.invalidateQueries({ queryKey: ['progreso', docenteId] });
+        queryClient.invalidateQueries({ queryKey: ['progreso-secretaria', docenteId] });
         queryClient.invalidateQueries({ queryKey: ['selecciones-temporales', docenteId] });
         setMensaje({ texto: 'Celda liberada.', tipo: 'success' });
       } catch (err: any) {
+        actualizarMatriz();
         setMensaje({ texto: err.response?.data?.error || 'Error al liberar celda', tipo: 'error' });
       }
     }

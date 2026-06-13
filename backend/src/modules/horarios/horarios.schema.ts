@@ -7,7 +7,7 @@ export const seleccionarCeldaSchema = z.object({
   idAmbiente: z.number().int().positive().optional(),
   idPeriodo: z.number().int().positive().optional(),
   modoPrueba: z.boolean().optional(),
-  diaSemana: z.enum(['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES']),
+  diaSemana: z.enum(['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO']),
   horaInicio: z.string().regex(/^\d{2}:\d{2}$/),
   horaFin: z.string().regex(/^\d{2}:\d{2}$/),
   sesionId: z.string().min(1),
@@ -16,7 +16,7 @@ export const seleccionarCeldaSchema = z.object({
 export const deseleccionarCeldaSchema = z.object({
   idDocente: z.number().int().positive(),
   idAmbiente: z.number().int().positive().optional(),
-  diaSemana: z.enum(['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES']),
+  diaSemana: z.enum(['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO']),
   horaInicio: z.string().regex(/^\d{2}:\d{2}$/),
   sesionId: z.string().min(1).optional(),
 });

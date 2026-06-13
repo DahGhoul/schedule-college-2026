@@ -238,6 +238,24 @@ export default function SeleccionHorarioPage() {
 
       const horaFin = `${(parseInt(hora) + 1).toString().padStart(2, '0')}:00`;
       try {
+        // Optimistic UI update: Invalidate query before call to feel faster
+        queryClient.setQueryData(['matriz-disponibilidad', ambienteId, idPeriodo, docenteId, componenteSeleccionado], (old: any) => {
+          if (!old) return old;
+          return {
+            ...old,
+            filas: old.filas.map((f: any) => {
+              if (f.horaInicio !== hora) return f;
+              return {
+                ...f,
+                celdas: f.celdas.map((c: any) => {
+                  if (c.diaSemana !== dia) return c;
+                  return { ...c, estado: 'SELECCION_TEMPORAL', info: { curso: 'Procesando...', tipoComponente: '', grupo: '' } };
+                })
+              };
+            })
+          };
+        });
+
         await seleccionarCelda({
           idDocente: docenteId,
           idComponente: componenteSeleccionado,
@@ -249,16 +267,37 @@ export default function SeleccionHorarioPage() {
           horaFin,
           sesionId,
         });
+        
         actualizarMatriz();
         queryClient.invalidateQueries({ queryKey: ['validacion-seleccion', docenteId, idPeriodo] });
         queryClient.invalidateQueries({ queryKey: ['progreso', docenteId] });
         queryClient.invalidateQueries({ queryKey: ['selecciones-temporales', docenteId] });
         setMensaje({ texto: 'Celda seleccionada correctamente.', tipo: 'success' });
       } catch (err: any) {
+        // Rollback optimistic update on error
+        actualizarMatriz();
         setMensaje({ texto: err.response?.data?.error || 'Error al seleccionar la celda.', tipo: 'error' });
       }
     } else if (estado === 'SELECCION_TEMPORAL' || estado === 'DOCENTE_OTRO_AMBIENTE') {
       try {
+        // Optimistic UI update for deselection
+        queryClient.setQueryData(['matriz-disponibilidad', ambienteId, idPeriodo, docenteId, componenteSeleccionado], (old: any) => {
+          if (!old) return old;
+          return {
+            ...old,
+            filas: old.filas.map((f: any) => {
+              if (f.horaInicio !== hora) return f;
+              return {
+                ...f,
+                celdas: f.celdas.map((c: any) => {
+                  if (c.diaSemana !== dia) return c;
+                  return { ...c, estado: 'LIBRE', info: undefined };
+                })
+              };
+            })
+          };
+        });
+
         await deseleccionarCelda({
           idDocente: docenteId,
           idAmbiente: info?.idAmbiente || ambienteId || undefined,
@@ -266,12 +305,15 @@ export default function SeleccionHorarioPage() {
           horaInicio: hora,
           sesionId: info?.sesionId || sesionId,
         });
+        
         actualizarMatriz();
         queryClient.invalidateQueries({ queryKey: ['validacion-seleccion', docenteId, idPeriodo] });
         queryClient.invalidateQueries({ queryKey: ['progreso', docenteId] });
         queryClient.invalidateQueries({ queryKey: ['selecciones-temporales', docenteId] });
         setMensaje({ texto: 'Celda liberada correctamente.', tipo: 'success' });
       } catch (err: any) {
+        // Rollback optimistic update on error
+        actualizarMatriz();
         setMensaje({ texto: err.response?.data?.error || 'No se pudo liberar la celda.', tipo: 'error' });
       }
     }

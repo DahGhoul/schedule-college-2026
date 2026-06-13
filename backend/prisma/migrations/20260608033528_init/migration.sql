@@ -15,9 +15,6 @@ ALTER TABLE "horario_personal_docente" DROP CONSTRAINT "horario_personal_docente
 ALTER TABLE "horario_personal_docente" DROP CONSTRAINT "horario_personal_docente_id_periodo_fkey";
 
 -- AlterTable
-ALTER TABLE "ambiente" ALTER COLUMN "codigo" SET DATA TYPE VARCHAR(100);
-
--- AlterTable
 ALTER TABLE "docente" ADD COLUMN     "dni" VARCHAR(20),
 ADD COLUMN     "empleo" VARCHAR(150);
 

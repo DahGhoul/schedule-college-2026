@@ -62,10 +62,17 @@ export class ValidadorHorario {
       });
     }
 
-    // 1. Validar horas máximas diarias
+    // 1. Validar horas máximas diarias y días válidos
     const horasPorDia: Record<string, number> = {};
+    const diasValidos = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
+
     for (const sel of seleccionesDocente) {
-      horasPorDia[sel.diaSemana] = (horasPorDia[sel.diaSemana] || 0) + 1;
+      const diaNormalizado = sel.diaSemana.toUpperCase();
+      if (!diasValidos.includes(diaNormalizado)) {
+        conflictos.push(`Conflicto: El día ${sel.diaSemana} no es válido para programación académica.`);
+        continue;
+      }
+      horasPorDia[diaNormalizado] = (horasPorDia[diaNormalizado] || 0) + 1;
     }
     for (const [dia, horas] of Object.entries(horasPorDia)) {
       if (horas > horasMaxDiarias) {
