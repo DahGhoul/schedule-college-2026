@@ -1,28 +1,45 @@
 "use client";
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { periodosService } from '@/services/periodos.service';
-import { CalendarioGeneral } from '@/components/horarios/CalendarioGeneral';
 import { SpinnerCarga } from '@/components/ui/SpinnerCarga';
 import { NotificacionToast } from '@/components/ui/NotificacionToast';
 import { Selector } from '@/components/ui/Selector';
 import { docentesService } from '@/services/docentes.service';
 import { useAuthStore } from '@/stores/auth.store';
 import { Boton } from '@/components/ui/Boton';
-import { Download } from 'lucide-react';
+import { FileText, Clock, ArrowLeft } from 'lucide-react';
+import { reportesService, descargarBlob } from '@/services/reportes.service';
+import { useRouter } from 'next/navigation';
+import { CalendarioGeneralConNoLectivos } from '@/components/horarios/CalendarioGeneralConNoLectivos';
 
 export default function VistaHorarioDocentePage() {
+  const router = useRouter();
   const { usuario } = useAuthStore();
   const docenteIdFromSession = usuario?.idDocente || null;
   const [docenteSeleccionado, setDocenteSeleccionado] = useState<number | null>(docenteIdFromSession);
-  const [mensaje] = useState<{ mensaje: string; tipo: 'exito' | 'error' } | null>(null);
+  const [toast, setToast] = useState<{ mensaje: string; tipo: 'exito' | 'error' } | null>(null);
   const [exportandoPdf, setExportandoPdf] = useState(false);
-  const horarioRef = useRef<HTMLDivElement | null>(null);
+  const [exportandoExcel, setExportandoExcel] = useState(false);
 
-  const { data: periodoActivo, isLoading } = useQuery({
+  const { data: periodosData } = useQuery({
+    queryKey: ['periodos'],
+    queryFn: () => periodosService.listar().then((res) => res.data),
+  });
+  const periodos = Array.isArray(periodosData) ? periodosData : periodosData?.data || [];
+
+  const { data: periodoActivo, isLoading: periodoActivoLoading } = useQuery({
     queryKey: ['periodo-activo'],
     queryFn: () => periodosService.activo().then((res) => res.data),
   });
+
+  const [idPeriodoSeleccionado, setIdPeriodoSeleccionado] = useState<number>(0);
+  useEffect(() => {
+    if (periodoActivo && idPeriodoSeleccionado === 0) {
+      setIdPeriodoSeleccionado(periodoActivo.id);
+    }
+  }, [periodoActivo]);
+  const idPeriodo = idPeriodoSeleccionado || periodoActivo?.id || 0;
 
   const { data: docentes } = useQuery({
     queryKey: ['docentes'],
@@ -30,58 +47,82 @@ export default function VistaHorarioDocentePage() {
   });
 
   const handleExportarPdf = async () => {
-    if (!horarioRef.current || exportandoPdf) return;
+    if (!idPeriodo || !docenteSeleccionado || exportandoPdf) return;
 
     setExportandoPdf(true);
     try {
-      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
-        import('html2canvas'),
-        import('jspdf'),
-      ]);
-
-      const canvas = await html2canvas(horarioRef.current, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-      });
-
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('l', 'mm', 'a4');
-      const marginX = 10;
-      const marginY = 10;
-      const pageWidth = pdf.internal.pageSize.getWidth() - marginX * 2;
-      const pageHeight = pdf.internal.pageSize.getHeight() - marginY * 2;
-      const imgHeight = (canvas.height * pageWidth) / canvas.width;
-      let remainingHeight = imgHeight;
-      let positionY = marginY;
-
-      pdf.addImage(imgData, 'PNG', marginX, positionY, pageWidth, imgHeight);
-      remainingHeight -= pageHeight;
-
-      while (remainingHeight > 0) {
-        positionY = remainingHeight - imgHeight + marginY;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', marginX, positionY, pageWidth, imgHeight);
-        remainingHeight -= pageHeight;
-      }
-
+      const response = await reportesService.pdfDocente(docenteSeleccionado, idPeriodo);
       const nombreDocente = usuario?.docente
         ? `${usuario.docente.apellidos || ''}_${usuario.docente.nombres || ''}`.replace(/\s+/g, '_')
         : 'horario';
-      pdf.save(`horario_${nombreDocente}.pdf`);
+      descargarBlob(response.data, `horario_${nombreDocente}.pdf`);
+      setToast({ mensaje: 'PDF generado correctamente', tipo: 'exito' });
+    } catch (err) {
+      setToast({ mensaje: 'Error al generar el PDF', tipo: 'error' });
     } finally {
       setExportandoPdf(false);
     }
   };
 
+  const handleExportarExcel = async () => {
+    if (!idPeriodo || !docenteSeleccionado || exportandoExcel) return;
+
+    setExportandoExcel(true);
+    try {
+      const response = await reportesService.excelDocente(docenteSeleccionado, idPeriodo);
+      const nombreDocente = usuario?.docente
+        ? `${usuario.docente.apellidos || ''}_${usuario.docente.nombres || ''}`.replace(/\s+/g, '_')
+        : 'horario';
+      descargarBlob(response.data, `horario_${nombreDocente}.xlsx`);
+      setToast({ mensaje: 'Excel generado correctamente', tipo: 'exito' });
+    } catch (err) {
+      setToast({ mensaje: 'Error al generar el Excel', tipo: 'error' });
+    } finally {
+      setExportandoExcel(false);
+    }
+  };
+
   return (
-    <div>
-      <h1 className="text-2xl font-bold mb-4">Horario por Docente</h1>
-      {mensaje && <NotificacionToast mensaje={mensaje.mensaje} tipo={mensaje.tipo} />}
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#0b1f3a] via-[#123b6d] to-[#0f4c81] px-6 py-8 text-white shadow-xl relative">
+        <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10 blur-3xl pointer-events-none"></div>
+        <div className="absolute left-1/3 bottom-0 h-56 w-56 bg-unt-accent/10 blur-3xl pointer-events-none"></div>
+
+        <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex items-center gap-4">
+            <button onClick={() => router.back()} className="rounded-full p-2 text-white hover:bg-white/20 transition-colors">
+              <ArrowLeft className="h-6 w-6" />
+            </button>
+            <div className="flex flex-col gap-2">
+              <span className="inline-flex items-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/80">
+                Vista de Horario
+              </span>
+              <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
+                Mi Horario Completo
+              </h1>
+            </div>
+          </div>
+
+          <div className="w-full lg:w-64 space-y-3">
+            <label className="text-xs font-semibold uppercase tracking-[0.14em] text-white/80">Periodo Académico</label>
+            <Selector
+              value={idPeriodo.toString()}
+              onChange={(e) => setIdPeriodoSeleccionado(parseInt(e.target.value))}
+              className="border-white/20 bg-white/95 text-slate-900 focus:border-white focus:ring-white/30 shadow-sm"
+            >
+              {periodos.map((p: any) => (
+                <option key={p.id} value={p.id}>{p.nombre}</option>
+              ))}
+            </Selector>
+          </div>
+        </div>
+      </div>
+
+      {toast && <NotificacionToast mensaje={toast.mensaje} tipo={toast.tipo} onClose={() => setToast(null)} />}
 
       {/* Mostrar selector solo si el usuario no es un docente */}
       {!docenteIdFromSession && (
-        <div className="mb-4">
+        <div className="bg-white p-4 rounded-[1.5rem] border border-slate-200 shadow-sm">
           <Selector
             label="Seleccionar Docente"
             opciones={[
@@ -94,28 +135,38 @@ export default function VistaHorarioDocentePage() {
         </div>
       )}
 
-      {isLoading ? (
+      {periodoActivoLoading ? (
         <SpinnerCarga />
-      ) : docenteSeleccionado && periodoActivo ? (
-        <div className="space-y-4">
-          <div className="flex justify-end">
+      ) : docenteSeleccionado && idPeriodo ? (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row justify-end gap-3">
+            <Boton
+              onClick={handleExportarExcel}
+              disabled={exportandoExcel}
+              className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 font-semibold rounded-[1.5rem]"
+            >
+              <Clock className="h-4 w-4" />
+              {exportandoExcel ? 'Generando Excel...' : 'Exportar Excel'}
+            </Boton>
             <Boton
               onClick={handleExportarPdf}
               disabled={exportandoPdf}
-              className="inline-flex items-center gap-2 bg-slate-900 text-white hover:bg-slate-800 font-semibold"
+              className="flex items-center gap-2 bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 font-semibold rounded-[1.5rem]"
             >
-              <Download className="h-4 w-4" />
-              {exportandoPdf ? 'Generando PDF...' : 'Exportar como PDF'}
+              <FileText className="h-4 w-4" />
+              {exportandoPdf ? 'Generando PDF...' : 'Exportar PDF'}
             </Boton>
           </div>
-          <div ref={horarioRef} className="bg-white rounded-xl">
-            <CalendarioGeneral idPeriodo={periodoActivo.id} filtroTipo="DOCENTE" filtroId={docenteSeleccionado} modo="LECTURA" />
+
+          <div className="bg-white rounded-[1.5rem] shadow-sm border border-slate-200 overflow-hidden">
+            <CalendarioGeneralConNoLectivos idPeriodo={idPeriodo} idDocente={docenteSeleccionado} />
           </div>
         </div>
       ) : (
-        <p className="text-gray-500 text-center py-10 bg-white rounded-xl shadow-sm border border-gray-100">
-          No se pudo identificar el docente de la sesión.
-        </p>
+        <div className="text-gray-500 text-center py-16 bg-white rounded-[1.5rem] shadow-sm border border-gray-100">
+          <FileText className="h-12 w-12 mx-auto mb-4 text-slate-300" />
+          No se pudo identificar el docente o el periodo académico.
+        </div>
       )}
     </div>
   );

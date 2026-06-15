@@ -108,7 +108,7 @@ export default function CargaNoLectivaPage() {
   const [erroresFormulario, setErroresFormulario] = useState<string[]>([]);
   const [toast, setToast] = useState<{ mensaje: string; tipo: 'exito' | 'error' } | null>(null);
 
-  const [pestanaActiva, setPestanaActiva] = useState<'declaracion' | 'calendario'>('declaracion');
+  const [pestanaActiva, setPestanaActiva] = useState<'declaracion' | 'calendario' | 'formatos'>('declaracion');
   const [seccionesVisibles, setSeccionesVisibles] = useState<SeccionNoLectivaKey[]>(['PREPARACION_EVALUACION']);
   const [nuevaSeccionClave, setNuevaSeccionClave] = useState<string>('');
 
@@ -522,6 +522,23 @@ export default function CargaNoLectivaPage() {
               <CalendarDays className="h-4 w-4" />
               2. Calendario de Distribución
             </button>
+            <button 
+              onClick={() => {
+                if (!declaracionData?.declaracion?.id) {
+                  setToast({ mensaje: 'Primero debes guardar tu declaración (Paso 1)', tipo: 'error' });
+                  return;
+                }
+                setPestanaActiva('formatos');
+              }}
+              className={cn(
+                "flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300",
+                pestanaActiva === 'formatos' ? "bg-white text-unt-primary shadow-md scale-105" : "text-white hover:bg-white/20",
+                !declaracionData?.declaracion?.id ? "opacity-50 cursor-not-allowed" : ""
+              )}
+            >
+              <FileText className="h-4 w-4" />
+              3. Formatos
+            </button>
           </div>
         </div>
       </header>
@@ -840,45 +857,6 @@ export default function CargaNoLectivaPage() {
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Formatos automáticos</p>
-                    <div className="mt-3 overflow-x-auto">
-                      <table className="min-w-full text-left text-sm text-slate-700">
-                        <thead>
-                          <tr className="border-b border-slate-200 text-xs uppercase tracking-[0.14em] text-slate-500">
-                            <th className="py-2 pr-4 font-semibold">Formato</th>
-                            <th className="py-2 pr-4 font-semibold">Sede</th>
-                            <th className="py-2 pr-4 font-semibold">Estado</th>
-                            <th className="py-2 pr-4 font-semibold text-right">Acción</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(declaracionData?.formatos ?? []).map((formato: any) => (
-                            <tr key={formato.tipo} className="border-b border-slate-100 last:border-b-0">
-                              <td className="py-2 pr-4">{formato.etiqueta}</td>
-                              <td className="py-2 pr-4">{formato.sede}</td>
-                              <td className="py-2 pr-4">
-                                <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${formato.estado === 'GENERADO' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                                  {formato.estado}
-                                </span>
-                              </td>
-                              <td className="py-2 pr-4 text-right">
-                                <Boton
-                                  onClick={() => window.open(`/imprimir/formatos/${formato.tipo}?idPeriodo=${idPeriodo}`, '_blank')}
-                                  variant="outline"
-                                  className="h-8 rounded-lg px-3 text-xs font-bold text-unt-primary hover:bg-unt-primary/10"
-                                >
-                                  <Printer className="mr-2 h-3.5 w-3.5" />
-                                  Imprimir
-                                </Boton>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
                   <div className="space-y-3">
                     <Boton
                       onClick={guardarDeclaracion}
@@ -915,7 +893,7 @@ export default function CargaNoLectivaPage() {
               </Card>
             </div>
           </div>
-        ) : (
+        ) : pestanaActiva === 'calendario' ? (
           <div className="grid grid-cols-1 gap-8">
             <Card className="border-none shadow-xl rounded-[2rem] overflow-hidden bg-white/60 backdrop-blur-md" id="paso2">
               <CardHeader className="bg-gradient-to-r from-unt-primary to-[#0f4c81] text-white flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between py-6">
@@ -1004,6 +982,66 @@ export default function CargaNoLectivaPage() {
                       Guardar Horario No Lectivo
                     </Boton>
                   </div>
+              </CardContent>
+            </Card>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-8">
+            <Card className="border-none shadow-xl rounded-[2rem] overflow-hidden bg-white/60 backdrop-blur-md" id="paso3">
+              <CardHeader className="bg-gradient-to-r from-unt-primary to-[#0f4c81] text-white flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between py-6">
+                <CardTitle className="flex items-center gap-3 text-white text-xl">
+                  <FileText className="h-6 w-6" />
+                  Paso 3: Formatos Automáticos
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6 pt-8 pb-10">
+                <div className="rounded-xl border border-blue-100 bg-blue-50/80 p-5 backdrop-blur-sm shadow-sm flex gap-4 items-start">
+                  <AlertCircle className="h-5 w-5 text-blue-500 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm text-blue-900 space-y-1">
+                    <p><strong>Instrucciones:</strong> Descarga los formatos oficiales con tu declaración no lectiva ya completada.</p>
+                  </div>
+                </div>
+
+                <div className="w-full">
+                  <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500 mb-4">Formatos Disponibles</p>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-left text-sm text-slate-700">
+                        <thead>
+                          <tr className="border-b border-slate-200 text-xs uppercase tracking-[0.14em] text-slate-500">
+                            <th className="py-3 pr-4 font-semibold">Formato</th>
+                            <th className="py-3 pr-4 font-semibold">Sede</th>
+                            <th className="py-3 pr-4 font-semibold">Estado</th>
+                            <th className="py-3 pr-4 font-semibold text-right">Acción</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(declaracionData?.formatos ?? []).map((formato: any) => (
+                            <tr key={formato.tipo} className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/50 transition-colors">
+                              <td className="py-3 pr-4 font-medium">{formato.etiqueta}</td>
+                              <td className="py-3 pr-4">{formato.sede}</td>
+                              <td className="py-3 pr-4">
+                                <span className={`inline-flex rounded-full px-3 py-1.5 text-xs font-bold ${formato.estado === 'GENERADO' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                                  {formato.estado}
+                                </span>
+                              </td>
+                              <td className="py-3 pr-4 text-right">
+                                <Boton
+                                  onClick={() => window.open(`/imprimir/formatos/${formato.tipo}?idPeriodo=${idPeriodo}`, '_blank')}
+                                  variante="borde"
+                                  className="h-10 rounded-xl px-4 text-xs font-bold text-unt-primary hover:bg-unt-primary/10"
+                                >
+                                  <Printer className="mr-2 h-4 w-4" />
+                                  Imprimir
+                                </Boton>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>
