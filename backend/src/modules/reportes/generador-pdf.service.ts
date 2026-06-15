@@ -304,21 +304,22 @@ export class GeneradorPdfService {
           }
           const altoCelda = gridRowHeight * span;
 
-          const blockHeight = altoCelda / entradas.length;
+          // Draw each block separately (horizontally)
+          const blockWidth = gridColWidth / entradas.length;
           entradas.forEach((celda, idx) => {
-            const blockTop = y + idx * blockHeight;
-            doc.rect(x, blockTop, gridColWidth, blockHeight).fill(`#${celda.registro.color.slice(2)}`).stroke(BORDER_COLOR);
+            const blockLeft = x + idx * blockWidth;
+            doc.rect(blockLeft, y, blockWidth, altoCelda).fill(`#${celda.registro.color.slice(2)}`).stroke(BORDER_COLOR);
             
             const texto = formatearEtiquetaCeldaPdf(celda.registro, celda.bloque, true);
-            const textWidth = gridColWidth - 4;
+            const textWidth = blockWidth - 4;
             const textHeight = 20;
             
-            const textoY = blockTop + (blockHeight / 2) - (textHeight / 2);
-            doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(5.5).text(texto, x + 2, textoY, {
+            const textoY = y + (altoCelda / 2) - (textHeight / 2);
+            doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(5).text(texto, blockLeft + 2, textoY, {
               width: textWidth,
               align: 'center',
               lineBreak: true,
-              height: blockHeight - 4,
+              height: altoCelda - 4,
               ellipsis: false
             });
           });
@@ -481,25 +482,25 @@ export class GeneradorPdfService {
           }
           const altoCelda = gridRowHeight * span;
 
-          // Draw each block separately
-          const blockHeight = altoCelda / entradas.length;
+          // Draw each block separately (horizontally)
+          const blockWidth = gridColWidth / entradas.length;
           entradas.forEach((celda, idx) => {
-            const blockTop = y + idx * blockHeight;
+            const blockLeft = x + idx * blockWidth;
             // Draw block background, then a slightly different (or same) border on top of grid
-            doc.rect(x, blockTop, gridColWidth, blockHeight).fill(`#${celda.registro.color.slice(2)}`).stroke(BORDER_COLOR);
+            doc.rect(blockLeft, y, blockWidth, altoCelda).fill(`#${celda.registro.color.slice(2)}`).stroke(BORDER_COLOR);
             
             // Draw text vertically centered
             const texto = formatearEtiquetaCeldaPdf(celda.registro, celda.bloque);
             // Calculate text height to center properly
-            const textWidth = gridColWidth - 4;
+            const textWidth = blockWidth - 4;
             const textHeight = 20; // Approximate text height for 2-3 lines
             
-            const textoY = blockTop + (blockHeight / 2) - (textHeight / 2);
-            doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(5.5).text(texto, x + 2, textoY, {
+            const textoY = y + (altoCelda / 2) - (textHeight / 2);
+            doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(5).text(texto, blockLeft + 2, textoY, {
               width: textWidth,
               align: 'center',
               lineBreak: true,
-              height: blockHeight - 4,
+              height: altoCelda - 4,
               ellipsis: false // Don't truncate text
             });
           });
@@ -725,25 +726,25 @@ export class GeneradorPdfService {
           }
           const altoCelda = gridRowHeight * span;
 
-          // Draw each block separately
-          const blockHeight = altoCelda / celdasEnHora.length;
+          // Draw each block separately (horizontally)
+          const blockWidth = gridColWidth / celdasEnHora.length;
           celdasEnHora.forEach((celda, idx) => {
-            const blockTop = y + idx * blockHeight;
+            const blockLeft = x + idx * blockWidth;
             // Draw block background, then a slightly different (or same) border on top of grid
-            doc.rect(x, blockTop, gridColWidth, blockHeight).fill(celda.info?.color || '#FFFFFF').stroke(BORDER_COLOR);
+            doc.rect(blockLeft, y, blockWidth, altoCelda).fill(celda.info?.color || '#FFFFFF').stroke(BORDER_COLOR);
             
             // Draw text vertically centered
             const texto = formatearEtiquetaCeldaAmbiente(celda.info, celda.bloque);
             // Calculate text height to center properly
-            const textWidth = gridColWidth - 4;
+            const textWidth = blockWidth - 4;
             const textHeight = 20; // Approximate text height for 2-3 lines
             
-            const textoY = blockTop + (blockHeight / 2) - (textHeight / 2);
-            doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(5.5).text(texto, x + 2, textoY, {
+            const textoY = y + (altoCelda / 2) - (textHeight / 2);
+            doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(5).text(texto, blockLeft + 2, textoY, {
               width: textWidth,
               align: 'center',
               lineBreak: true,
-              height: blockHeight - 4,
+              height: altoCelda - 4,
               ellipsis: false // Don't truncate text
             });
           });
