@@ -180,23 +180,34 @@ export class GeneradorExcelService {
 
       dias.forEach((d, di) => {
         const cs = gridCols[di + 1].start, ce = gridCols[di + 1].end;
-        worksheet.mergeCells(row, cs, row, ce);
-        const cell = worksheet.getCell(row, cs);
         const entradas = contexto.celdas[`${d}-${h}`] ?? [];
+        const numEntradas = entradas.length;
         
-        if (entradas.length > 0) {
-          const texto = entradas.map(e => {
+        if (numEntradas === 0) {
+          worksheet.mergeCells(row, cs, row, ce);
+          const cell = worksheet.getCell(row, cs);
+          cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+          cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+        } else {
+          const colWidth = (ce - cs + 1) / numEntradas;
+          let currentCol = cs;
+          entradas.forEach((e, idx) => {
+            const startCol = currentCol;
+            const endCol = idx === numEntradas - 1 ? ce : Math.floor(currentCol + colWidth - 1);
+            if (startCol < endCol) {
+              worksheet.mergeCells(row, startCol, row, endCol);
+            }
+            const cell = worksheet.getCell(row, startCol);
             const grupoEtiqueta = e.registro.tieneMultiplesGrupos ? `Gr. ${e.registro.grupoCodigo}` : '';
             const ambienteEtiqueta = e.bloque.ambiente?.codigo || 'Solic.';
-            return `${e.registro.indice} | ${grupoEtiqueta} | ${ambienteEtiqueta}`;
-          }).join('\n---\n');
-          
-          cell.value = texto;
-          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: entradas[0].registro.color } };
-          cell.font = { bold: true, size: 7 };
+            cell.value = `${e.registro.indice}\n${grupoEtiqueta}\n${ambienteEtiqueta}`;
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: e.registro.color } };
+            cell.font = { bold: true, size: 6 };
+            cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+            cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+            currentCol = endCol + 1;
+          });
         }
-        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
       });
     });
   }
@@ -332,27 +343,37 @@ export class GeneradorExcelService {
       worksheet.mergeCells(row, 1, row, 2);
       worksheet.getCell(row, 1).value = h;
       worksheet.getCell(row, 1).font = { bold: true, size: 8 };
-      worksheet.getRow(row).height = 35; // Aumentar altura para múltiples cursos
+      worksheet.getRow(row).height = 35;
 
       dias.forEach((d, di) => {
         const cs = gridCols[di + 1].s, ce = gridCols[di + 1].e;
-        worksheet.mergeCells(row, cs, row, ce);
-        const cell = worksheet.getCell(row, cs);
         const celdasEnHora = bloques.filter(bl => bl.dia_semana === d && bl.hora_inicio === h);
+        const numEntradas = celdasEnHora.length;
         
-        if (celdasEnHora.length > 0) {
-          const texto = celdasEnHora.map(b => {
+        if (numEntradas === 0) {
+          worksheet.mergeCells(row, cs, row, ce);
+          const cell = worksheet.getCell(row, cs);
+          cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+          cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+        } else {
+          const colWidth = (ce - cs + 1) / numEntradas;
+          let currentCol = cs;
+          celdasEnHora.forEach((b, idx) => {
+            const startCol = currentCol;
+            const endCol = idx === numEntradas - 1 ? ce : Math.floor(currentCol + colWidth - 1);
+            if (startCol < endCol) {
+              worksheet.mergeCells(row, startCol, row, endCol);
+            }
+            const cell = worksheet.getCell(row, startCol);
             const info = mapaDocenteCurso[`${b.id_docente}-${b.componente.id_oferta}`];
-            return `${info?.indice || '?'}\n(Ciclo: ${b.componente.oferta.id_ciclo}°)`;
-          }).join('\n---\n');
-          
-          cell.value = texto;
-          const infoPrimero = mapaDocenteCurso[`${celdasEnHora[0].id_docente}-${celdasEnHora[0].componente.id_oferta}`];
-          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + (infoPrimero?.color || 'FFFFFF') } };
-          cell.font = { bold: true, size: 7 };
+            cell.value = `${info?.indice || '?'}\n(Ciclo: ${b.componente.oferta.id_ciclo}°)`;
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + (info?.color || 'FFFFFF') } };
+            cell.font = { bold: true, size: 6 };
+            cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+            cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+            currentCol = endCol + 1;
+          });
         }
-        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
       });
     });
   }
@@ -484,23 +505,33 @@ export class GeneradorExcelService {
 
       dias.forEach((d, di) => {
         const cs = gridCols[di + 1].s, ce = gridCols[di + 1].e;
-        ws.mergeCells(row, cs, row, ce);
-        const cell = ws.getCell(row, cs);
         const celdasEnHora = bloques.filter(bl => bl.dia_semana === d && bl.hora_inicio === h);
+        const numEntradas = celdasEnHora.length;
         
-        if (celdasEnHora.length > 0) {
-          const texto = celdasEnHora.map(b => {
+        if (numEntradas === 0) {
+          ws.mergeCells(row, cs, row, ce);
+          const cell = ws.getCell(row, cs);
+          cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+          cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+        } else {
+          const colWidth = (ce - cs + 1) / numEntradas;
+          let currentCol = cs;
+          celdasEnHora.forEach((b, idx) => {
+            const startCol = currentCol;
+            const endCol = idx === numEntradas - 1 ? ce : Math.floor(currentCol + colWidth - 1);
+            if (startCol < endCol) {
+              ws.mergeCells(row, startCol, row, endCol);
+            }
+            const cell = ws.getCell(row, startCol);
             const info = mapaCursos[b.componente.oferta.id_curso];
-            return `${info?.indice || '?'}\n(Aula: ${b.ambiente?.codigo || 'Solic.'})`;
-          }).join('\n---\n');
-          
-          cell.value = texto;
-          const infoPrimero = mapaCursos[celdasEnHora[0].componente.oferta.id_curso];
-          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + (infoPrimero?.color || 'FFFFFF') } };
-          cell.font = { bold: true, size: 7 };
+            cell.value = `${info?.indice || '?'}\n(Aula: ${b.ambiente?.codigo || 'Solic.'})`;
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + (info?.color || 'FFFFFF') } };
+            cell.font = { bold: true, size: 6 };
+            cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+            cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+            currentCol = endCol + 1;
+          });
         }
-        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
       });
     });
   }
