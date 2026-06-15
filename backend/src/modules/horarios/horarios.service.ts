@@ -160,6 +160,18 @@ export class HorariosService {
       throw new Error('El docente ya tiene una clase en ese bloque horario');
     }
 
+    const conflictosNoLectivos = await prisma.bloque_no_lectivo.findMany({
+      where: {
+        id_periodo: componente.oferta.id_periodo,
+        id_docente: datos.idDocente,
+        dia_semana: datos.diaSemana,
+      },
+    });
+    const tieneCruceNoLectivo = conflictosNoLectivos.some(h => h.hora_inicio === datos.horaInicio);
+    if (tieneCruceNoLectivo) {
+      throw new Error('El docente ya tiene Carga No Lectiva en ese bloque horario');
+    }
+
     // 2. Validar cruce del CICLO (Promoción)
     // 2.1 En la Base de Datos
     const conflictosCiclo = await prisma.bloque_horario.findMany({

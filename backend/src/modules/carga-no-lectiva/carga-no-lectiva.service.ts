@@ -1,4 +1,6 @@
 import { prisma } from '@/lib/prisma';
+import { ConfiguracionService } from '../configuracion/configuracion.service';
+import { RestriccionInstitucional } from '../configuracion/configuracion.types';
 
 type DatosDocenteActualizables = {
   codigo_ibm?: string;
@@ -76,12 +78,14 @@ const normalizarNumero = (valor: unknown) => {
 
 const redondear = (valor: number) => Math.round(valor * 100) / 100;
 
-const parseHoraMinutos = (hora: string) => {
-  const valor = String(hora ?? '').trim();
-  const match = /^(\d{2}):(\d{2})$/.exec(valor);
-  if (!match) {
-    return null;
+const parseHoraMinutos = (hora: unknown) => {
+  if (hora instanceof Date) {
+    return (hora.getUTCHours() * 60) + hora.getUTCMinutes();
   }
+  const valor = String(hora ?? '').trim();
+  const match = /^(\d{2}):(\d{2})/.exec(valor);
+  if (!match) return null;
+  
   const horas = Number(match[1]);
   const minutos = Number(match[2]);
   if (!Number.isInteger(horas) || !Number.isInteger(minutos) || horas < 0 || horas > 23 || minutos < 0 || minutos > 59) {
@@ -120,10 +124,10 @@ const normalizarSecciones = (secciones: SeccionNoLectivaPayload[]) => {
   return Array.from(mapa.values());
 };
 
-const construirSugerenciasIniciales = (horasLectivas: number) => {
-  const maxPreparacion = redondear(horasLectivas * 0.5);
+const construirSugerenciasIniciales = (horasLectivas: number, config: RestriccionInstitucional) => {
+  const minPreparacion = redondear(horasLectivas * config.limiteMinPreparacionPct);
   return {
-    PREPARACION_EVALUACION: maxPreparacion > 0 ? Math.min(8, maxPreparacion) : 0,
+    PREPARACION_EVALUACION: minPreparacion > 0 ? minPreparacion : 0,
     CONSEJERIA_TUTORIA: 2,
     INVESTIGACION: 0,
     CAPACITACION: 0,
@@ -135,29 +139,35 @@ const construirSugerenciasIniciales = (horasLectivas: number) => {
   };
 };
 
-const construirReglas = (horasLectivas: number, dedicacion: string) => {
+const construirReglas = (horasLectivas: number, dedicacion: string, config: RestriccionInstitucional) => {
   const horasObjetivo = HORAS_OBJETIVO_POR_DEDICACION[dedicacion] ?? 40;
   return {
     horas_objetivo: horasObjetivo,
     horas_lectivas: redondear(horasLectivas),
     horas_no_lectivas_requeridas: redondear(Math.max(0, horasObjetivo - horasLectivas)),
-    limite_preparacion_evaluacion: redondear(horasLectivas * 0.5),
-    limites_fijos_por_seccion: LIMITE_FIJO_POR_SECCION,
+    limite_min_preparacion_evaluacion: redondear(horasLectivas * config.limiteMinPreparacionPct),
+    limites_fijos_por_seccion: {
+      ...LIMITE_FIJO_POR_SECCION,
+      ASESORIA_TESIS: config.limiteMaxAsesoriaTesis,
+      CAPACITACION: config.limiteMaxCapacitacion,
+      INVESTIGACION: config.limiteMaxInvestigacion,
+    } as Record<string, number>,
   };
 };
 
 const validarSecciones = (params: {
   secciones: Array<{ seccion: string; horas: number }>;
   reglas: ReturnType<typeof construirReglas>;
+  config: RestriccionInstitucional;
   habilitaGobierno: boolean;
   habilitaAdministracion: boolean;
 }) => {
-  const { secciones, reglas, habilitaGobierno, habilitaAdministracion } = params;
+  const { secciones, reglas, config, habilitaGobierno, habilitaAdministracion } = params;
 
   for (const seccion of secciones) {
-    if (seccion.seccion === SECCION_PREPARACION && seccion.horas > reglas.limite_preparacion_evaluacion) {
+    if (seccion.seccion === SECCION_PREPARACION && seccion.horas < reglas.limite_min_preparacion_evaluacion) {
       throw new Error(
-        `Preparación y Evaluación excede el máximo permitido (${reglas.limite_preparacion_evaluacion}h), equivalente al 50% de la carga lectiva.`
+        `Preparación y Evaluación no alcanza el mínimo requerido (${reglas.limite_min_preparacion_evaluacion}h), que es equivalente al ${config.limiteMinPreparacionPct * 100}% de la carga lectiva.`
       );
     }
 
@@ -280,8 +290,9 @@ export class CargaNoLectivaService {
     });
 
     const horasLectivas = await calcularHorasLectivas(prismaDb, idDocente, idPeriodo);
-    const reglas = construirReglas(horasLectivas, docente?.dedicacion ?? 'TIEMPO_COMPLETO_40H');
-    const sugerencias = construirSugerenciasIniciales(horasLectivas);
+    const config = await ConfiguracionService.obtenerRestricciones();
+    const reglas = construirReglas(horasLectivas, docente?.dedicacion ?? 'TIEMPO_COMPLETO_40H', config);
+    const sugerencias = construirSugerenciasIniciales(horasLectivas, config);
 
     const banderas = {
       habilita_actividades_gobierno: declaracion?.secciones?.some((s: any) => s.seccion === SECCION_GOBIERNO && Number(s.horas_declaradas) > 0) ?? false,
@@ -356,13 +367,15 @@ export class CargaNoLectivaService {
         : docenteActual;
 
       const horasLectivas = await calcularHorasLectivas(tx, idDocente, idPeriodo);
-      const reglas = construirReglas(horasLectivas, docenteActualizado?.dedicacion ?? docenteActual?.dedicacion ?? 'TIEMPO_COMPLETO_40H');
+      const config = await ConfiguracionService.obtenerRestricciones();
+      const reglas = construirReglas(horasLectivas, docenteActualizado?.dedicacion ?? docenteActual?.dedicacion ?? 'TIEMPO_COMPLETO_40H', config);
 
       validarSecciones({
         secciones: seccionesNormalizadas.map((s) => ({ seccion: s.seccion, horas: s.horas })),
         reglas,
-        habilitaGobierno,
-        habilitaAdministracion,
+        config,
+        habilitaGobierno: !!payload.habilita_actividades_gobierno,
+        habilitaAdministracion: !!payload.habilita_actividades_administracion,
       });
 
       const totalHorasNoLectivas = redondear(seccionesNormalizadas.reduce((acumulado, seccion) => acumulado + seccion.horas, 0));
@@ -461,5 +474,89 @@ export class CargaNoLectivaService {
     });
 
     return { mensaje: 'Declaración no lectiva eliminada' };
+  }
+
+  static async obtenerMiHorarioNoLectivo(idDocente: number, idPeriodo: number) {
+    const formatHora = (hora: unknown) => {
+      if (hora instanceof Date) {
+        return `${hora.getUTCHours().toString().padStart(2, '0')}:${hora.getUTCMinutes().toString().padStart(2, '0')}`;
+      }
+      return String(hora ?? '').substring(0, 5);
+    };
+
+    const noLectivosRaw = await prismaDb.bloque_no_lectivo.findMany({
+      where: { id_docente: idDocente, id_periodo: idPeriodo },
+    });
+    
+    const noLectivos = noLectivosRaw.map((b: any) => ({
+      dia_semana: b.dia_semana,
+      hora_inicio: formatHora(b.hora_inicio),
+      hora_fin: formatHora(b.hora_fin),
+      seccion: b.seccion,
+    }));
+
+    const lectivosRaw = await prismaDb.bloque_horario.findMany({
+      where: { id_docente: idDocente, id_periodo: idPeriodo },
+      include: {
+        componente: {
+          include: { oferta: { include: { curso: true } } }
+        }
+      }
+    });
+
+    const lectivos = lectivosRaw.map((b: any) => ({
+      dia_semana: b.dia_semana,
+      hora_inicio: formatHora(b.hora_inicio),
+      hora_fin: formatHora(b.hora_fin),
+      origen: `${b.componente?.oferta?.curso?.codigo ?? 'Desconocido'} - ${b.componente?.tipo ?? ''}`
+    }));
+
+    return { lectivos, no_lectivos: noLectivos };
+  }
+
+  static async guardarMiHorarioNoLectivo(idDocente: number, idPeriodo: number, bloques: any[]) {
+    return await prismaDb.$transaction(async (tx: any) => {
+      // Validar que no haya cruces con los bloques lectivos ni con los no lectivos
+      const lectivos = await tx.bloque_horario.findMany({
+        where: { id_docente: idDocente, id_periodo: idPeriodo },
+        include: { componente: { include: { oferta: { include: { curso: true } } } } },
+      });
+
+      const todos = [
+        ...lectivos.map((b: any) => ({
+          dia_semana: b.dia_semana,
+          hora_inicio: b.hora_inicio,
+          hora_fin: b.hora_fin,
+          origen: `Lectivo (${b.componente?.oferta?.curso?.codigo ?? 'Desconocido'})`
+        })),
+        ...bloques.map((b: any) => ({
+          dia_semana: b.dia_semana,
+          hora_inicio: b.hora_inicio,
+          hora_fin: b.hora_fin,
+          origen: `No Lectivo (${b.seccion})`
+        }))
+      ];
+
+      validarHorarioSinCruces(todos);
+
+      await tx.bloque_no_lectivo.deleteMany({
+        where: { id_docente: idDocente, id_periodo: idPeriodo },
+      });
+
+      if (bloques && bloques.length > 0) {
+        await tx.bloque_no_lectivo.createMany({
+          data: bloques.map((b: any) => ({
+            id_docente: idDocente,
+            id_periodo: idPeriodo,
+            seccion: b.seccion,
+            dia_semana: b.dia_semana,
+            hora_inicio: b.hora_inicio,
+            hora_fin: b.hora_fin,
+          })),
+        });
+      }
+
+      return this.obtenerMiHorarioNoLectivo(idDocente, idPeriodo);
+    });
   }
 }

@@ -10,4 +10,7 @@ router.get('/mi/:id_periodo', CargaNoLectivaController.obtenerMiDeclaracion);
 router.put('/mi/:id_periodo', CargaNoLectivaController.guardarMiDeclaracion);
 router.delete('/mi/:id_periodo', CargaNoLectivaController.eliminarMiDeclaracion);
 
+router.get('/mi/:id_periodo/horario', CargaNoLectivaController.obtenerMiHorarioNoLectivo);
+router.put('/mi/:id_periodo/horario', CargaNoLectivaController.guardarMiHorarioNoLectivo);
+
 export default router;

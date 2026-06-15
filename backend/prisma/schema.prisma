@@ -143,6 +143,7 @@ model docente {
   atenciones        atencion_docente[]
   declaraciones     declaracion_carga[]
   carga_no_lectiva  carga_no_lectiva[]
+  bloques_no_lectivos bloque_no_lectivo[]
 
   asignaciones_sede asignacion_sede[]
   formatos          formato_generado[]
@@ -170,6 +171,7 @@ model periodo_academico {
   bloques         bloque_horario[]
   declaraciones   declaracion_carga[]
   cargas_no_lectivas carga_no_lectiva[]
+  bloques_no_lectivos bloque_no_lectivo[]
 
   asignaciones_sede asignacion_sede[]
   formatos        formato_generado[]
@@ -422,6 +424,22 @@ model carga_no_lectiva {
   @@map("carga_no_lectiva")
 }
 
+model bloque_no_lectivo {
+  id              Int               @id @default(autoincrement()) @map("id_bloque_no_lectivo")
+  id_periodo      Int
+  periodo         periodo_academico @relation(fields: [id_periodo], references: [id])
+  id_docente      Int
+  docente         docente           @relation(fields: [id_docente], references: [id])
+  seccion         SeccionNoLectiva
+  dia_semana      String            @db.VarChar(15)
+  hora_inicio     String            @db.VarChar(5)
+  hora_fin        String            @db.VarChar(5)
+  estado          String            @default("BORRADOR") @db.VarChar(20)
+  fecha_modificacion DateTime       @default(now()) @db.Timestamp
+
+  @@index([id_docente, id_periodo, dia_semana])
+  @@map("bloque_no_lectivo")
+}
 
 
 model asignacion_sede {
