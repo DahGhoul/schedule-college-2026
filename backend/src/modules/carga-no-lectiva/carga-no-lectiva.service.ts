@@ -103,8 +103,6 @@ const calcularDuracionHoras = (horaInicio: string, horaFin: string) => {
   return redondear((fin - inicio) / 60);
 };
 
-
-
 const normalizarSecciones = (secciones: SeccionNoLectivaPayload[]) => {
   const seccionesFiltradas = secciones
     .filter((seccion) => seccion && typeof seccion.seccion === 'string' && SECCIONES_VALIDAS.has(seccion.seccion))
@@ -248,7 +246,7 @@ const calcularHorasLectivas = async (tx: any, idDocente: number, idPeriodo: numb
 
 export class CargaNoLectivaService {
   static async obtenerMiDeclaracion(idDocente: number, idPeriodo: number) {
-    const [docente, declaracion] = await Promise.all([
+    const [docente, declaracion, periodo] = await Promise.all([
       prismaDb.docente.findUnique({
         where: { id: idDocente },
       }),
@@ -256,6 +254,17 @@ export class CargaNoLectivaService {
         where: { id_docente: idDocente, id_periodo: idPeriodo },
         include: {
           secciones: true,
+        },
+      }),
+      // ── NUEVO: consultar el periodo para exponer nombre, fecha_inicio y fecha_fin ──
+      prismaDb.periodo_academico.findUnique({
+        where: { id: idPeriodo },
+        select: {
+          id: true,
+          nombre: true,
+          fecha_inicio: true,
+          fecha_fin: true,
+          estado: true,
         },
       }),
     ]);
@@ -302,6 +311,8 @@ export class CargaNoLectivaService {
     return {
       docente,
       declaracion,
+      // ── NUEVO: periodo incluido en la respuesta ──
+      periodo,
       reglas,
       secciones_sugeridas: sugerencias,
       banderas,
@@ -391,8 +402,6 @@ export class CargaNoLectivaService {
         );
       }
 
-
-
       let declaracion = await (tx as any).declaracion_carga.findFirst({
         where: { id_docente: idDocente, id_periodo: idPeriodo },
       });
@@ -442,8 +451,6 @@ export class CargaNoLectivaService {
         });
       }
 
-
-
       for (const formatoBase of FORMATOS_BASE) {
         await (tx as any).formato_generado.upsert({
           where: {
@@ -487,7 +494,7 @@ export class CargaNoLectivaService {
     const noLectivosRaw = await prismaDb.bloque_no_lectivo.findMany({
       where: { id_docente: idDocente, id_periodo: idPeriodo },
     });
-    
+
     const noLectivos = noLectivosRaw.map((b: any) => ({
       dia_semana: b.dia_semana,
       hora_inicio: formatHora(b.hora_inicio),
@@ -499,16 +506,32 @@ export class CargaNoLectivaService {
       where: { id_docente: idDocente, id_periodo: idPeriodo },
       include: {
         componente: {
-          include: { oferta: { include: { curso: true } } }
-        }
-      }
+          include: {
+            oferta: {
+              include: {
+                curso: true,
+                ciclo: true,
+              },
+            },
+          },
+        },
+        ambiente: true,
+        grupo: true,
+      },
     });
 
     const lectivos = lectivosRaw.map((b: any) => ({
       dia_semana: b.dia_semana,
       hora_inicio: formatHora(b.hora_inicio),
       hora_fin: formatHora(b.hora_fin),
-      origen: `${b.componente?.oferta?.curso?.codigo ?? 'Desconocido'} - ${b.componente?.tipo ?? ''}`
+      origen: `${b.componente?.oferta?.curso?.codigo ?? 'Desconocido'} - ${b.componente?.tipo ?? ''}`,
+      curso_nombre: b.componente?.oferta?.curso?.nombre ?? '',
+      curso_codigo: b.componente?.oferta?.curso?.codigo ?? '',
+      tipo_componente: b.componente?.tipo ?? 'TEORIA',
+      ciclo: b.componente?.oferta?.ciclo?.numero ?? null,
+      ciclo_nombre: b.componente?.oferta?.ciclo?.nombre ?? null,
+      grupo: b.grupo?.codigo ?? '',
+      ambiente: b.ambiente?.codigo ?? 'F11',
     }));
 
     return { lectivos, no_lectivos: noLectivos };
@@ -516,7 +539,6 @@ export class CargaNoLectivaService {
 
   static async guardarMiHorarioNoLectivo(idDocente: number, idPeriodo: number, bloques: any[]) {
     return await prismaDb.$transaction(async (tx: any) => {
-      // Validar que no haya cruces con los bloques lectivos ni con los no lectivos
       const lectivos = await tx.bloque_horario.findMany({
         where: { id_docente: idDocente, id_periodo: idPeriodo },
         include: { componente: { include: { oferta: { include: { curso: true } } } } },
@@ -527,14 +549,14 @@ export class CargaNoLectivaService {
           dia_semana: b.dia_semana,
           hora_inicio: b.hora_inicio,
           hora_fin: b.hora_fin,
-          origen: `Lectivo (${b.componente?.oferta?.curso?.codigo ?? 'Desconocido'})`
+          origen: `Lectivo (${b.componente?.oferta?.curso?.codigo ?? 'Desconocido'})`,
         })),
         ...bloques.map((b: any) => ({
           dia_semana: b.dia_semana,
           hora_inicio: b.hora_inicio,
           hora_fin: b.hora_fin,
-          origen: `No Lectivo (${b.seccion})`
-        }))
+          origen: `No Lectivo (${b.seccion})`,
+        })),
       ];
 
       validarHorarioSinCruces(todos);
