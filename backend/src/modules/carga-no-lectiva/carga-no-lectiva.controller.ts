@@ -64,4 +64,34 @@ export class CargaNoLectivaController {
       res.status(400).json({ error: error?.message ?? 'No se pudo eliminar la declaración' });
     }
   }
+
+  static async obtenerMiHorarioNoLectivo(req: Request, res: Response) {
+    try {
+      const usuario = (req as any).usuario;
+      const idDocente = usuario?.idDocente ?? usuario?.id_docente;
+      const idPeriodo = Number(req.params.id_periodo);
+      if (!idDocente) return res.status(400).json({ error: 'Usuario no asociado' });
+      if (!Number.isInteger(idPeriodo) || idPeriodo <= 0) return res.status(400).json({ error: 'Periodo inválido' });
+      
+      const datos = await CargaNoLectivaService.obtenerMiHorarioNoLectivo(Number(idDocente), idPeriodo);
+      res.json(datos);
+    } catch (error: any) {
+      res.status(400).json({ error: error?.message ?? 'Error al obtener horario no lectivo' });
+    }
+  }
+
+  static async guardarMiHorarioNoLectivo(req: Request, res: Response) {
+    try {
+      const usuario = (req as any).usuario;
+      const idDocente = usuario?.idDocente ?? usuario?.id_docente;
+      const idPeriodo = Number(req.params.id_periodo);
+      if (!idDocente) return res.status(400).json({ error: 'Usuario no asociado' });
+      if (!Number.isInteger(idPeriodo) || idPeriodo <= 0) return res.status(400).json({ error: 'Periodo inválido' });
+      
+      const datos = await CargaNoLectivaService.guardarMiHorarioNoLectivo(Number(idDocente), idPeriodo, req.body.bloques);
+      res.json(datos);
+    } catch (error: any) {
+      res.status(400).json({ error: error?.message ?? 'Error al guardar horario no lectivo' });
+    }
+  }
 }

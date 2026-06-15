@@ -75,6 +75,15 @@ export class GestorDisponibilidad {
         })
       : [];
 
+    const noLectivosDocente = idDocente
+      ? await prisma.bloque_no_lectivo.findMany({
+          where: {
+            id_docente: idDocente,
+            id_periodo: idPeriodo,
+          },
+        })
+      : [];
+
     // 3. Horarios del CICLO actual (si aplica, en cualquier ambiente)
     const horariosCiclo = idCicloReferencia
       ? await prisma.bloque_horario.findMany({
@@ -143,6 +152,21 @@ export class GestorDisponibilidad {
         // Mantenimiento
         if (mantenimientos.length > 0) {
           return { diaSemana: dia, horaInicio: hora, estado: 'OCUPADO', info: { detalle: 'Mantenimiento de ambiente' } };
+        }
+
+        // 1.0 ¿Tiene el docente carga NO Lectiva?
+        const bloqueNoLectivoBD = noLectivosDocente.find(
+          (h) => h.dia_semana === dia && h.hora_inicio === hora
+        );
+        if (bloqueNoLectivoBD) {
+          return {
+            diaSemana: dia,
+            horaInicio: hora,
+            estado: 'OCUPADO',
+            info: {
+              detalle: `Carga No Lectiva: ${bloqueNoLectivoBD.seccion.replace(/_/g, ' ')}`,
+            },
+          };
         }
 
         // 1. ¿Tiene el docente actual alguna clase o selección temporal propia en este horario?

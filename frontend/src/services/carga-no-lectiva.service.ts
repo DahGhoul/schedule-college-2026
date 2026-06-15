@@ -15,4 +15,6 @@ export const cargaNoLectivaService = {
   obtenerMiDeclaracion: (idPeriodo: number) => apiClient.get(`/carga-no-lectiva/mi/${idPeriodo}`),
   guardarMiDeclaracion: (idPeriodo: number, datos: any) => apiClient.put(`/carga-no-lectiva/mi/${idPeriodo}`, datos),
   eliminarMiDeclaracion: (idPeriodo: number) => apiClient.delete(`/carga-no-lectiva/mi/${idPeriodo}`),
+  obtenerMiHorarioNoLectivo: (idPeriodo: number) => apiClient.get(`/carga-no-lectiva/mi/${idPeriodo}/horario`),
+  guardarMiHorarioNoLectivo: (idPeriodo: number, bloques: any[]) => apiClient.put(`/carga-no-lectiva/mi/${idPeriodo}/horario`, { bloques }),
 };

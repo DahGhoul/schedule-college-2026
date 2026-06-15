@@ -853,9 +853,7 @@ export default function CargaNoLectivaPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {(declaracionData?.formatos ?? [])
-                            .filter((formato: any) => ['CARGA_HORARIA_CENTRAL', 'DECLARACION_JURADA_CENTRAL', 'DECLARACION_JURADA_DESCONCENTRADA'].includes(formato.tipo))
-                            .map((formato: any) => (
+                          {(declaracionData?.formatos ?? []).map((formato: any) => (
                             <tr key={formato.tipo} className="border-b border-slate-100 last:border-b-0">
                               <td className="py-2 pr-4">{formato.etiqueta}</td>
                               <td className="py-2 pr-4">{formato.sede}</td>

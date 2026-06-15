@@ -73,6 +73,10 @@ async function main() {
       { clave: 'BLOQUEO_ALMUERZO_INICIO', valor: '13:00' },
       { clave: 'BLOQUEO_ALMUERZO_FIN', valor: '14:00' },
       { clave: 'TIEMPO_ATENCION_VENTANA', valor: '30' },
+      { clave: 'LIMITE_MIN_PREPARACION_PCT', valor: '0.5' },
+      { clave: 'LIMITE_MAX_ASESORIA_TESIS', valor: '2' },
+      { clave: 'LIMITE_MAX_CAPACITACION', valor: '1' },
+      { clave: 'LIMITE_MAX_INVESTIGACION', valor: '6' },
     ];
     for (const r of restricciones) {
       await prisma.configuracion.upsert({

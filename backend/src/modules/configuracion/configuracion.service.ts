@@ -25,6 +25,10 @@ export class ConfiguracionService {
       bloqueoAlmuerzoInicio: mapa['BLOQUEO_ALMUERZO_INICIO'] || '12:00',
       bloqueoAlmuerzoFin: mapa['BLOQUEO_ALMUERZO_FIN'] || '13:00',
       tiempoAtencionVentana: parseInt(mapa['TIEMPO_ATENCION_VENTANA'] || '30'),
+      limiteMinPreparacionPct: parseFloat(mapa['LIMITE_MIN_PREPARACION_PCT'] || '0.5'),
+      limiteMaxAsesoriaTesis: parseInt(mapa['LIMITE_MAX_ASESORIA_TESIS'] || '2'),
+      limiteMaxCapacitacion: parseInt(mapa['LIMITE_MAX_CAPACITACION'] || '1'),
+      limiteMaxInvestigacion: parseInt(mapa['LIMITE_MAX_INVESTIGACION'] || '6'),
     };
   }
 
