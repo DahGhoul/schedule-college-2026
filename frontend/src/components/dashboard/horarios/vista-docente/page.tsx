@@ -1,17 +1,17 @@
 "use client";
-import { useRef, useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { periodosService } from '@/services/periodos.service';
+import { reportesService, descargarBlob } from '@/services/reportes.service';
+import { cargaNoLectivaService } from '@/services/carga-no-lectiva.service';
 import { SpinnerCarga } from '@/components/ui/SpinnerCarga';
 import { NotificacionToast } from '@/components/ui/NotificacionToast';
 import { Selector } from '@/components/ui/Selector';
-import { docentesService } from '@/services/docentes.service';
-import { useAuthStore } from '@/stores/auth.store';
 import { Boton } from '@/components/ui/Boton';
-import { FileText, Clock, ArrowLeft } from 'lucide-react';
-import { reportesService, descargarBlob } from '@/services/reportes.service';
+import { useAuthStore } from '@/stores/auth.store';
 import { useRouter } from 'next/navigation';
-import { CalendarioGeneralConNoLectivos } from '@/components/horarios/CalendarioGeneralConNoLectivos';
+import { FileText, Clock, ArrowLeft } from 'lucide-react';
+import { CalendarioGeneralConNoLectiva } from '@/components/horarios/CalendarioGeneralConNoLectiva';
 
 export default function VistaHorarioDocentePage() {
   const router = useRouter();
@@ -22,14 +22,14 @@ export default function VistaHorarioDocentePage() {
   const [exportandoPdf, setExportandoPdf] = useState(false);
   const [exportandoExcel, setExportandoExcel] = useState(false);
 
-  const { data: periodosData } = useQuery({
-    queryKey: ['periodos'],
+  const { data: periodosData, isLoading: periodosLoading } = useQuery({
+    queryKey: ['periodos-vista-docente'],
     queryFn: () => periodosService.listar().then((res) => res.data),
   });
   const periodos = Array.isArray(periodosData) ? periodosData : periodosData?.data || [];
 
   const { data: periodoActivo, isLoading: periodoActivoLoading } = useQuery({
-    queryKey: ['periodo-activo'],
+    queryKey: ['periodo-activo-vista-docente'],
     queryFn: () => periodosService.activo().then((res) => res.data),
   });
 
@@ -40,11 +40,6 @@ export default function VistaHorarioDocentePage() {
     }
   }, [periodoActivo]);
   const idPeriodo = idPeriodoSeleccionado || periodoActivo?.id || 0;
-
-  const { data: docentes } = useQuery({
-    queryKey: ['docentes'],
-    queryFn: () => docentesService.listar().then((res) => res.data),
-  });
 
   const handleExportarPdf = async () => {
     if (!idPeriodo || !docenteSeleccionado || exportandoPdf) return;
@@ -82,32 +77,37 @@ export default function VistaHorarioDocentePage() {
     }
   };
 
+  if (periodoActivoLoading || periodosLoading) return <SpinnerCarga />;
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#0b1f3a] via-[#123b6d] to-[#0f4c81] px-6 py-8 text-white shadow-xl relative">
+      <header className="overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#0b1f3a] via-[#123b6d] to-[#0f4c81] px-6 py-8 text-white shadow-xl relative">
         <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10 blur-3xl pointer-events-none"></div>
         <div className="absolute left-1/3 bottom-0 h-56 w-56 bg-unt-accent/10 blur-3xl pointer-events-none"></div>
-
+        
         <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="flex items-center gap-4">
-            <button onClick={() => router.back()} className="rounded-full p-2 text-white hover:bg-white/20 transition-colors">
+            <button onClick={() => router.push('/dashboard/docente')} className="rounded-full p-3 text-white hover:bg-white/20 transition-colors">
               <ArrowLeft className="h-6 w-6" />
             </button>
             <div className="flex flex-col gap-2">
               <span className="inline-flex items-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/80">
-                Vista de Horario
+                Panel Docente
               </span>
-              <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
+              <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
                 Mi Horario Completo
               </h1>
+              <p className="text-sm text-blue-100">
+                Visualiza tu horario lectivo y no lectivo para el período académico
+              </p>
             </div>
           </div>
 
           <div className="w-full lg:w-64 space-y-3">
-            <label className="text-xs font-semibold uppercase tracking-[0.14em] text-white/80">Periodo Académico</label>
+            <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/80">Periodo Académico</label>
             <Selector
-              value={idPeriodo.toString()}
-              onChange={(e) => setIdPeriodoSeleccionado(parseInt(e.target.value))}
+              value={idPeriodoSeleccionado}
+              onChange={(e: any) => setIdPeriodoSeleccionado(Number(e.target.value))}
               className="border-white/20 bg-white/95 text-slate-900 focus:border-white focus:ring-white/30 shadow-sm"
             >
               {periodos.map((p: any) => (
@@ -116,27 +116,15 @@ export default function VistaHorarioDocentePage() {
             </Selector>
           </div>
         </div>
-      </div>
+      </header>
 
       {toast && <NotificacionToast mensaje={toast.mensaje} tipo={toast.tipo} onClose={() => setToast(null)} />}
 
-      {/* Mostrar selector solo si el usuario no es un docente */}
-      {!docenteIdFromSession && (
-        <div className="bg-white p-4 rounded-[1.5rem] border border-slate-200 shadow-sm">
-          <Selector
-            label="Seleccionar Docente"
-            opciones={[
-              { valor: '', etiqueta: 'Seleccionar...' },
-              ...(docentes?.map((d: any) => ({ valor: String(d.id), etiqueta: `${d.nombres} ${d.apellidos}` })) || []),
-            ]}
-            value={docenteSeleccionado?.toString() || ''}
-            onChange={(e) => setDocenteSeleccionado(e.target.value ? parseInt(e.target.value) : null)}
-          />
+      {!usuario?.idDocente ? (
+        <div className="text-gray-500 text-center py-16 bg-white rounded-[1.5rem] shadow-sm border border-gray-100">
+          <FileText className="h-12 w-12 mx-auto mb-4 text-slate-300" />
+          Este módulo solo está disponible para docentes autenticados.
         </div>
-      )}
-
-      {periodoActivoLoading ? (
-        <SpinnerCarga />
       ) : docenteSeleccionado && idPeriodo ? (
         <div className="space-y-6">
           <div className="flex flex-col sm:flex-row justify-end gap-3">
@@ -159,13 +147,13 @@ export default function VistaHorarioDocentePage() {
           </div>
 
           <div className="bg-white rounded-[1.5rem] shadow-sm border border-slate-200 overflow-hidden">
-            <CalendarioGeneralConNoLectivos idPeriodo={idPeriodo} idDocente={docenteSeleccionado} />
+            <CalendarioGeneralConNoLectiva idPeriodo={idPeriodo} idDocente={docenteSeleccionado} />
           </div>
         </div>
       ) : (
         <div className="text-gray-500 text-center py-16 bg-white rounded-[1.5rem] shadow-sm border border-gray-100">
           <FileText className="h-12 w-12 mx-auto mb-4 text-slate-300" />
-          No se pudo identificar el docente o el periodo académico.
+          No se pudo identificar el docente o el período académico.
         </div>
       )}
     </div>

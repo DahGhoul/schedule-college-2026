@@ -224,7 +224,7 @@ export default function CargaNoLectivaPage() {
 
   useEffect(() => {
     validarSeccionesEnTiempoReal();
-  }, [secciones, reglas]);
+  }, [secciones, reglas, habilitaGobierno, habilitaAdministracion]);
 
   const validarSeccionesEnTiempoReal = () => {
     const nuevosErrores: Record<string, string> = {};
@@ -334,7 +334,7 @@ export default function CargaNoLectivaPage() {
 
   const handleCeldaClick = (diaSemana: string, horaInicio: string) => {
     if (!seccionActiva) {
-      setToast({ mensaje: 'Primero seleccione una sección (Pincel) de la lista inferior', tipo: 'error' });
+      setToast({ mensaje: 'Primero selecciona una sección (Pinceles) de la lista inferior', tipo: 'error' });
       return;
     }
     
@@ -398,7 +398,6 @@ export default function CargaNoLectivaPage() {
     let almuerzoFin = -1;
 
     const resActivas = restricciones?.franjaInicio ? restricciones : restricciones?.data;
-    console.log("RESTRICCIONES DATA", restricciones, resActivas);
 
     if (resActivas) {
       if (resActivas.franjaInicio) inicio = parseInt(resActivas.franjaInicio.split(':')[0]);
@@ -406,7 +405,6 @@ export default function CargaNoLectivaPage() {
       if (resActivas.bloqueoAlmuerzoInicio) almuerzoInicio = parseInt(resActivas.bloqueoAlmuerzoInicio.split(':')[0]);
       if (resActivas.bloqueoAlmuerzoFin) almuerzoFin = parseInt(resActivas.bloqueoAlmuerzoFin.split(':')[0]);
     }
-    console.log("PARSED HOURS", { inicio, fin, almuerzoInicio, almuerzoFin });
 
     for (let hora = inicio; hora < fin; hora++) {
       const hh = hora.toString().padStart(2, '0');
@@ -476,30 +474,50 @@ export default function CargaNoLectivaPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <header className="overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#081e34] via-[#123b6d] to-[#0f4c81] pt-4 pb-2 text-white shadow-2xl relative">
-        <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-white/10 blur-3xl pointer-events-none" />
-        <div className="absolute left-1/3 bottom-0 h-56 w-56 bg-unt-accent/10 blur-3xl pointer-events-none" />
+      <header className="overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#0b1f3a] via-[#123b6d] to-[#0f4c81] px-6 py-8 text-white shadow-xl relative">
+        <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10 blur-3xl pointer-events-none"></div>
+        <div className="absolute left-1/3 bottom-0 h-56 w-56 bg-unt-accent/10 blur-3xl pointer-events-none"></div>
         
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-4 pb-6 pt-4 sm:flex-row sm:px-6 lg:px-8 relative z-10">
-          <div className="flex items-center gap-3">
-            <button onClick={() => router.push('/dashboard/docente')} className="rounded-full p-2 text-white hover:bg-white/20 transition-colors">
+        <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex items-center gap-4">
+            <button onClick={() => router.push('/dashboard/docente')} className="rounded-full p-3 text-white hover:bg-white/20 transition-colors">
               <ArrowLeft className="h-6 w-6" />
             </button>
-            <div className="flex flex-col">
-              <h1 className="text-2xl font-bold text-white sm:text-3xl">Declaración Jurada y Calendario No Lectivo</h1>
-              <p className="text-sm text-blue-100">Distribuye tus horas no lectivas para el período {periodos?.find((p: any) => p.id === idPeriodo)?.nombre || 'actual'}</p>
+            <div className="flex flex-col gap-2">
+              <span className="inline-flex items-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/80">
+                Panel Docente
+              </span>
+              <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
+                Declaración Jurada y Calendario No Lectivo
+              </h1>
+              <p className="text-sm text-blue-100">
+                Distribuye tus horas no lectivas para el período {periodos?.find((p: any) => p.id === idPeriodo)?.nombre || 'actual'}
+              </p>
             </div>
+          </div>
+
+          <div className="w-full lg:w-64 space-y-3">
+            <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/80">Periodo Académico</label>
+            <Selector
+              value={idPeriodo}
+              onChange={(e: any) => setIdPeriodo(Number(e.target.value))}
+              className="border-white/20 bg-white/95 text-slate-900 focus:border-white focus:ring-white/30 shadow-sm"
+            >
+              {periodos.map((p: any) => (
+                <option key={p.id} value={p.id}>{p.nombre}</option>
+              ))}
+            </Selector>
           </div>
         </div>
 
         {/* Navegación de Pestañas */}
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 relative z-10">
-          <div className="flex bg-white/10 rounded-2xl p-1 backdrop-blur-sm w-fit shadow-inner">
+        <div className="relative z-10 mt-8">
+          <div className="flex bg-white/10 rounded-2xl p-1.5 backdrop-blur-md shadow-inner w-fit">
             <button 
               onClick={() => setPestanaActiva('declaracion')}
               className={cn(
-                "flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300",
-                pestanaActiva === 'declaracion' ? "bg-white text-unt-primary shadow-md scale-105" : "text-white hover:bg-white/20"
+                'flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold transition-all duration-300',
+                pestanaActiva === 'declaracion' ? 'bg-white text-unt-primary shadow-md scale-105' : 'text-white hover:bg-white/20'
               )}
             >
               <LayoutList className="h-4 w-4" />
@@ -514,9 +532,9 @@ export default function CargaNoLectivaPage() {
                 setPestanaActiva('calendario');
               }}
               className={cn(
-                "flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300",
-                pestanaActiva === 'calendario' ? "bg-white text-unt-primary shadow-md scale-105" : "text-white hover:bg-white/20",
-                !declaracionData?.declaracion?.id ? "opacity-50 cursor-not-allowed" : ""
+                'flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold transition-all duration-300',
+                pestanaActiva === 'calendario' ? 'bg-white text-unt-primary shadow-md scale-105' : 'text-white hover:bg-white/20',
+                !declaracionData?.declaracion?.id ? 'opacity-50 cursor-not-allowed' : ''
               )}
             >
               <CalendarDays className="h-4 w-4" />
@@ -531,9 +549,9 @@ export default function CargaNoLectivaPage() {
                 setPestanaActiva('formatos');
               }}
               className={cn(
-                "flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300",
-                pestanaActiva === 'formatos' ? "bg-white text-unt-primary shadow-md scale-105" : "text-white hover:bg-white/20",
-                !declaracionData?.declaracion?.id ? "opacity-50 cursor-not-allowed" : ""
+                'flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold transition-all duration-300',
+                pestanaActiva === 'formatos' ? 'bg-white text-unt-primary shadow-md scale-105' : 'text-white hover:bg-white/20',
+                !declaracionData?.declaracion?.id ? 'opacity-50 cursor-not-allowed' : ''
               )}
             >
               <FileText className="h-4 w-4" />
@@ -558,16 +576,18 @@ export default function CargaNoLectivaPage() {
             </CardContent>
           </Card>
         ) : pestanaActiva === 'declaracion' ? (
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-            <div className="space-y-6">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            {/* Columna izquierda: Datos del docente y secciones no lectivas */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Datos del docente */}
               <Card className="border-none shadow-lg rounded-[2rem] overflow-hidden">
-                <CardHeader className="bg-slate-50/80">
-                  <CardTitle className="flex items-center gap-2 text-slate-900">
+                <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-100">
+                  <CardTitle className="flex items-center gap-2 text-slate-900 text-lg">
                     <UserRound className="h-5 w-5 text-unt-primary" />
                     Datos del docente
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4 pt-6">
                   <CampoTexto label="Nombres" value={declaracionData?.docente?.nombres || usuario?.docente?.nombres || ''} disabled />
                   <CampoTexto label="Apellidos" value={declaracionData?.docente?.apellidos || usuario?.docente?.apellidos || ''} disabled />
                   <CampoTexto
@@ -625,35 +645,38 @@ export default function CargaNoLectivaPage() {
                 </CardContent>
               </Card>
 
+              {/* Secciones no lectivas */}
               <Card className="border-none shadow-lg rounded-[2rem] overflow-hidden">
-                <CardHeader className="bg-slate-50/80 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <CardTitle className="flex items-center gap-2 text-slate-900">
+                <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-100">
+                  <CardTitle className="flex items-center gap-2 text-slate-900 text-lg">
                     <FileText className="h-5 w-5 text-unt-primary" />
                     Secciones no lectivas
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-4 pt-6">
                   <div className="grid grid-cols-1 gap-4">
                     {seccionesVisibles.map((clave) => {
                       const seccion = SECCIONES.find(s => s.clave === clave);
                       if (!seccion) return null;
                       return (
-                      <div key={seccion.clave} className="rounded-2xl border border-slate-100 bg-slate-50/40 p-4 shadow-sm relative group">
+                      <div key={seccion.clave} className="rounded-2xl border border-slate-100 bg-slate-50/40 p-5 shadow-sm relative group">
                         {seccion.clave !== 'PREPARACION_EVALUACION' && (
                           <button 
                             onClick={() => manejarEliminarSeccion(seccion.clave)}
-                            className="absolute top-4 right-4 text-slate-400 hover:text-red-500 bg-white hover:bg-red-50 p-1.5 rounded-lg border border-transparent hover:border-red-200 transition-colors shadow-sm"
+                            className="absolute top-5 right-5 text-slate-400 hover:text-red-500 bg-white hover:bg-red-50 p-2 rounded-lg border border-transparent hover:border-red-200 transition-colors shadow-sm"
                             title="Quitar sección"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
                         )}
-                        <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between pr-8">
-                          <div className="space-y-1">
-                            <h3 className="text-sm font-bold text-slate-900">{seccion.titulo}</h3>
-                            <p className="text-xs text-slate-500">{seccion.ayuda}</p>
+                        <div className="flex flex-col gap-3">
+                          <div className="flex items-start justify-between">
+                            <div className="space-y-1">
+                              <h3 className="text-sm font-bold text-slate-900">{seccion.titulo}</h3>
+                              <p className="text-xs text-slate-500">{seccion.ayuda}</p>
+                            </div>
                           </div>
-                          <div className="grid grid-cols-1 gap-3 lg:w-[26rem] lg:grid-cols-[110px_1fr]">
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                             <div className="relative">
                               <CampoTexto
                                 label="Horas (Enteros)"
@@ -670,7 +693,7 @@ export default function CargaNoLectivaPage() {
                                 className={erroresSecciones[seccion.clave] ? 'border-red-400 focus:border-red-500 focus:ring-red-500 bg-red-50' : ''}
                               />
                               {erroresSecciones[seccion.clave] && (
-                                <p className="absolute -bottom-5 left-1 text-[10px] font-bold text-red-600 truncate max-w-full" title={erroresSecciones[seccion.clave]}>
+                                <p className="absolute -bottom-6 left-1 text-[10px] font-bold text-red-600 truncate max-w-full" title={erroresSecciones[seccion.clave]}>
                                   {erroresSecciones[seccion.clave]}
                                 </p>
                               )}
@@ -684,22 +707,23 @@ export default function CargaNoLectivaPage() {
                                 (seccion.clave === 'ACTIVIDADES_ADMINISTRACION' && !habilitaAdministracion)
                               }
                               placeholder="Opcional"
+                              className="sm:col-span-2"
                             />
                           </div>
-                        </div>
-                        <div className="mt-4">
-                          <label className="mb-1.5 block text-sm font-bold text-gray-700 ml-1">Descripción</label>
-                          <textarea
-                            value={secciones[seccion.clave].descripcion}
-                            onChange={(e) => manejarCambioSeccion(seccion.clave, 'descripcion', e.target.value)}
-                            disabled={
-                              (seccion.clave === 'ACTIVIDADES_GOBIERNO' && !habilitaGobierno) ||
-                              (seccion.clave === 'ACTIVIDADES_ADMINISTRACION' && !habilitaAdministracion)
-                            }
-                            placeholder="Descripción detallada de las actividades..."
-                            rows={2}
-                            className="w-full rounded-xl border border-gray-300 bg-white p-3 text-sm text-gray-900 placeholder-gray-400 shadow-sm transition-all focus:border-unt-primary focus:outline-none focus:ring-2 focus:ring-unt-primary/20 disabled:cursor-not-allowed disabled:bg-gray-50"
-                          />
+                          <div className="mt-2">
+                            <label className="mb-1.5 block text-sm font-bold text-gray-700 ml-1">Descripción</label>
+                            <textarea
+                              value={secciones[seccion.clave].descripcion}
+                              onChange={(e) => manejarCambioSeccion(seccion.clave, 'descripcion', e.target.value)}
+                              disabled={
+                                (seccion.clave === 'ACTIVIDADES_GOBIERNO' && !habilitaGobierno) ||
+                                (seccion.clave === 'ACTIVIDADES_ADMINISTRACION' && !habilitaAdministracion)
+                              }
+                              placeholder="Descripción detallada de las actividades..."
+                              rows={2}
+                              className="w-full rounded-xl border border-gray-300 bg-white p-3 text-sm text-gray-900 placeholder-gray-400 shadow-sm transition-all focus:border-unt-primary focus:outline-none focus:ring-2 focus:ring-unt-primary/20 disabled:cursor-not-allowed disabled:bg-gray-50"
+                            />
+                          </div>
                         </div>
                       </div>
                     )})}
@@ -736,37 +760,38 @@ export default function CargaNoLectivaPage() {
                       disabled={!nuevaSeccionClave}
                       className="whitespace-nowrap rounded-xl mt-1"
                     >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Añadir Sección
+                      <Plus className="h-4 w-4 mr-2" />
+                      Agregar Sección
                     </Boton>
                   </div>
                 </CardContent>
               </Card>
 
+              {/* Detalle de carga lectiva */}
               <Card className="border-none shadow-lg rounded-[2rem] overflow-hidden">
-                <CardHeader className="bg-slate-50/80">
-                  <CardTitle className="flex items-center gap-2 text-slate-900">Detalle de carga lectiva asignada</CardTitle>
+                <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-100">
+                  <CardTitle className="text-slate-900 text-lg">Detalle de carga lectiva asignada</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="pt-6">
                   <div className="overflow-x-auto">
                     <table className="min-w-full text-left text-sm text-slate-700">
                       <thead>
                         <tr className="border-b border-slate-200 text-xs uppercase tracking-[0.14em] text-slate-500">
-                          <th className="py-2 pr-4 font-semibold">Código</th>
-                          <th className="py-2 pr-4 font-semibold">Curso</th>
-                          <th className="py-2 pr-4 font-semibold">Ciclo</th>
-                          <th className="py-2 pr-4 font-semibold">Componente</th>
-                          <th className="py-2 pr-4 font-semibold">Horas</th>
+                          <th className="py-3 pr-4 font-semibold">Código</th>
+                          <th className="py-3 pr-4 font-semibold">Curso</th>
+                          <th className="py-3 pr-4 font-semibold">Ciclo</th>
+                          <th className="py-3 pr-4 font-semibold">Componente</th>
+                          <th className="py-3 pr-4 font-semibold text-right">Horas</th>
                         </tr>
                       </thead>
                       <tbody>
                         {(declaracionData?.carga_lectiva ?? []).map((fila: any, index: number) => (
-                          <tr key={`${fila.curso_codigo}-${index}`} className="border-b border-slate-100 last:border-b-0">
-                            <td className="py-2 pr-4">{fila.curso_codigo}</td>
-                            <td className="py-2 pr-4">{fila.curso_nombre}</td>
-                            <td className="py-2 pr-4">{fila.ciclo}</td>
-                            <td className="py-2 pr-4">{fila.componente}</td>
-                            <td className="py-2 pr-4">{formatearHoras(Number(fila.horas ?? 0))}</td>
+                          <tr key={`${fila.curso_codigo}-${index}`} className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/50 transition-colors">
+                            <td className="py-3 pr-4 font-mono">{fila.curso_codigo}</td>
+                            <td className="py-3 pr-4 font-medium">{fila.curso_nombre}</td>
+                            <td className="py-3 pr-4">{fila.ciclo}</td>
+                            <td className="py-3 pr-4">{fila.componente}</td>
+                            <td className="py-3 pr-4 text-right font-bold text-slate-900">{formatearHoras(Number(fila.horas ?? 0))}h</td>
                           </tr>
                         ))}
                       </tbody>
@@ -776,104 +801,141 @@ export default function CargaNoLectivaPage() {
               </Card>
             </div>
 
+            {/* Columna derecha: Resumen y acciones */}
             <div className="space-y-6">
               <Card className="border-none shadow-lg rounded-[2rem] overflow-hidden sticky top-6">
                 <CardHeader className="bg-gradient-to-r from-unt-primary to-[#0f4c81] text-white">
-                  <CardTitle className="flex items-center gap-2 text-white">
+                  <CardTitle className="flex items-center gap-2 text-white text-lg">
                     <Save className="h-5 w-5" />
-                    Resumen
+                    Resumen de la Declaración
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-5">
-                  <div className="rounded-2xl bg-slate-50 p-5 border border-slate-100">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Total horas no lectivas</p>
-                    <p className="mt-2 text-4xl font-extrabold text-slate-900">{formatearHoras(totalHoras)}</p>
-                    <p className="mt-1 text-sm text-slate-500">Suma automática de todas las secciones.</p>
+                <CardContent className="space-y-5 pt-6">
+                  <div className="rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 p-6 border border-slate-100">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500 mb-3">Total horas no lectivas</p>
+                    <p className="text-5xl font-extrabold text-slate-900">{formatearHoras(totalHoras)}h</p>
+                    <p className="mt-2 text-sm text-slate-500">Suma automática de todas las secciones declaradas.</p>
                   </div>
 
-                  <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Validación de jornada</p>
-                    <div className="mt-3 space-y-2 text-sm text-slate-600">
-                      <p><span className="font-semibold text-slate-900">Carga lectiva:</span> {formatearHoras(horasLectivas)}h</p>
-                      <p><span className="font-semibold text-slate-900">Carga no lectiva:</span> {formatearHoras(totalHoras)}h</p>
-                      <p><span className="font-semibold text-slate-900">Carga total:</span> {formatearHoras(horasTotales)}h</p>
-                      <p><span className="font-semibold text-slate-900">Objetivo por dedicación:</span> {formatearHoras(horasObjetivo)}h</p>
+                  <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500 mb-4">Validación de jornada</p>
+                    <div className="space-y-3 text-sm text-slate-600">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-slate-900">Carga lectiva:</span>
+                        <span className="font-mono text-lg">{formatearHoras(horasLectivas)}h</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-slate-900">Carga no lectiva:</span>
+                        <span className="font-mono text-lg">{formatearHoras(totalHoras)}h</span>
+                      </div>
+                      <div className="border-t border-slate-100 pt-2 mt-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-slate-900 text-base">Carga total:</span>
+                          <span className="font-mono text-xl font-extrabold">{formatearHoras(horasTotales)}h</span>
+                        </div>
+                        <div className="flex items-center justify-between mt-1">
+                          <span className="font-semibold text-slate-900">Objetivo dedicación:</span>
+                          <span className="font-mono text-lg font-bold">{formatearHoras(horasObjetivo)}h</span>
+                        </div>
+                      </div>
                     </div>
                     {horasObjetivo > 0 && (
-                      <p className={`mt-3 text-xs font-semibold ${Math.abs(horasTotales - horasObjetivo) < 0.01 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                      <p className={cn(
+                        'mt-4 text-xs font-bold px-3 py-2 rounded-lg text-center',
+                        Math.abs(horasTotales - horasObjetivo) < 0.01 
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                          : 'bg-amber-50 text-amber-700 border border-amber-200'
+                      )}>
                         {Math.abs(horasTotales - horasObjetivo) < 0.01
-                          ? 'La jornada está completa según dedicación.'
-                          : `Faltan o sobran ${formatearHoras(Math.abs(horasObjetivo - horasTotales))}h para completar la jornada.`}
+                          ? '✅ La jornada está completa según dedicación.'
+                          : `⚠️ Faltan o sobran ${formatearHoras(Math.abs(horasObjetivo - horasTotales))}h para completar la jornada.`}
                       </p>
                     )}
                   </div>
 
-                  <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm space-y-3">
+                  <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm space-y-4">
                     <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Cargos y habilitaciones</p>
-                    <label className="flex items-start gap-3 text-sm text-slate-700 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                    <label className="flex items-start gap-3 text-sm text-slate-700 bg-slate-50 p-4 rounded-xl border border-slate-100">
                       <input
                         type="checkbox"
                         checked={habilitaGobierno}
                         onChange={(e) => setHabilitaGobierno(e.target.checked)}
-                        className="mt-1 h-4 w-4 rounded border-slate-300 text-unt-primary focus:ring-unt-primary"
+                        className="mt-1 h-5 w-5 rounded border-slate-300 text-unt-primary focus:ring-unt-primary"
                       />
                       <div>
                         <span className="font-semibold block">Tengo cargo por elección para declarar Actividades de Gobierno.</span>
-                        <span className="text-xs text-slate-500">Nota: Al marcarlo como declaración jurada, esta habilitación será visible para la Secretaría y autoridades pertinentes.</span>
+                        <span className="text-xs text-slate-500 mt-1">Nota: Al marcarlo como declaración jurada, esta habilitación será visible para la Secretaría y autoridades pertinentes.</span>
                       </div>
                     </label>
-                    <label className="flex items-start gap-3 text-sm text-slate-700 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                    <label className="flex items-start gap-3 text-sm text-slate-700 bg-slate-50 p-4 rounded-xl border border-slate-100">
                       <input
                         type="checkbox"
                         checked={habilitaAdministracion}
                         onChange={(e) => setHabilitaAdministracion(e.target.checked)}
-                        className="mt-1 h-4 w-4 rounded border-slate-300 text-unt-primary focus:ring-unt-primary"
+                        className="mt-1 h-5 w-5 rounded border-slate-300 text-unt-primary focus:ring-unt-primary"
                       />
                       <div>
                         <span className="font-semibold block">Tengo encargatura/cargo de confianza para declarar Actividades de Administración.</span>
-                        <span className="text-xs text-slate-500">Nota: Al marcarlo como declaración jurada, esta habilitación será visible para la Secretaría y autoridades pertinentes.</span>
+                        <span className="text-xs text-slate-500 mt-1">Nota: Al marcarlo como declaración jurada, esta habilitación será visible para la Secretaría y autoridades pertinentes.</span>
                       </div>
                     </label>
                   </div>
 
                   {erroresFormulario.length > 0 && (
-                    <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
-                      <p className="text-xs font-black uppercase tracking-[0.16em] text-red-700">Validaciones pendientes</p>
-                      <ul className="mt-2 space-y-1 text-sm text-red-700">
+                    <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
+                      <p className="text-[11px] font-black uppercase tracking-[0.16em] text-red-700 mb-3 flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4" />
+                        Validaciones pendientes
+                      </p>
+                      <ul className="mt-2 space-y-1.5 text-sm text-red-700">
                         {erroresFormulario.map((error, index) => (
-                          <li key={`${error}-${index}`}>• {error}</li>
+                          <li key={`${error}-${index}`} className="flex items-start gap-2">
+                            <span className="text-red-500 mt-1">•</span>
+                            {error}
+                          </li>
                         ))}
                       </ul>
                     </div>
                   )}
 
-                  <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Datos guardados</p>
-                    <div className="mt-3 space-y-2 text-sm text-slate-600">
-                      <p><span className="font-semibold text-slate-900">Periodo:</span> {periodos.find((p: any) => p.id === idPeriodo)?.nombre || idPeriodo}</p>
-                      <p><span className="font-semibold text-slate-900">IBM:</span> {docente.codigo_ibm || 'Pendiente'}</p>
-                      <p><span className="font-semibold text-slate-900">Condición:</span> {docente.modalidad}</p>
-                      <p><span className="font-semibold text-slate-900">Categoría:</span> {docente.categoria}</p>
+                  <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500 mb-4">Datos guardados</p>
+                    <div className="space-y-3 text-sm text-slate-600">
+                      <div className="flex justify-between">
+                        <span className="font-semibold text-slate-900">Periodo:</span>
+                        <span>{periodos.find((p: any) => p.id === idPeriodo)?.nombre || idPeriodo}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="font-semibold text-slate-900">IBM:</span>
+                        <span>{docente.codigo_ibm || 'Pendiente'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="font-semibold text-slate-900">Condición:</span>
+                        <span>{docente.modalidad}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="font-semibold text-slate-900">Categoría:</span>
+                        <span>{docente.categoria}</span>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="space-y-3">
+                  <div className="space-y-3 pt-2">
                     <Boton
                       onClick={guardarDeclaracion}
-                      className="w-full justify-center gap-2 rounded-2xl bg-unt-primary px-5 py-3.5 text-sm font-bold text-white shadow-lg shadow-unt-primary/20 hover:bg-[#002244]"
-                      cargando={mutationGuardar.isPending}
-                      disabled={cargandoDeclaracion || Object.keys(erroresSecciones).length > 0 || erroresFormulario.length > 0}
+                      className="w-full justify-center gap-2 rounded-[1.5rem] bg-gradient-to-r from-unt-primary to-[#0f4c81] px-5 py-4 text-sm font-bold text-white shadow-lg shadow-unt-primary/20 hover:from-[#0a2a52] hover:to-[#0a3a6e] transition-all"
+                      cargando={mutationGuardar.isPending || cargandoDeclaracion}
                     >
                       <Save className="h-4 w-4" />
-                      Guardar y Continuar a Calendario
+                      {mutationGuardar.isPending ? 'Guardando...' : 'Guardar y Continuar a Calendario'}
                     </Boton>
                     <Boton
                       variante="borde"
                       onClick={() => router.push('/dashboard/docente')}
-                      className="w-full justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-bold"
+                      className="w-full justify-center gap-2 rounded-[1.5rem] px-5 py-4 text-sm font-bold"
                     >
                       <ArrowLeft className="h-4 w-4" />
-                      Volver
+                      Volver al Dashboard
                     </Boton>
                     <Boton
                       variante="peligro"
@@ -882,7 +944,7 @@ export default function CargaNoLectivaPage() {
                           mutationEliminar.mutate();
                         }
                       }}
-                      className="w-full justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-bold"
+                      className="w-full justify-center gap-2 rounded-[1.5rem] px-5 py-4 text-sm font-bold"
                       disabled={!declaracionData?.declaracion}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -896,13 +958,13 @@ export default function CargaNoLectivaPage() {
         ) : pestanaActiva === 'calendario' ? (
           <div className="grid grid-cols-1 gap-8">
             <Card className="border-none shadow-xl rounded-[2rem] overflow-hidden bg-white/60 backdrop-blur-md" id="paso2">
-              <CardHeader className="bg-gradient-to-r from-unt-primary to-[#0f4c81] text-white flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between py-6">
+              <CardHeader className="bg-gradient-to-r from-unt-primary to-[#0f4c81] text-white flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between py-6 px-6">
                 <CardTitle className="flex items-center gap-3 text-white text-xl">
                   <CalendarDays className="h-6 w-6" />
                   Paso 2: Distribución de Horario No Lectivo
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-6 pt-8 pb-10">
+              <CardContent className="space-y-6 pt-8 pb-10 px-6">
                 <div className="rounded-xl border border-blue-100 bg-blue-50/80 p-5 backdrop-blur-sm shadow-sm flex gap-4 items-start">
                   <AlertCircle className="h-5 w-5 text-blue-500 mt-0.5 flex-shrink-0" />
                   <div className="text-sm text-blue-900 space-y-1">
@@ -933,7 +995,7 @@ export default function CargaNoLectivaPage() {
                               key={clave}
                               onClick={() => setSeccionActiva(clave as SeccionNoLectivaKey)}
                               className={cn(
-                                'flex items-center justify-between p-3 rounded-xl border text-left transition-all duration-200 w-full',
+                                'flex items-center justify-between p-4 rounded-xl border text-left transition-all duration-200 w-full',
                                 seccionActiva === clave 
                                   ? 'bg-indigo-50 border-indigo-500 shadow-md ring-2 ring-indigo-500/20' 
                                   : 'bg-white border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/30'
@@ -966,35 +1028,35 @@ export default function CargaNoLectivaPage() {
                   </div>
                 </div>
                   
-                  <div className="flex justify-end pt-8 mt-6">
-                    <Boton 
-                      onClick={() => mutationGuardarHorario.mutate()} 
-                      cargando={mutationGuardarHorario.isPending}
-                      disabled={Object.keys(secciones).some((key) => {
-                        const k = key as SeccionNoLectivaKey;
-                        const horasStr = secciones[k].horas;
-                        return Number(horasStr) > 0 && bloquesAsignados.filter((b) => b.seccion === k).length < Number(horasStr);
-                      })}
-                      variante="primario"
-                      className="px-8 py-6 text-base rounded-2xl shadow-lg shadow-unt-primary/20 hover:scale-[1.02] transition-transform"
-                    >
-                      <Save className="h-5 w-5" />
-                      Guardar Horario No Lectivo
-                    </Boton>
-                  </div>
+                <div className="flex justify-end pt-8 mt-6">
+                  <Boton 
+                    onClick={() => mutationGuardarHorario.mutate()} 
+                    cargando={mutationGuardarHorario.isPending}
+                    disabled={Object.keys(secciones).some((key) => {
+                      const k = key as SeccionNoLectivaKey;
+                      const horasStr = secciones[k].horas;
+                      return Number(horasStr) > 0 && bloquesAsignados.filter((b) => b.seccion === k).length < Number(horasStr);
+                    })}
+                    variante="primario"
+                    className="px-10 py-5 text-base rounded-[1.5rem] shadow-lg shadow-unt-primary/20 hover:scale-[1.02] transition-transform"
+                  >
+                    <Save className="h-5 w-5" />
+                    Guardar Horario No Lectivo
+                  </Boton>
+                </div>
               </CardContent>
             </Card>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-8">
             <Card className="border-none shadow-xl rounded-[2rem] overflow-hidden bg-white/60 backdrop-blur-md" id="paso3">
-              <CardHeader className="bg-gradient-to-r from-unt-primary to-[#0f4c81] text-white flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between py-6">
+              <CardHeader className="bg-gradient-to-r from-unt-primary to-[#0f4c81] text-white flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between py-6 px-6">
                 <CardTitle className="flex items-center gap-3 text-white text-xl">
                   <FileText className="h-6 w-6" />
                   Paso 3: Formatos Automáticos
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-6 pt-8 pb-10">
+              <CardContent className="space-y-6 pt-8 pb-10 px-6">
                 <div className="rounded-xl border border-blue-100 bg-blue-50/80 p-5 backdrop-blur-sm shadow-sm flex gap-4 items-start">
                   <AlertCircle className="h-5 w-5 text-blue-500 mt-0.5 flex-shrink-0" />
                   <div className="text-sm text-blue-900 space-y-1">
@@ -1021,7 +1083,11 @@ export default function CargaNoLectivaPage() {
                               <td className="py-3 pr-4 font-medium">{formato.etiqueta}</td>
                               <td className="py-3 pr-4">{formato.sede}</td>
                               <td className="py-3 pr-4">
-                                <span className={`inline-flex rounded-full px-3 py-1.5 text-xs font-bold ${formato.estado === 'GENERADO' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                                <span className={cn('inline-flex rounded-full px-3 py-1.5 text-xs font-bold', 
+                                  formato.estado === 'GENERADO' 
+                                    ? 'bg-emerald-100 text-emerald-700' 
+                                    : 'bg-amber-100 text-amber-700'
+                                )}>
                                   {formato.estado}
                                 </span>
                               </td>
