@@ -86,17 +86,6 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.10)]">
-        {alertaAmbientes && (
-          <div className={`px-6 py-3 flex items-center justify-between ${alertaAmbientes.nivel === 'critico' ? 'bg-red-50 text-red-700' : 'bg-yellow-50 text-yellow-700'} border-b border-slate-200`}>
-            <div className="flex items-center gap-3 text-sm font-medium">
-              <AlertTriangle className="h-5 w-5" />
-              <span>{alertaAmbientes.mensaje}</span>
-            </div>
-            <Link href="/dashboard/director/solicitudes-aula" className="text-xs font-bold uppercase tracking-wider hover:underline flex items-center gap-1">
-              Ver solicitudes <MapPin className="h-3 w-3" />
-            </Link>
-          </div>
-        )}
         <div className="relative overflow-hidden bg-gradient-to-br from-[#0b1f3a] via-[#123b6d] to-[#0f4c81] px-6 py-8 text-white sm:px-8">
           <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10 blur-3xl pointer-events-none" />
           <div className="absolute left-1/3 bottom-0 h-56 w-56 rounded-full bg-unt-accent/10 blur-3xl pointer-events-none" />
