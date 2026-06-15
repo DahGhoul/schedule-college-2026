@@ -56,6 +56,16 @@ async function getDocenteData(idDocente: number, idPeriodo: number) {
           },
         },
       },
+      declaraciones: {
+        where: { id_periodo: idPeriodo },
+        include: {
+          secciones: true
+        },
+      },
+      bloques_no_lectivos: {
+        where: { id_periodo: idPeriodo },
+        orderBy: [{ dia_semana: 'asc' }, { hora_inicio: 'asc' }],
+      }
     },
   });
 
@@ -66,7 +76,9 @@ async function getDocenteData(idDocente: number, idPeriodo: number) {
     0
   );
 
-  return { docente, periodo, horasAsignadas };
+  const declaracion = docente.declaraciones.length > 0 ? docente.declaraciones[0] : null;
+
+  return { docente, periodo, horasAsignadas, declaracion };
 }
 
 // ---------- PDF helpers ----------
@@ -75,6 +87,7 @@ function drawPDFDocenteSection(
   docente: Awaited<ReturnType<typeof getDocenteData>>['docente'],
   periodo: { nombre: string } | null,
   horasAsignadas: number,
+  declaracion: Awaited<ReturnType<typeof getDocenteData>>['declaracion'],
   addNewPage: boolean
 ) {
   if (addNewPage) doc.addPage();
@@ -99,10 +112,14 @@ function drawPDFDocenteSection(
   doc
     .fontSize(10)
     .font('Helvetica')
-    .text(`Categoría: ${docente.categoria}   |   Modalidad: ${docente.modalidad}   |   Horas asignadas: ${horasAsignadas}`);
+    .text(`Categoría: ${docente.categoria}   |   Modalidad: ${docente.modalidad}   |   Horas asignadas (lectivas): ${horasAsignadas}`);
   doc.moveDown(0.5);
 
-  // Table header
+  // ---- Carga Lectiva ----
+  doc.font('Helvetica-Bold').fontSize(10).text('Carga Lectiva', { underline: true });
+  doc.moveDown(0.3);
+
+  // Table header for lectiva
   const colX = [50, 130, 190, 285, 375, 440, 500];
   const colHeaders = ['Día', 'H. Inicio', 'H. Fin', 'Curso', 'Componente', 'Grupo', 'Ambiente'];
   const tableTop = doc.y;
@@ -117,7 +134,7 @@ function drawPDFDocenteSection(
   doc.moveTo(50, lineY).lineTo(555, lineY).stroke();
   doc.moveDown(0.2);
 
-  // Table rows
+  // Table rows for lectiva
   doc.font('Helvetica').fontSize(9);
   const bloques = [...docente.bloques];
   sortBloques(bloques);
@@ -142,6 +159,68 @@ function drawPDFDocenteSection(
     doc.moveDown(0.4);
   }
 
+  doc.moveDown(0.7);
+
+  // ---- Carga No Lectiva ----
+  doc.font('Helvetica-Bold').fontSize(10).text('Carga No Lectiva', { underline: true });
+  doc.moveDown(0.3);
+
+  if (declaracion?.secciones && declaracion.secciones.length > 0) {
+    const secciones = declaracion.secciones;
+    doc.font('Helvetica').fontSize(9);
+    for (const s of secciones) {
+      doc.text(
+        `${s.seccion.replace(/_/g, ' ')}: ${s.horas_declaradas} horas${s.descripcion ? ` (${s.descripcion})` : ''}`,
+      );
+      doc.moveDown(0.2);
+    }
+
+    // Now show bloques no lectivos if any
+    if (docente.bloques_no_lectivos && docente.bloques_no_lectivos.length > 0) {
+      doc.moveDown(0.2);
+      doc.font('Helvetica-Bold').fontSize(9).text('Horario No Lectivo:');
+      doc.font('Helvetica').fontSize(9);
+      doc.moveDown(0.2);
+
+      const colXNoLectiva = [50, 130, 190, 250];
+      const colHeadersNoLectiva = ['Día', 'H. Inicio', 'H. Fin', 'Sección'];
+      const tableTopNoLectiva = doc.y;
+
+      doc.font('Helvetica-Bold').fontSize(8);
+      colHeadersNoLectiva.forEach((h, i) => {
+        doc.text(h, colXNoLectiva[i], tableTopNoLectiva, { width: colXNoLectiva[i + 1] ? colXNoLectiva[i + 1] - colXNoLectiva[i] - 4 : 150, ellipsis: true });
+      });
+      doc.moveDown(0.2);
+
+      const lineYNoLectiva = doc.y;
+      doc.moveTo(50, lineYNoLectiva).lineTo(400, lineYNoLectiva).stroke();
+      doc.moveDown(0.2);
+
+      const bloquesNoLectivos = [...docente.bloques_no_lectivos];
+      sortBloques(bloquesNoLectivos as any);
+      for (const b of bloquesNoLectivos) {
+        const y = doc.y;
+        const cells = [
+          b.dia_semana,
+          b.hora_inicio,
+          b.hora_fin,
+          b.seccion.replace(/_/g, ' '),
+        ];
+        doc.font('Helvetica').fontSize(8);
+        cells.forEach((c, i) => {
+          doc.text(String(c), colXNoLectiva[i], y, {
+            width: colXNoLectiva[i + 1] ? colXNoLectiva[i + 1] - colXNoLectiva[i] - 4 : 150,
+            ellipsis: true,
+          });
+        });
+        doc.moveDown(0.3);
+      }
+    }
+
+  } else {
+    doc.font('Helvetica').fontSize(9).text('No hay carga no lectiva registrada para este período.');
+  }
+
   // Footer
   const footerY = doc.page.height - 40;
   doc
@@ -161,7 +240,7 @@ export class ReportesService {
     idDocente: number,
     idPeriodo: number
   ): Promise<Buffer> {
-    const { docente, periodo, horasAsignadas } = await getDocenteData(
+    const { docente, periodo, horasAsignadas, declaracion } = await getDocenteData(
       idDocente,
       idPeriodo
     );
@@ -173,7 +252,7 @@ export class ReportesService {
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
 
-      drawPDFDocenteSection(doc, docente, periodo, horasAsignadas, false);
+      drawPDFDocenteSection(doc, docente, periodo, horasAsignadas, declaracion, false);
       doc.end();
     });
   }
@@ -183,7 +262,7 @@ export class ReportesService {
     idDocente: number,
     idPeriodo: number
   ): Promise<Buffer> {
-    const { docente, horasAsignadas } = await getDocenteData(
+    const { docente, horasAsignadas, declaracion } = await getDocenteData(
       idDocente,
       idPeriodo
     );
@@ -192,8 +271,23 @@ export class ReportesService {
     const sheetName = docente.apellidos.substring(0, 30);
     const ws = workbook.addWorksheet(sheetName);
 
-    // Headers
-    ws.columns = [
+    // Info row
+    ws.addRow([
+      `${docente.nombres} ${docente.apellidos}`,
+      `Cat: ${docente.categoria}`,
+      `Mod: ${docente.modalidad}`,
+      `Horas Lectivas: ${horasAsignadas}`,
+    ]);
+    ws.getRow(1).font = { bold: true, size: 12 };
+
+    ws.addRow([]); // Add space
+
+    // Carga Lectiva
+    ws.addRow(['Carga Lectiva']);
+    ws.getRow(3).font = { bold: true };
+
+    // Headers for lectiva
+    const lectivaColumns = [
       { header: 'Día', key: 'dia', width: 12 },
       { header: 'Hora Inicio', key: 'inicio', width: 12 },
       { header: 'Hora Fin', key: 'fin', width: 12 },
@@ -202,28 +296,15 @@ export class ReportesService {
       { header: 'Grupo', key: 'grupo', width: 10 },
       { header: 'Ambiente', key: 'ambiente', width: 12 },
     ];
+    
+    ws.columns = lectivaColumns as any;
+    const headerRowLectiva = ws.addRow(['Día', 'Hora Inicio', 'Hora Fin', 'Curso', 'Componente', 'Grupo', 'Ambiente']);
+    headerRowLectiva.font = { bold: true };
+    headerRowLectiva.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD0E4F7' } };
 
-    // Bold header row
-    ws.getRow(1).font = { bold: true };
-    ws.getRow(1).fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FFD0E4F7' },
-    };
-
-    // Info row
-    ws.insertRow(1, [
-      `${docente.nombres} ${docente.apellidos}`,
-      `Cat: ${docente.categoria}`,
-      `Mod: ${docente.modalidad}`,
-      `Horas: ${horasAsignadas}`,
-    ]);
-    ws.getRow(1).font = { bold: true, size: 12 };
-
-    // Data rows (after header which is now row 2)
+    // Data rows for lectiva
     const bloques = [...docente.bloques];
     sortBloques(bloques);
-
     for (const b of bloques) {
       ws.addRow({
         dia: b.dia_semana,
@@ -234,6 +315,42 @@ export class ReportesService {
         grupo: b.grupo?.codigo ?? '',
         ambiente: b.ambiente?.codigo ?? 'Sin aula',
       });
+    }
+
+    ws.addRow([]); // Add space
+
+    // Carga No Lectiva
+    ws.addRow(['Carga No Lectiva']);
+    ws.getRow(ws.lastRow?.number || 0).font = { bold: true };
+
+    if (declaracion?.secciones && declaracion.secciones.length > 0) {
+      ws.addRow(['Sección', 'Horas', 'Descripción']);
+      const headerRowNoLectiva = ws.getRow(ws.lastRow?.number || 0);
+      headerRowNoLectiva.font = { bold: true };
+      headerRowNoLectiva.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE6F7E7' } };
+
+      for (const s of declaracion.secciones) {
+        ws.addRow([s.seccion.replace(/_/g, ' '), s.horas_declaradas, s.descripcion || '']);
+      }
+
+      // Add bloques no lectivos
+      if (docente.bloques_no_lectivos && docente.bloques_no_lectivos.length > 0) {
+        ws.addRow([]);
+        ws.addRow(['Horario No Lectivo']);
+        ws.getRow(ws.lastRow?.number || 0).font = { bold: true };
+        ws.addRow(['Día', 'Hora Inicio', 'Hora Fin', 'Sección']);
+        const headerRowHorarioNoLectivo = ws.getRow(ws.lastRow?.number || 0);
+        headerRowHorarioNoLectivo.font = { bold: true };
+        headerRowHorarioNoLectivo.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0E7FA' } };
+
+        const bloquesNoLectivos = [...docente.bloques_no_lectivos];
+        sortBloques(bloquesNoLectivos as any);
+        for (const b of bloquesNoLectivos) {
+          ws.addRow([b.dia_semana, b.hora_inicio, b.hora_fin, b.seccion.replace(/_/g, ' ')]);
+        }
+      }
+    } else {
+      ws.addRow(['No hay carga no lectiva registrada para este período']);
     }
 
     return workbook.xlsx.writeBuffer() as unknown as Promise<Buffer>;
@@ -263,6 +380,14 @@ export class ReportesService {
           },
         },
         asignaciones: true,
+        declaraciones: {
+          where: { id_periodo: idPeriodo },
+          include: { secciones: true },
+        },
+        bloques_no_lectivos: {
+          where: { id_periodo: idPeriodo },
+          orderBy: [{ dia_semana: 'asc' }, { hora_inicio: 'asc' }],
+        },
       },
       orderBy: [
         { modalidad: 'asc' },
@@ -283,7 +408,8 @@ export class ReportesService {
           (s, a) => s + a.horas_asignadas,
           0
         );
-        drawPDFDocenteSection(doc, d as any, periodo, horasAsignadas, idx > 0);
+        const declaracion = d.declaraciones.length > 0 ? d.declaraciones[0] : null;
+        drawPDFDocenteSection(doc, d as any, periodo, horasAsignadas, declaracion, idx > 0);
       });
 
       doc.end();
@@ -309,6 +435,14 @@ export class ReportesService {
           },
         },
         asignaciones: true,
+        declaraciones: {
+          where: { id_periodo: idPeriodo },
+          include: { secciones: true },
+        },
+        bloques_no_lectivos: {
+          where: { id_periodo: idPeriodo },
+          orderBy: [{ dia_semana: 'asc' }, { hora_inicio: 'asc' }],
+        },
       },
       orderBy: [
         { modalidad: 'asc' },
@@ -327,14 +461,21 @@ export class ReportesService {
         (s, a) => s + a.horas_asignadas,
         0
       );
+      const declaracion = d.declaraciones.length > 0 ? d.declaraciones[0] : null;
 
       ws.addRow([
         `${d.nombres} ${d.apellidos}`,
         `Cat: ${d.categoria}`,
         `Mod: ${d.modalidad}`,
-        `Horas: ${horasAsignadas}`,
+        `Horas Lectivas: ${horasAsignadas}`,
       ]);
       ws.getRow(1).font = { bold: true, size: 12 };
+
+      ws.addRow([]); // Add space
+
+      // Carga Lectiva
+      ws.addRow(['Carga Lectiva']);
+      ws.getRow(ws.lastRow?.number || 0).font = { bold: true };
 
       ws.columns = [
         { key: 'dia', width: 12 },
@@ -367,6 +508,42 @@ export class ReportesService {
           b.grupo?.codigo ?? '',
           b.ambiente?.codigo ?? 'Sin aula',
         ]);
+      }
+
+      ws.addRow([]); // Add space
+
+      // Carga No Lectiva
+      ws.addRow(['Carga No Lectiva']);
+      ws.getRow(ws.lastRow?.number || 0).font = { bold: true };
+
+      if (declaracion?.secciones && declaracion.secciones.length > 0) {
+        ws.addRow(['Sección', 'Horas', 'Descripción']);
+        const headerRowNoLectiva = ws.getRow(ws.lastRow?.number || 0);
+        headerRowNoLectiva.font = { bold: true };
+        headerRowNoLectiva.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE6F7E7' } };
+
+        for (const s of declaracion.secciones) {
+          ws.addRow([s.seccion.replace(/_/g, ' '), s.horas_declaradas, s.descripcion || '']);
+        }
+
+        // Add bloques no lectivos
+        if (d.bloques_no_lectivos && d.bloques_no_lectivos.length > 0) {
+          ws.addRow([]);
+          ws.addRow(['Horario No Lectivo']);
+          ws.getRow(ws.lastRow?.number || 0).font = { bold: true };
+          ws.addRow(['Día', 'Hora Inicio', 'Hora Fin', 'Sección']);
+          const headerRowHorarioNoLectivo = ws.getRow(ws.lastRow?.number || 0);
+          headerRowHorarioNoLectivo.font = { bold: true };
+          headerRowHorarioNoLectivo.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0E7FA' } };
+
+          const bloquesNoLectivos = [...d.bloques_no_lectivos];
+          sortBloques(bloquesNoLectivos as any);
+          for (const b of bloquesNoLectivos) {
+            ws.addRow([b.dia_semana, b.hora_inicio, b.hora_fin, b.seccion.replace(/_/g, ' ')]);
+          }
+        }
+      } else {
+        ws.addRow(['No hay carga no lectiva registrada para este período']);
       }
     }
 

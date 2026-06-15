@@ -316,13 +316,26 @@ export default function CargaNoLectivaPage() {
   const horasTotales = horasLectivas + totalHoras;
 
   const manejarCambioSeccion = (clave: SeccionNoLectivaKey, campo: keyof FormularioSeccion, valor: string) => {
-    setSecciones((actual) => ({
-      ...actual,
-      [clave]: {
-        ...actual[clave],
-        [campo]: valor,
-      },
-    }));
+    if (campo === 'horas') {
+      // Only allow positive integers
+      const num = parseInt(valor, 10);
+      const nuevoValor = !isNaN(num) && num >= 0 ? String(num) : valor.replace(/[^0-9]/g, '');
+      setSecciones((actual) => ({
+        ...actual,
+        [clave]: {
+          ...actual[clave],
+          [campo]: nuevoValor,
+        },
+      }));
+    } else {
+      setSecciones((actual) => ({
+        ...actual,
+        [clave]: {
+          ...actual[clave],
+          [campo]: valor,
+        },
+      }));
+    }
   };
 
   const manejarEliminarSeccion = (clave: SeccionNoLectivaKey) => {
