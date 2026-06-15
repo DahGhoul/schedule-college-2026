@@ -132,7 +132,6 @@ export default function VistaHorarioAulaPage() {
                 ]}
                 value={ambienteSeleccionado?.toString() || ''}
                 onChange={(e) => setAmbienteSeleccionado(e.target.value ? parseInt(e.target.value) : null)}
-                className="w-full py-4 text-lg font-bold rounded-2xl border-slate-200 bg-slate-50/50 focus:ring-4 focus:ring-unt-primary/5 transition-all"
               />
             </div>
           </CardContent>

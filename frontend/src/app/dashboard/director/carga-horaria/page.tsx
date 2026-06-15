@@ -63,7 +63,7 @@ export default function CargaHorariaPage() {
 
   const { data: ciclos } = useQuery({
     queryKey: ['ciclos', idPeriodo],
-    queryFn: () => cargaHorariaService.obtenerCiclosPorPeriodo(idPeriodo).then(res => res.data),
+    queryFn: () => periodosService.obtenerCiclosPorPeriodo(idPeriodo).then(res => res.data),
     enabled: idPeriodo > 0
   });
 
@@ -163,38 +163,53 @@ export default function CargaHorariaPage() {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
-        <div>
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Carga Horaria</h1>
-          <p className="text-slate-500 mt-1">Asigna docentes a los componentes de cada curso.</p>
-        </div>
-        <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-          <div className="w-full sm:w-64">
-            <Selector
-              label="Período Lectivo"
-              value={idPeriodo}
-              onChange={(e: any) => setIdPeriodo(Number(e.target.value))}
-            >
-              <option value={0}>-- Seleccionar Periodo --</option>
-              {periodos?.map((p: any) => (
-                <option key={p.id} value={p.id}>{p.nombre}</option>
-              ))}
-            </Selector>
+    <div className="space-y-8 max-w-[1800px] mx-auto pb-20 animate-in fade-in duration-500">
+      {/* Header Estilo Classroom */}
+      <div className="relative overflow-hidden rounded-[3rem] bg-gradient-to-br from-[#0b1f3a] via-[#123b6d] to-[#0f4c81] px-10 py-12 text-white shadow-2xl">
+        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/10 blur-3xl pointer-events-none" />
+        <div className="absolute -left-10 -bottom-10 h-40 w-40 rounded-full bg-white/5 blur-2xl pointer-events-none" />
+        
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-end justify-between gap-8">
+          <div className="space-y-4">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/10 backdrop-blur-md rounded-full border border-white/20 text-xs font-bold uppercase tracking-widest text-white/90">
+              <Clock className="w-3.5 h-3.5" />
+              Asignación de Carga
+            </div>
+            <h1 className="text-4xl font-extrabold tracking-tight">Carga Horaria</h1>
+            <p className="text-lg text-white/70 max-w-2xl">
+              Asigna docentes a los componentes de cada curso y gestiona la distribución de horas por periodo.
+            </p>
           </div>
+          
+          <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
+            <div className="w-full sm:w-64">
+              <Selector
+                label="Período Lectivo"
+                value={idPeriodo}
+                onChange={(e: any) => setIdPeriodo(Number(e.target.value))}
+                className="bg-white/20 border-white/20 text-white"
+              >
+                <option value={0}>-- Seleccionar Periodo --</option>
+                {periodos?.map((p: any) => (
+                  <option key={p.id} value={p.id}>{p.nombre}</option>
+                ))}
+              </Selector>
+            </div>
 
-          <div className="w-full sm:w-48">
-            <Selector
-              label="Filtrar por Ciclo"
-              value={idCiclo}
-              onChange={(e: any) => setIdCiclo(Number(e.target.value))}
-              disabled={!idPeriodo}
-            >
-              <option value={0}>-- Todos los Ciclos --</option>
-              {ciclos?.map((c: any) => (
-                <option key={c.id} value={c.id}>Ciclo {c.numero}</option>
-              ))}
-            </Selector>
+            <div className="w-full sm:w-48">
+              <Selector
+                label="Filtrar por Ciclo"
+                value={idCiclo}
+                onChange={(e: any) => setIdCiclo(Number(e.target.value))}
+                disabled={!idPeriodo}
+                className="bg-white/20 border-white/20 text-white"
+              >
+                <option value={0}>-- Todos los Ciclos --</option>
+                {ciclos?.map((c: any) => (
+                  <option key={c.id} value={c.id}>Ciclo {c.numero}</option>
+                ))}
+              </Selector>
+            </div>
           </div>
         </div>
       </div>

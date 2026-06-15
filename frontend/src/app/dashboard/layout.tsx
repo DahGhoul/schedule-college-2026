@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/auth.store';
 import { useRouter, usePathname } from 'next/navigation';
 import { Sidebar } from '@/components/layouts/Sidebar';
 import { BarraSuperior } from '@/components/layouts/BarraSuperior';
+import { NanoChatbot } from '@/components/layouts/NanoChatbot';
 import { SpinnerCarga } from '@/components/ui/SpinnerCarga';
 import { useRefreshTokenSilent } from '@/hooks/useRefreshTokenSilent';
 
@@ -74,6 +75,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="max-w-7xl mx-auto">{children}</div>
         </main>
       </div>
+      <NanoChatbot />
     </div>
   );
 }

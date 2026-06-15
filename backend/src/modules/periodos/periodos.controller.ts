@@ -52,4 +52,17 @@ export class PeriodosController {
     if (!periodo) return res.status(404).json({ error: 'No hay período activo' });
     res.json(periodo);
   }
+
+  static async obtenerCiclos(req: Request, res: Response) {
+    const id = parseInt(req.params.id);
+    const ciclos = await PeriodosService.obtenerCiclosPorPeriodo(id);
+    res.json(ciclos);
+  }
+
+  static async obtenerCiclosActivo(req: Request, res: Response) {
+    const periodo = await PeriodosService.obtenerActivo();
+    if (!periodo) return res.status(404).json({ error: 'No hay período activo' });
+    const ciclos = await PeriodosService.obtenerCiclosPorPeriodo(periodo.id);
+    res.json(ciclos);
+  }
 }

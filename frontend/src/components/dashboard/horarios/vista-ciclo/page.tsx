@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import { Card, CardContent } from '@/components/ui/Card';
 import { Selector } from '@/components/ui/Selector';
 import { CalendarioGeneral } from '@/components/horarios/CalendarioGeneral';
 import { periodosService } from '@/services/periodos.service';
@@ -15,13 +15,18 @@ export default function VistaHorarioCicloPage() {
   const [cicloSeleccionado, setCicloSeleccionado] = useState<number | null>(null);
   const [descargando, setDescargando] = useState<'excel' | 'pdf' | 'excel-todo' | 'pdf-todo' | null>(null);
 
-  // Obtener periodo activo
-  const { data: periodos } = useQuery({
-    queryKey: ['periodos'],
-    queryFn: () => periodosService.listar().then(res => res.data),
+  // Obtener período activo
+  const { data: periodoActivo, isLoading: periodoLoading } = useQuery({
+    queryKey: ['periodo-activo-ciclo'],
+    queryFn: () => periodosService.activo().then(res => res.data),
   });
 
-  const periodoActivo = periodos?.find((p: any) => p.activo);
+  // Obtener ciclos permitidos del período activo
+  const { data: ciclos } = useQuery({
+    queryKey: ['ciclos-activo-vista', periodoActivo?.id],
+    queryFn: () => periodosService.obtenerCiclosActivo().then(res => res.data),
+    enabled: !!periodoActivo,
+  });
 
   const exportarArchivo = async (tipo: 'excel' | 'pdf', todo: boolean = false) => {
     if (!periodoActivo) return;
@@ -42,7 +47,8 @@ export default function VistaHorarioCicloPage() {
         res = tipo === 'excel'
           ? await reportesService.excelCiclo(cicloSeleccionado!, periodoActivo.id)
           : await reportesService.pdfCiclo(cicloSeleccionado!, periodoActivo.id);
-        nombre = `horario-ciclo-${cicloSeleccionado}-${periodoActivo.nombre}.${tipo === 'excel' ? 'xlsx' : 'pdf'}`;
+        const ciclo = (ciclos || []).find((c: any) => c.id === cicloSeleccionado || c.numero === cicloSeleccionado);
+        nombre = `horario-ciclo-${ciclo?.numero || cicloSeleccionado}-${periodoActivo.nombre}.${tipo === 'excel' ? 'xlsx' : 'pdf'}`;
       }
 
       descargarBlob(res.data, nombre);
@@ -53,11 +59,7 @@ export default function VistaHorarioCicloPage() {
     }
   };
 
-  // Ciclos Impares (1, 3, 5, 7, 9)
-  const ciclos = [1, 3, 5, 7, 9].map(n => ({
-    valor: String(n),
-    etiqueta: `Ciclo ${n}`,
-  }));
+  if (periodoLoading) return <SpinnerCarga />;
 
   return (
     <div className="space-y-8 max-w-[1600px] mx-auto pb-10">
@@ -111,11 +113,13 @@ export default function VistaHorarioCicloPage() {
                 label=""
                 opciones={[
                   { valor: '', etiqueta: '-- Seleccionar Ciclo --' },
-                  ...ciclos
+                  ...(ciclos?.map((c: any) => ({
+                    valor: String(c.id),
+                    etiqueta: `Ciclo ${c.numero}`,
+                  })) || []),
                 ]}
                 value={cicloSeleccionado?.toString() || ''}
                 onChange={(e) => setCicloSeleccionado(e.target.value ? parseInt(e.target.value) : null)}
-                className="w-full py-4 text-lg font-bold rounded-2xl border-slate-200 bg-slate-50/50 focus:ring-4 focus:ring-unt-primary/5 transition-all"
               />
             </div>
           </CardContent>
@@ -207,7 +211,7 @@ export default function VistaHorarioCicloPage() {
               <div className="p-4 bg-amber-50 rounded-full text-amber-500">
                 <Share2 className="w-8 h-8" />
               </div>
-              <p className="text-amber-700 font-bold text-lg">No hay un periodo académico activo para mostrar horarios.</p>
+              <p className="text-amber-700 font-bold text-lg">No hay un período académico activo para mostrar horarios.</p>
             </div>
           )}
         </div>

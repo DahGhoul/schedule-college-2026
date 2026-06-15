@@ -20,9 +20,11 @@ export default function PeriodosPage() {
   const [toast, setToast] = useState<{ mensaje: string; tipo: 'exito' | 'error' } | null>(null);
   const [formulario, setFormulario] = useState({
     nombre: '',
+    tipo: 'I' as 'I' | 'II' | 'III',
     fecha_inicio: '',
     fecha_fin: '',
     estado: 'BORRADOR',
+    activo: false,
   });
 
   const { data: response, isLoading } = useQuery({
@@ -78,9 +80,11 @@ export default function PeriodosPage() {
   const resetFormulario = () => {
     setFormulario({
       nombre: '',
+      tipo: 'I',
       fecha_inicio: '',
       fecha_fin: '',
       estado: 'BORRADOR',
+      activo: false,
     });
     setPeriodoEditando(null);
   };
@@ -94,9 +98,11 @@ export default function PeriodosPage() {
     setPeriodoEditando(periodo);
     setFormulario({
       nombre: periodo.nombre,
+      tipo: periodo.tipo || 'I',
       fecha_inicio: periodo.fecha_inicio.split('T')[0],
       fecha_fin: periodo.fecha_fin.split('T')[0],
       estado: periodo.estado,
+      activo: periodo.activo || false,
     });
     setModalAbierto(true);
   };
@@ -122,6 +128,29 @@ export default function PeriodosPage() {
           <span className="font-bold text-slate-900">{item.nombre}</span>
         </div>
       )
+    },
+    { 
+      clave: 'tipo', 
+      titulo: 'Tipo',
+      render: (item: any) => {
+        let etiqueta = item.tipo;
+        let color = 'bg-slate-100 text-slate-700';
+        if (item.tipo === 'I') {
+          etiqueta = 'I (Impares)';
+          color = 'bg-blue-100 text-blue-700';
+        } else if (item.tipo === 'II') {
+          etiqueta = 'II (Pares)';
+          color = 'bg-purple-100 text-purple-700';
+        } else if (item.tipo === 'III') {
+          etiqueta = 'III (Extraordinario)';
+          color = 'bg-orange-100 text-orange-700';
+        }
+        return (
+          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${color}`}>
+            {etiqueta}
+          </span>
+        );
+      }
     },
     { 
       clave: 'fecha_inicio', 
@@ -158,12 +187,12 @@ export default function PeriodosPage() {
     },
     {
       clave: 'activo',
-      titulo: 'Visibilidad',
+      titulo: 'Estado',
       render: (item: any) => (
-        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
-          item.activo ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-red-50 text-red-700 border border-red-100'
+        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border ${
+          item.activo ? 'bg-green-50 text-green-700 border-green-100' : 'bg-slate-50 text-slate-600 border-slate-200'
         }`}>
-          {item.activo ? 'Visible' : 'Oculto'}
+          {item.activo ? 'Activo' : 'Inactivo'}
         </span>
       ),
     },
@@ -223,6 +252,17 @@ export default function PeriodosPage() {
             onChange={(e) => setFormulario({ ...formulario, nombre: e.target.value })}
             required
           />
+
+          <Selector 
+            label="Tipo de Período" 
+            value={formulario.tipo} 
+            onChange={(e) => setFormulario({ ...formulario, tipo: e.target.value as 'I' | 'II' | 'III' })}
+            opciones={[
+              { valor: 'I', etiqueta: 'Periodo I (Ciclos Impares: 1,3,5,7,9)' },
+              { valor: 'II', etiqueta: 'Periodo II (Ciclos Pares: 2,4,6,8,10)' },
+              { valor: 'III', etiqueta: 'Periodo III (Extraordinario - Sin Ciclos)' }
+            ]}
+          />
           
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <CampoTexto
@@ -251,6 +291,19 @@ export default function PeriodosPage() {
               { valor: 'CERRADO', etiqueta: 'Cerrado (Histórico)' }
             ]}
           />
+
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              id="periodo-activo"
+              checked={formulario.activo}
+              onChange={(e) => setFormulario({ ...formulario, activo: e.target.checked })}
+              className="w-5 h-5 text-unt-primary focus:ring-unt-primary border-slate-300 rounded"
+            />
+            <label htmlFor="periodo-activo" className="text-sm font-medium text-slate-700">
+              Establecer como período activo (desactivará otros períodos)
+            </label>
+          </div>
 
           <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
             <Boton type="button" variant="outline" onClick={() => setModalAbierto(false)} className="rounded-xl px-6">

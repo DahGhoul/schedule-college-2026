@@ -28,16 +28,17 @@ export default function DashboardPage() {
     enabled: usuario?.rol === 'DIRECTOR'
   });
 
-  const alertaAmbientes = useMemo(() => {
-    if (!solicitudesPendientes) return null;
-    return solicitudesPendientes.length > 5 ? {
-      nivel: 'critico',
-      mensaje: `¡Alerta! Hay ${solicitudesPendientes.length} horarios sin ambiente asignado. Se requiere buscar nuevos ambientes urgentemente.`,
-    } : solicitudesPendientes.length > 0 ? {
-      nivel: 'advertencia',
-      mensaje: `Hay ${solicitudesPendientes.length} solicitudes de aula pendientes de revisión.`,
-    } : null;
-  }, [solicitudesPendientes]);
+  // const alertaAmbientes = useMemo(() => {
+  //   if (!solicitudesPendientes) return null;
+  //   return solicitudesPendientes.length > 5 ? {
+  //     nivel: 'critico',
+  //     mensaje: `¡Alerta! Hay ${solicitudesPendientes.length} horarios sin ambiente asignado. Se requiere buscar nuevos ambientes urgentemente.`,
+  //   } : solicitudesPendientes.length > 0 ? {
+  //     nivel: 'advertencia',
+  //     mensaje: `Hay ${solicitudesPendientes.length} solicitudes de aula pendientes de revisión.`,
+  //   } : null;
+  // }, [solicitudesPendientes]);
+  const alertaAmbientes = null;
 
   const { data: periodoActivo, isLoading: periodoLoading } = useQuery({
     queryKey: ['periodo-activo-admin'],

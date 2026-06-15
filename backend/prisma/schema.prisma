@@ -59,6 +59,12 @@ enum TipoFormato {
   HORARIO_SEMANAL_DOCENTE
 }
 
+enum TipoPeriodo {
+  I
+  II
+  III
+}
+
 // ============================================================
 // 0. DATOS INSTITUCIONALES Y SEDES
 // ============================================================
@@ -158,10 +164,11 @@ model docente {
 model periodo_academico {
   id              Int                @id @default(autoincrement()) @map("id_periodo")
   nombre          String             @unique @db.VarChar(20)   // "2026-I"
+  tipo            TipoPeriodo        @default(I)
   fecha_inicio    DateTime           @db.Date
   fecha_fin       DateTime           @db.Date
   estado          String             @default("BORRADOR") @db.VarChar(20)
-  activo          Boolean            @default(true)
+  activo          Boolean            @default(false) // Changed default to false since only one should be active
   id_sede         Int?
   sede            sede?              @relation(fields: [id_sede], references: [id])
   ciclos          ciclo[]

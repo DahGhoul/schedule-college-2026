@@ -56,9 +56,6 @@ export function Sidebar() {
     { href: '/dashboard/director/oferta-academica', etiqueta: 'Oferta Académica', Icono: GraduationCap },
     { href: '/dashboard/director/oferta-ciclos', etiqueta: 'Oferta por Ciclos', Icono: LayoutGrid },
     { href: '/dashboard/director/carga-horaria', etiqueta: 'Asignación de Carga', Icono: Clock },
-    { href: '/dashboard/director/solicitudes-aula', etiqueta: 'Solicitudes de Aula', Icono: MapPin },
-    //{ href: '/dashboard/horarios', etiqueta: 'Generador Horarios', Icono: Calendar },
-    { href: '/dashboard/horarios/publicar', etiqueta: 'Publicar Horarios', Icono: Send },
   ];
 
   const enlacesSecretaria = [

@@ -11,7 +11,7 @@ import { Boton } from '@/components/ui/Boton';
 import { useAuthStore } from '@/stores/auth.store';
 import { useRouter } from 'next/navigation';
 import { FileText, Clock, ArrowLeft } from 'lucide-react';
-import { CalendarioGeneralConNoLectiva } from '@/components/horarios/CalendarioGeneralConNoLectiva';
+import { CalendarioGeneralConNoLectivos } from '@/components/horarios/CalendarioGeneralConNoLectivos';
 
 export default function VistaHorarioDocentePage() {
   const router = useRouter();
@@ -147,7 +147,7 @@ export default function VistaHorarioDocentePage() {
           </div>
 
           <div className="bg-white rounded-[1.5rem] shadow-sm border border-slate-200 overflow-hidden">
-            <CalendarioGeneralConNoLectiva idPeriodo={idPeriodo} idDocente={docenteSeleccionado} />
+            <CalendarioGeneralConNoLectivos idPeriodo={idPeriodo} idDocente={docenteSeleccionado} />
           </div>
         </div>
       ) : (

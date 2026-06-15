@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { TipoComponente } from '@prisma/client';
+import { PeriodosService } from '../periodos/periodos.service';
 
 export class CargaHorariaService {
   /**
@@ -375,9 +376,19 @@ export class CargaHorariaService {
    * Obtener ciclos de un período específico que tengan oferta académica activa
    */
   static async obtenerCiclosPorPeriodo(id_periodo: number) {
+    // First get allowed cycle numbers from the period's type
+    const periodo = await prisma.periodo_academico.findUnique({
+      where: { id: id_periodo }
+    });
+    
+    if (!periodo) return [];
+    
+    const allowedNumbers = PeriodosService.getNumerosCiclosPermitidos(periodo.tipo);
+    
     return prisma.ciclo.findMany({
       where: { 
         id_periodo,
+        numero: { in: allowedNumbers },
         ofertas: {
           some: {
             estado: { not: 'ELIMINADO' }

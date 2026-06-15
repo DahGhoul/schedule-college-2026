@@ -17,14 +17,14 @@ export const Selector = forwardRef<HTMLSelectElement, SelectorProps>(
           <select
             ref={ref}
             className={cn(
-              "block w-full h-full appearance-none rounded-2xl border border-slate-200 bg-slate-50 px-4 pr-10 text-[11px] font-black uppercase tracking-widest text-slate-600 transition-all duration-300 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 focus:outline-none cursor-pointer hover:border-slate-300",
+              "block w-full h-full appearance-none rounded-2xl border border-slate-200 bg-slate-50 px-4 pr-10 text-sm font-medium normal-case text-slate-600 transition-all duration-300 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 focus:outline-none cursor-pointer hover:border-slate-300 truncate",
               error ? "border-red-500 focus:border-red-500 focus:ring-red-500/10" : "",
               className
             )}
             {...props}
           >
             {opciones?.length ? opciones.map((op) => (
-              <option key={op.valor} value={op.valor} className="font-sans text-sm normal-case tracking-normal py-2">
+              <option key={op.valor} value={op.valor} className="font-sans text-sm normal-case tracking-normal py-2 truncate">
                 {op.etiqueta}
               </option>
             )) : children}

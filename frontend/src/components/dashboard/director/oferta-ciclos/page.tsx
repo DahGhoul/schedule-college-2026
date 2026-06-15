@@ -40,7 +40,7 @@ export default function OfertaPorCiclosPage() {
   // Obtener ciclos del periodo activo
   const { data: ciclos, isLoading: isLoadingCiclos } = useQuery({
     queryKey: ['ciclos', periodoActivo?.id],
-    queryFn: () => cargaHorariaService.obtenerCiclosPorPeriodo(periodoActivo.id).then(res => res.data),
+    queryFn: () => periodosService.obtenerCiclosActivo().then(res => res.data),
     enabled: !!periodoActivo,
   });
 
@@ -82,16 +82,23 @@ export default function OfertaPorCiclosPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <LayoutGrid className="w-8 h-8 text-unt-primary" />
-            Oferta por Ciclos
-          </h1>
-          <p className="text-slate-500 mt-1">
-            Visualiza los cursos y componentes asignados a cada ciclo académico.
-          </p>
+    <div className="space-y-8 max-w-[1800px] mx-auto pb-20 animate-in fade-in duration-500">
+      {/* Header Estilo Classroom */}
+      <div className="relative overflow-hidden rounded-[3rem] bg-gradient-to-br from-[#0b1f3a] via-[#123b6d] to-[#0f4c81] px-10 py-12 text-white shadow-2xl">
+        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/10 blur-3xl pointer-events-none" />
+        <div className="absolute -left-10 -bottom-10 h-40 w-40 rounded-full bg-white/5 blur-2xl pointer-events-none" />
+        
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-end justify-between gap-8">
+          <div className="space-y-4">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/10 backdrop-blur-md rounded-full border border-white/20 text-xs font-bold uppercase tracking-widest text-white/90">
+              <LayoutGrid className="w-3.5 h-3.5" />
+              Catálogo por Ciclo
+            </div>
+            <h1 className="text-4xl font-extrabold tracking-tight">Oferta por Ciclos</h1>
+            <p className="text-lg text-white/70 max-w-2xl">
+              Visualiza los cursos, componentes y distribución por grupos de cada ciclo académico del periodo.
+            </p>
+          </div>
         </div>
       </div>
 

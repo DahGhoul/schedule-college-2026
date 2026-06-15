@@ -10,7 +10,7 @@ import { Selector } from '@/components/ui/Selector';
 import { Modal } from '@/components/ui/Modal';
 import { NotificacionToast } from '@/components/ui/NotificacionToast';
 import { TablaDatos } from '@/components/ui/TablaDatos';
-import { UserPlus, Search, Mail, Phone, Briefcase, GraduationCap, Calendar, Edit2 } from 'lucide-react';
+import { UserPlus, Search, Mail, Phone, Briefcase, GraduationCap, Calendar, Edit2, Users } from 'lucide-react';
 
 export default function GestionDocentesPage() {
   const queryClient = useQueryClient();
@@ -200,28 +200,42 @@ export default function GestionDocentesPage() {
   ];
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
-        <div>
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Gestión de Docentes</h1>
-          <p className="text-slate-500 mt-1">Registro de plana docente y configuración de carga lectiva.</p>
-        </div>
-        <div className="flex w-full sm:w-auto gap-3">
-          <div className="relative flex-1 sm:w-72">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Buscar docente..."
-              value={buscar}
-              onChange={(e) => setBuscar(e.target.value)}
-              className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-4 focus:ring-unt-primary/5 focus:border-unt-primary transition-all bg-white shadow-sm"
-            />
+    <div className="space-y-8 max-w-[1800px] mx-auto pb-20 animate-in fade-in duration-500">
+      {/* Header Estilo Classroom */}
+      <div className="relative overflow-hidden rounded-[3rem] bg-gradient-to-br from-[#0b1f3a] via-[#123b6d] to-[#0f4c81] px-10 py-12 text-white shadow-2xl">
+        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/10 blur-3xl pointer-events-none" />
+        <div className="absolute -left-10 -bottom-10 h-40 w-40 rounded-full bg-white/5 blur-2xl pointer-events-none" />
+        
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-end justify-between gap-8">
+          <div className="space-y-4">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/10 backdrop-blur-md rounded-full border border-white/20 text-xs font-bold uppercase tracking-widest text-white/90">
+              <Users className="w-3.5 h-3.5" />
+              Gestión de Personal
+            </div>
+            <h1 className="text-4xl font-extrabold tracking-tight">Gestión de Docentes</h1>
+            <p className="text-lg text-white/70 max-w-2xl">
+              Registro de plana docente y configuración de límites de carga lectiva por periodo académico.
+            </p>
           </div>
-          <Boton onClick={() => { resetForm(); setModalAbierto(true); }} className="rounded-2xl px-6 shadow-lg shadow-unt-primary/20">
-            <UserPlus className="w-4 h-4 mr-2" />
-            Nuevo Docente
-          </Boton>
         </div>
+      </div>
+
+      {/* Barra de Acciones y Búsqueda */}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+        <div className="relative flex-1 w-full lg:w-auto">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Buscar docente por nombre, apellido o correo..."
+            value={buscar}
+            onChange={(e) => setBuscar(e.target.value)}
+            className="w-full pl-11 pr-4 py-4 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-4 focus:ring-unt-primary/5 focus:border-unt-primary transition-all bg-white shadow-sm"
+          />
+        </div>
+        <Boton onClick={() => { resetForm(); setModalAbierto(true); }} className="rounded-2xl px-8 py-4 shadow-lg shadow-unt-primary/20">
+          <UserPlus className="w-5 h-5 mr-2" />
+          Nuevo Docente
+        </Boton>
       </div>
 
       <Card className="border-none shadow-xl shadow-slate-200/50 rounded-[2.5rem] overflow-hidden">

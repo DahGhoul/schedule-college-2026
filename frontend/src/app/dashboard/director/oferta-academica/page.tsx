@@ -11,7 +11,7 @@ import { Boton } from '@/components/ui/Boton';
 import { CampoTexto } from '@/components/ui/CampoTexto';
 import { NotificacionToast } from '@/components/ui/NotificacionToast';
 import { SelectorFiltrable } from '@/components/ui/SelectorFiltrable';
-import { Plus, Trash2, Save, Clock } from 'lucide-react';
+import { Plus, Trash2, Save, Clock, GraduationCap } from 'lucide-react';
 
 export default function OfertaAcademicaPage() {
   const queryClient = useQueryClient();
@@ -53,6 +53,12 @@ export default function OfertaAcademicaPage() {
   const { data: ciclosConOferta } = useQuery({
     queryKey: ['ciclos-con-oferta', idPeriodo],
     queryFn: () => cargaHorariaService.obtenerCiclosPorPeriodo(idPeriodo).then(res => res.data),
+    enabled: idPeriodo > 0
+  });
+
+  const { data: ciclosDisponibles } = useQuery({
+    queryKey: ['ciclos-disponibles', idPeriodo],
+    queryFn: () => periodosService.obtenerCiclosPorPeriodo(idPeriodo).then(res => res.data),
     enabled: idPeriodo > 0
   });
 
@@ -158,11 +164,23 @@ export default function OfertaAcademicaPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">Oferta Académica</h1>
-          <p className="text-gray-500 text-sm">Configura los cursos que se dictarán en el periodo y sus componentes.</p>
+    <div className="space-y-8 max-w-[1800px] mx-auto pb-20 animate-in fade-in duration-500">
+      {/* Header Estilo Classroom */}
+      <div className="relative overflow-hidden rounded-[3rem] bg-gradient-to-br from-[#0b1f3a] via-[#123b6d] to-[#0f4c81] px-10 py-12 text-white shadow-2xl">
+        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/10 blur-3xl pointer-events-none" />
+        <div className="absolute -left-10 -bottom-10 h-40 w-40 rounded-full bg-white/5 blur-2xl pointer-events-none" />
+        
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-end justify-between gap-8">
+          <div className="space-y-4">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/10 backdrop-blur-md rounded-full border border-white/20 text-xs font-bold uppercase tracking-widest text-white/90">
+              <GraduationCap className="w-3.5 h-3.5" />
+              Configuración Académica
+            </div>
+            <h1 className="text-4xl font-extrabold tracking-tight">Oferta Académica</h1>
+            <p className="text-lg text-white/70 max-w-2xl">
+              Configura los cursos que se dictarán en el periodo, sus componentes y distribución por grupos.
+            </p>
+          </div>
         </div>
       </div>
 
@@ -190,9 +208,8 @@ export default function OfertaAcademicaPage() {
               disabled={!idPeriodo}
             >
               <option value={0}>Seleccione un ciclo</option>
-              {/* Solo mostrar ciclos 1-10 por defecto, pero podrías usar ciclosConOferta si quieres filtrar aquí también */}
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
-                <option key={n} value={n}>Ciclo {n}</option>
+              {ciclosDisponibles?.map((c: any) => (
+                <option key={c.id} value={c.id}>Ciclo {c.numero}</option>
               ))}
             </Selector>
 
