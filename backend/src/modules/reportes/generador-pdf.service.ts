@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma';
 import PDFDocument from 'pdfkit';
 import { crearContextoHorarioCiclo, formatearEtiquetaCelda, obtenerColorCurso } from './horario-ciclo.utils';
 
-const BORDER_COLOR = '#94A3B8'; // Darker grey border
+const BORDER_COLOR = '#000000'; // Black border
 
 function formatearFranjaHora(horaInicio: string): string {
   const [horas, minutos] = horaInicio.split(':');
@@ -33,9 +33,6 @@ function formatearEtiquetaCeldaPdf(registro: any, bloque: any, esHorarioDocente:
     }
   }
 
-  const esTeoria = bloque?.componente?.tipo === 'TEORIA';
-  const grupoEtiqueta = (!esTeoria && bloque?.grupo?.codigo) ? `Gr. ${bloque.grupo.codigo}` : '';
-
   if (esHorarioDocente) {
     // Para horario de docente: mostrar índice, ciclo (número real), tipo y ambiente
     const cicloNumero = bloque?.componente?.oferta?.ciclo?.numero;
@@ -51,10 +48,9 @@ function formatearEtiquetaCeldaPdf(registro: any, bloque: any, esHorarioDocente:
     return [cursoNombre].filter(Boolean).join('\n');
   }
 
-  const partes = [String(registro.indice), cursoNombre];
-  if (grupoEtiqueta) {
-    partes.push(grupoEtiqueta);
-  }
+  // Para horario de ciclo: mostrar índice y ambiente
+  const ambienteEtiqueta = bloque?.ambiente?.codigo || 'Solic.';
+  const partes = [String(registro.indice), ambienteEtiqueta];
   return partes.filter(Boolean).join('\n');
 }
 
@@ -187,8 +183,8 @@ export class GeneradorPdfService {
     doc.font('Helvetica-Bold').fontSize(7);
     let currentX = tableStartX;
     detailHeaders.forEach((h, i) => {
-      doc.rect(currentX, currentY, colWidths[i], 12).fill('#1E293B').stroke('#1E293B');
-      doc.fillColor('white').text(h, currentX, currentY + 3, { width: colWidths[i], align: 'center' });
+      doc.rect(currentX, currentY, colWidths[i], 12).fill('#D9D2E9').stroke(BORDER_COLOR);
+      doc.fillColor('black').text(h, currentX, currentY + 3, { width: colWidths[i], align: 'center' });
       currentX += colWidths[i];
     });
     currentY += 12;
@@ -251,7 +247,7 @@ export class GeneradorPdfService {
       doc.font('Helvetica').fontSize(6).fillColor('black');
       rowData.forEach((val, i) => {
         doc.rect(currentX, currentY, colWidths[i], 10).fill(`#${info.color.slice(2)}`).stroke(BORDER_COLOR);
-        doc.fillColor('#334155').text(val, currentX, currentY + 2, {
+        doc.fillColor('black').text(val, currentX, currentY + 2, {
           width: colWidths[i],
           height: 10,
           align: i === 1 ? 'left' : 'center',
@@ -273,18 +269,18 @@ export class GeneradorPdfService {
     const gridRowHeight = 32;
 
     doc.font('Helvetica-Bold').fontSize(8);
-    doc.rect(leftColX, horarioTop, gridColWidth, 15).fill('#334155').stroke('#334155');
-    doc.fillColor('white').text('HORA', leftColX, horarioTop + 3, { width: gridColWidth, align: 'center' });
+    doc.rect(leftColX, horarioTop, gridColWidth, 15).fill('#D9D2E9').stroke(BORDER_COLOR);
+    doc.fillColor('black').text('HORA', leftColX, horarioTop + 3, { width: gridColWidth, align: 'center' });
     dias.forEach((dia, i) => {
       const x = leftColX + (i + 1) * gridColWidth;
-      doc.rect(x, horarioTop, gridColWidth, 15).fill('#334155').stroke('#334155');
-      doc.fillColor('white').text(dia, x, horarioTop + 3, { width: gridColWidth, align: 'center' });
+      doc.rect(x, horarioTop, gridColWidth, 15).fill('#D9D2E9').stroke(BORDER_COLOR);
+      doc.fillColor('black').text(dia, x, horarioTop + 3, { width: gridColWidth, align: 'center' });
     });
 
     let y = horarioTop + 15;
     horas.forEach((hora, horaIndex) => {
       doc.rect(leftColX, y, gridColWidth, gridRowHeight).stroke(BORDER_COLOR);
-      doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(7).text(formatearFranjaHora(hora), leftColX, y + 8, { width: gridColWidth, align: 'center' });
+      doc.fillColor('black').font('Helvetica-Bold').fontSize(7).text(formatearFranjaHora(hora), leftColX, y + 8, { width: gridColWidth, align: 'center' });
       dias.forEach((dia, dIdx) => {
         const x = leftColX + (dIdx + 1) * gridColWidth;
         const slotKey = `${dia}-${hora}`;
@@ -315,7 +311,7 @@ export class GeneradorPdfService {
             const textHeight = 20;
             
             const textoY = y + (altoCelda / 2) - (textHeight / 2);
-            doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(5).text(texto, blockLeft + 2, textoY, {
+            doc.fillColor('black').font('Helvetica-Bold').fontSize(5).text(texto, blockLeft + 2, textoY, {
               width: textWidth,
               align: 'center',
               lineBreak: true,
@@ -374,8 +370,8 @@ export class GeneradorPdfService {
 
     doc.font('Helvetica-Bold').fontSize(7);
     detailHeaders.forEach((h, i) => {
-      doc.rect(currentX, currentY, colWidths[i], 12).fill('#1E293B').stroke('#1E293B');
-      doc.fillColor('white').text(h, currentX, currentY + 3, { width: colWidths[i], align: 'center' });
+      doc.rect(currentX, currentY, colWidths[i], 12).fill('#D9D2E9').stroke(BORDER_COLOR);
+      doc.fillColor('black').text(h, currentX, currentY + 3, { width: colWidths[i], align: 'center' });
       currentX += colWidths[i];
     });
     currentY += 12;
@@ -420,7 +416,7 @@ export class GeneradorPdfService {
       doc.font('Helvetica').fontSize(6).fillColor('black');
       rowData.forEach((val, i) => {
         doc.rect(currentX, currentY, colWidths[i], 10).fill(`#${info.color.slice(2)}`).stroke(BORDER_COLOR);
-        doc.fillColor('#334155').text(val, currentX, currentY + 2, {
+        doc.fillColor('black').text(val, currentX, currentY + 2, {
           width: colWidths[i],
           height: 10,
           align: i === 1 || i === 2 ? 'left' : 'center',
@@ -446,19 +442,19 @@ export class GeneradorPdfService {
     const gridRowHeight = 32; // Increased height a bit more
 
     doc.font('Helvetica-Bold').fontSize(8);
-    doc.rect(leftColX, horarioTop, gridColWidth, 15).fill('#334155').stroke('#334155');
-    doc.fillColor('white').text('HORA', leftColX, horarioTop + 3, { width: gridColWidth, align: 'center' });
+    doc.rect(leftColX, horarioTop, gridColWidth, 15).fill('#D9D2E9').stroke(BORDER_COLOR);
+    doc.fillColor('black').text('HORA', leftColX, horarioTop + 3, { width: gridColWidth, align: 'center' });
 
     dias.forEach((dia, i) => {
       const x = leftColX + (i + 1) * gridColWidth;
-      doc.rect(x, horarioTop, gridColWidth, 15).fill('#334155').stroke('#334155');
-      doc.fillColor('white').text(dia, x, horarioTop + 3, { width: gridColWidth, align: 'center' });
+      doc.rect(x, horarioTop, gridColWidth, 15).fill('#D9D2E9').stroke(BORDER_COLOR);
+      doc.fillColor('black').text(dia, x, horarioTop + 3, { width: gridColWidth, align: 'center' });
     });
 
     let y = horarioTop + 15;
     horas.forEach((hora, horaIndex) => {
       doc.rect(leftColX, y, gridColWidth, gridRowHeight).stroke(BORDER_COLOR);
-      doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(7).text(formatearFranjaHora(hora), leftColX, y + 8, { width: gridColWidth, align: 'center' });
+      doc.fillColor('black').font('Helvetica-Bold').fontSize(7).text(formatearFranjaHora(hora), leftColX, y + 8, { width: gridColWidth, align: 'center' });
 
       dias.forEach((dia, dIdx) => {
         const x = leftColX + (dIdx + 1) * gridColWidth;
@@ -496,7 +492,7 @@ export class GeneradorPdfService {
             const textHeight = 20; // Approximate text height for 2-3 lines
             
             const textoY = y + (altoCelda / 2) - (textHeight / 2);
-            doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(5).text(texto, blockLeft + 2, textoY, {
+            doc.fillColor('black').font('Helvetica-Bold').fontSize(5).text(texto, blockLeft + 2, textoY, {
               width: textWidth,
               align: 'center',
               lineBreak: true,
@@ -590,8 +586,8 @@ export class GeneradorPdfService {
     doc.font('Helvetica-Bold').fontSize(7);
     let currentX = tableStartX;
     detailHeaders.forEach((h, i) => {
-      doc.rect(currentX, currentY, colWidths[i], 12).fill('#1E293B').stroke('#1E293B');
-      doc.fillColor('white').text(h, currentX, currentY + 3, { width: colWidths[i], align: 'center' });
+      doc.rect(currentX, currentY, colWidths[i], 12).fill('#D9D2E9').stroke(BORDER_COLOR);
+      doc.fillColor('black').text(h, currentX, currentY + 3, { width: colWidths[i], align: 'center' });
       currentX += colWidths[i];
     });
     currentY += 12;
@@ -638,7 +634,7 @@ export class GeneradorPdfService {
       doc.font('Helvetica').fontSize(6).fillColor('black');
       rowData.forEach((val, i) => {
         doc.rect(currentX, currentY, colWidths[i], 10).fill(info.color).stroke(BORDER_COLOR);
-        doc.fillColor('#334155').text(val, currentX, currentY + 2, { width: colWidths[i], align: i === 1 || i === 2 ? 'left' : 'center', ellipsis: true });
+        doc.fillColor('black').text(val, currentX, currentY + 2, { width: colWidths[i], align: i === 1 || i === 2 ? 'left' : 'center', ellipsis: true });
         currentX += colWidths[i];
       });
       currentY += 10;
@@ -691,19 +687,19 @@ export class GeneradorPdfService {
     const gridRowHeight = 32; // Increased height a bit more
 
     doc.font('Helvetica-Bold').fontSize(8);
-    doc.rect(leftColX, horarioTop, gridColWidth, 15).fill('#334155').stroke('#334155');
-    doc.fillColor('white').text('HORA', leftColX, horarioTop + 3, { width: gridColWidth, align: 'center' });
+    doc.rect(leftColX, horarioTop, gridColWidth, 15).fill('#D9D2E9').stroke(BORDER_COLOR);
+    doc.fillColor('black').text('HORA', leftColX, horarioTop + 3, { width: gridColWidth, align: 'center' });
     dias.forEach((dia, i) => {
       const x = leftColX + (i + 1) * gridColWidth;
-      doc.rect(x, horarioTop, gridColWidth, 15).fill('#334155').stroke('#334155');
-      doc.fillColor('white').text(dia, x, horarioTop + 3, { width: gridColWidth, align: 'center' });
+      doc.rect(x, horarioTop, gridColWidth, 15).fill('#D9D2E9').stroke(BORDER_COLOR);
+      doc.fillColor('black').text(dia, x, horarioTop + 3, { width: gridColWidth, align: 'center' });
     });
 
     const slotsOcupados = new Set<string>();
     let y = horarioTop + 15;
     horas.forEach((hora, horaIndex) => {
       doc.rect(leftColX, y, gridColWidth, gridRowHeight).stroke(BORDER_COLOR);
-      doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(7).text(formatearFranjaHora(hora), leftColX, y + 8, { width: gridColWidth, align: 'center' });
+      doc.fillColor('black').font('Helvetica-Bold').fontSize(7).text(formatearFranjaHora(hora), leftColX, y + 8, { width: gridColWidth, align: 'center' });
       dias.forEach((dia, dIdx) => {
         const x = leftColX + (dIdx + 1) * gridColWidth;
         const slotKey = `${dia}-${hora}`;
@@ -740,7 +736,7 @@ export class GeneradorPdfService {
             const textHeight = 20; // Approximate text height for 2-3 lines
             
             const textoY = y + (altoCelda / 2) - (textHeight / 2);
-            doc.fillColor('#1E293B').font('Helvetica-Bold').fontSize(5).text(texto, blockLeft + 2, textoY, {
+            doc.fillColor('black').font('Helvetica-Bold').fontSize(5).text(texto, blockLeft + 2, textoY, {
               width: textWidth,
               align: 'center',
               lineBreak: true,
@@ -840,8 +836,8 @@ export class GeneradorPdfService {
       
       doc.font('Helvetica-Bold').fontSize(9);
       headers.forEach((h, i) => {
-        doc.rect(colX[i], tableTop, colX[i+1] - colX[i], 15).fill('#1E293B').stroke('#1E293B');
-        doc.fillColor('white').text(h, colX[i], tableTop + 4, { width: colX[i+1] - colX[i], align: 'center' });
+        doc.rect(colX[i], tableTop, colX[i+1] - colX[i], 15).fill('#D9D2E9').stroke(BORDER_COLOR);
+        doc.fillColor('black').text(h, colX[i], tableTop + 4, { width: colX[i+1] - colX[i], align: 'center' });
       });
 
       let currentY = tableTop + 15;
