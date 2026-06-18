@@ -35,7 +35,7 @@ export class GeneradorExcelService {
      });
 
     // Definir columnas para cabecera, detalle y grilla
-    const colWidths = [15, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12];
+    const colWidths = [15, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12];
     colWidths.forEach((w, i) => {
       worksheet.getColumn(i + 1).width = w;
     });
@@ -151,21 +151,22 @@ export class GeneradorExcelService {
 
     // --- FILA 2: HORARIO ---
     const startRowHorario = Math.max(currentRowDetail + 2, 12);
-    const dias = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES'];
+    const dias = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
     const horas = [
       '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00',
       '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'
     ];
 
-    // Header horario (A-L -> 12 cols, 2 por día aprox)
-    // Col 1-2: Hora, Col 3-4: Lunes, Col 5-6: Martes, Col 7-8: Miércoles, Col 9-10: Jueves, Col 11-12: Viernes
+    // Header horario (A-N -> 14 cols, 2 por día aprox)
+    // Col 1-2: Hora, Col 3-4: Lunes, Col 5-6: Martes, Col 7-8: Miércoles, Col 9-10: Jueves, Col 11-12: Viernes, Col 13-14: Sábado
     const gridCols = [
       { start: 1, end: 2, label: 'HORA' },
       { start: 3, end: 4, label: 'LUNES' },
       { start: 5, end: 6, label: 'MARTES' },
       { start: 7, end: 8, label: 'MIÉRCOLES' },
       { start: 9, end: 10, label: 'JUEVES' },
-      { start: 11, end: 12, label: 'VIERNES' }
+      { start: 11, end: 12, label: 'VIERNES' },
+      { start: 13, end: 14, label: 'SÁBADO' }
     ];
 
     gridCols.forEach(col => {
@@ -173,7 +174,7 @@ export class GeneradorExcelService {
       const cell = worksheet.getCell(startRowHorario, col.start);
       cell.value = col.label;
       cell.font = { bold: true, size: 10, color: { argb: 'FF000000' } };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D2E9' } }; // Morado claro
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } }; // Blanco
       cell.alignment = { horizontal: 'center', vertical: 'middle' };
       cell.border = { 
         top: { style: 'thin', color: { argb: 'FF000000' } }, 
@@ -373,7 +374,7 @@ export class GeneradorExcelService {
       const cell = worksheet.getCell(startRowHorario, col.s);
       cell.value = col.l;
       cell.font = { bold: true, size: 9, color: { argb: 'FF000000' } };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D2E9' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } }; // Blanco
       cell.alignment = { horizontal: 'center', vertical: 'middle' };
       cell.border = { 
         top: { style: 'thin', color: { argb: 'FF000000' } }, 

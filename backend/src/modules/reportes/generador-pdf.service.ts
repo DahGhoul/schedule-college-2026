@@ -269,27 +269,42 @@ export class GeneradorPdfService {
     const gridRowHeight = 32;
 
     doc.font('Helvetica-Bold').fontSize(8);
-    doc.rect(leftColX, horarioTop, gridColWidth, 15).fill('#D9D2E9').stroke(BORDER_COLOR);
+    doc.rect(leftColX, horarioTop, gridColWidth, 15).fill('#FFFFFF').stroke(BORDER_COLOR);
     doc.fillColor('black').text('HORA', leftColX, horarioTop + 3, { width: gridColWidth, align: 'center' });
     dias.forEach((dia, i) => {
       const x = leftColX + (i + 1) * gridColWidth;
-      doc.rect(x, horarioTop, gridColWidth, 15).fill('#D9D2E9').stroke(BORDER_COLOR);
+      doc.rect(x, horarioTop, gridColWidth, 15).fill('#FFFFFF').stroke(BORDER_COLOR);
       doc.fillColor('black').text(dia, x, horarioTop + 3, { width: gridColWidth, align: 'center' });
     });
 
     let y = horarioTop + 15;
+    doc.lineWidth(1); // Consistent line width
+    
+    // First, draw all base grid cells
     horas.forEach((hora, horaIndex) => {
       doc.rect(leftColX, y, gridColWidth, gridRowHeight).stroke(BORDER_COLOR);
       doc.fillColor('black').font('Helvetica-Bold').fontSize(7).text(formatearFranjaHora(hora), leftColX, y + 8, { width: gridColWidth, align: 'center' });
+      
+      dias.forEach((dia, dIdx) => {
+        const x = leftColX + (dIdx + 1) * gridColWidth;
+        doc.rect(x, y, gridColWidth, gridRowHeight).stroke(BORDER_COLOR);
+      });
+      
+      y += gridRowHeight;
+    });
+    
+    // Now draw schedule blocks
+    y = horarioTop + 15;
+    const newSlotsOcupados = new Set<string>();
+    
+    horas.forEach((hora, horaIndex) => {
       dias.forEach((dia, dIdx) => {
         const x = leftColX + (dIdx + 1) * gridColWidth;
         const slotKey = `${dia}-${hora}`;
-        if (slotsOcupados.has(slotKey)) {
+        
+        if (newSlotsOcupados.has(slotKey)) {
           return;
         }
-
-        doc.lineWidth(1.5);
-        doc.rect(x, y, gridColWidth, gridRowHeight).stroke(BORDER_COLOR);
         
         const entradas = contexto.celdas[slotKey] ?? [];
         
@@ -299,8 +314,7 @@ export class GeneradorPdfService {
             span = calcularFusionPdf(contexto.celdas, dia, horaIndex, horas, entradas[0].bloque);
           }
           const altoCelda = gridRowHeight * span;
-
-          // Draw each block separately (horizontally)
+          
           const blockWidth = gridColWidth / entradas.length;
           entradas.forEach((celda, idx) => {
             const blockLeft = x + idx * blockWidth;
@@ -309,8 +323,8 @@ export class GeneradorPdfService {
             const texto = formatearEtiquetaCeldaPdf(celda.registro, celda.bloque, true);
             const textWidth = blockWidth - 4;
             const textHeight = 20;
-            
             const textoY = y + (altoCelda / 2) - (textHeight / 2);
+            
             doc.fillColor('black').font('Helvetica-Bold').fontSize(5).text(texto, blockLeft + 2, textoY, {
               width: textWidth,
               align: 'center',
@@ -319,14 +333,15 @@ export class GeneradorPdfService {
               ellipsis: false
             });
           });
-
+          
           if (span > 1) {
             for (let offset = 1; offset < span; offset++) {
-              slotsOcupados.add(`${dia}-${horas[horaIndex + offset]}`);
+              newSlotsOcupados.add(`${dia}-${horas[horaIndex + offset]}`);
             }
           }
         }
       });
+      
       y += gridRowHeight;
     });
   }
@@ -397,7 +412,6 @@ export class GeneradorPdfService {
     });
 
     const contexto = crearContextoHorarioCiclo(bloques as any[]);
-    const slotsOcupados = new Set<string>();
 
     for (const info of contexto.registros) {
       const rowData = [
@@ -442,66 +456,72 @@ export class GeneradorPdfService {
     const gridRowHeight = 32; // Increased height a bit more
 
     doc.font('Helvetica-Bold').fontSize(8);
-    doc.rect(leftColX, horarioTop, gridColWidth, 15).fill('#D9D2E9').stroke(BORDER_COLOR);
+    doc.rect(leftColX, horarioTop, gridColWidth, 15).fill('#FFFFFF').stroke(BORDER_COLOR);
     doc.fillColor('black').text('HORA', leftColX, horarioTop + 3, { width: gridColWidth, align: 'center' });
 
     dias.forEach((dia, i) => {
       const x = leftColX + (i + 1) * gridColWidth;
-      doc.rect(x, horarioTop, gridColWidth, 15).fill('#D9D2E9').stroke(BORDER_COLOR);
+      doc.rect(x, horarioTop, gridColWidth, 15).fill('#FFFFFF').stroke(BORDER_COLOR);
       doc.fillColor('black').text(dia, x, horarioTop + 3, { width: gridColWidth, align: 'center' });
     });
 
     let y = horarioTop + 15;
+    doc.lineWidth(1); // Consistent line width for all borders
+    
+    // First, draw all base grid cells (including empty ones)
     horas.forEach((hora, horaIndex) => {
       doc.rect(leftColX, y, gridColWidth, gridRowHeight).stroke(BORDER_COLOR);
       doc.fillColor('black').font('Helvetica-Bold').fontSize(7).text(formatearFranjaHora(hora), leftColX, y + 8, { width: gridColWidth, align: 'center' });
-
+      
+      dias.forEach((dia, dIdx) => {
+        const x = leftColX + (dIdx + 1) * gridColWidth;
+        doc.rect(x, y, gridColWidth, gridRowHeight).stroke(BORDER_COLOR);
+      });
+      
+      y += gridRowHeight;
+    });
+    
+    // Now draw the actual schedule blocks on top
+    y = horarioTop + 15;
+    const slotsOcupados = new Set<string>();
+    
+    horas.forEach((hora, horaIndex) => {
       dias.forEach((dia, dIdx) => {
         const x = leftColX + (dIdx + 1) * gridColWidth;
         const slotKey = `${dia}-${hora}`;
+        
         if (slotsOcupados.has(slotKey)) {
           return;
         }
-
-        // Draw grid with thicker lines
-        doc.lineWidth(1.5);
-        // ALWAYS draw base grid cell border
-        doc.rect(x, y, gridColWidth, gridRowHeight).stroke(BORDER_COLOR);
         
         const entradas = contexto.celdas[slotKey] ?? [];
         
         if (entradas.length > 0) {
-          // Calculate span first
           let span = 1;
           if (entradas.length === 1) {
             span = calcularFusionPdf(contexto.celdas, dia, horaIndex, horas, entradas[0].bloque);
           }
           const altoCelda = gridRowHeight * span;
-
-          // Draw each block separately (horizontally)
+          
           const blockWidth = gridColWidth / entradas.length;
           entradas.forEach((celda, idx) => {
             const blockLeft = x + idx * blockWidth;
-            // Draw block background, then a slightly different (or same) border on top of grid
             doc.rect(blockLeft, y, blockWidth, altoCelda).fill(`#${celda.registro.color.slice(2)}`).stroke(BORDER_COLOR);
             
-            // Draw text vertically centered
             const texto = formatearEtiquetaCeldaPdf(celda.registro, celda.bloque);
-            // Calculate text height to center properly
             const textWidth = blockWidth - 4;
-            const textHeight = 20; // Approximate text height for 2-3 lines
-            
+            const textHeight = 20;
             const textoY = y + (altoCelda / 2) - (textHeight / 2);
+            
             doc.fillColor('black').font('Helvetica-Bold').fontSize(5).text(texto, blockLeft + 2, textoY, {
               width: textWidth,
               align: 'center',
               lineBreak: true,
               height: altoCelda - 4,
-              ellipsis: false // Don't truncate text
+              ellipsis: false
             });
           });
-
-          // Mark slots as occupied for vertical merging
+          
           if (span > 1) {
             for (let offset = 1; offset < span; offset++) {
               slotsOcupados.add(`${dia}-${horas[horaIndex + offset]}`);
@@ -509,7 +529,7 @@ export class GeneradorPdfService {
           }
         }
       });
-
+      
       y += gridRowHeight;
     });
   }
@@ -687,72 +707,79 @@ export class GeneradorPdfService {
     const gridRowHeight = 32; // Increased height a bit more
 
     doc.font('Helvetica-Bold').fontSize(8);
-    doc.rect(leftColX, horarioTop, gridColWidth, 15).fill('#D9D2E9').stroke(BORDER_COLOR);
+    doc.rect(leftColX, horarioTop, gridColWidth, 15).fill('#FFFFFF').stroke(BORDER_COLOR);
     doc.fillColor('black').text('HORA', leftColX, horarioTop + 3, { width: gridColWidth, align: 'center' });
     dias.forEach((dia, i) => {
       const x = leftColX + (i + 1) * gridColWidth;
-      doc.rect(x, horarioTop, gridColWidth, 15).fill('#D9D2E9').stroke(BORDER_COLOR);
+      doc.rect(x, horarioTop, gridColWidth, 15).fill('#FFFFFF').stroke(BORDER_COLOR);
       doc.fillColor('black').text(dia, x, horarioTop + 3, { width: gridColWidth, align: 'center' });
     });
 
-    const slotsOcupados = new Set<string>();
     let y = horarioTop + 15;
+    doc.lineWidth(1); // Consistent line width
+    
+    // First, draw all base grid cells
     horas.forEach((hora, horaIndex) => {
       doc.rect(leftColX, y, gridColWidth, gridRowHeight).stroke(BORDER_COLOR);
       doc.fillColor('black').font('Helvetica-Bold').fontSize(7).text(formatearFranjaHora(hora), leftColX, y + 8, { width: gridColWidth, align: 'center' });
+      
+      dias.forEach((dia, dIdx) => {
+        const x = leftColX + (dIdx + 1) * gridColWidth;
+        doc.rect(x, y, gridColWidth, gridRowHeight).stroke(BORDER_COLOR);
+      });
+      
+      y += gridRowHeight;
+    });
+    
+    // Now draw schedule blocks
+    y = horarioTop + 15;
+    const newSlotsOcupados = new Set<string>();
+    
+    horas.forEach((hora, horaIndex) => {
       dias.forEach((dia, dIdx) => {
         const x = leftColX + (dIdx + 1) * gridColWidth;
         const slotKey = `${dia}-${hora}`;
-        if (slotsOcupados.has(slotKey)) {
+        
+        if (newSlotsOcupados.has(slotKey)) {
           return;
         }
-
-        // Draw grid with thicker lines
-        doc.lineWidth(1.5);
-        // ALWAYS draw base grid cell border
-        doc.rect(x, y, gridColWidth, gridRowHeight).stroke(BORDER_COLOR);
         
         const celdasEnHora = celdasPorSlot[slotKey] ?? [];
         
         if (celdasEnHora.length > 0) {
-          // Calculate span first
           let span = 1;
           if (celdasEnHora.length === 1) {
             span = calcularFusionPdf(celdasPorSlot, dia, horaIndex, horas, celdasEnHora[0].bloque);
           }
           const altoCelda = gridRowHeight * span;
-
-          // Draw each block separately (horizontally)
+          
           const blockWidth = gridColWidth / celdasEnHora.length;
           celdasEnHora.forEach((celda, idx) => {
             const blockLeft = x + idx * blockWidth;
-            // Draw block background, then a slightly different (or same) border on top of grid
             doc.rect(blockLeft, y, blockWidth, altoCelda).fill(celda.info?.color || '#FFFFFF').stroke(BORDER_COLOR);
             
-            // Draw text vertically centered
             const texto = formatearEtiquetaCeldaAmbiente(celda.info, celda.bloque);
-            // Calculate text height to center properly
             const textWidth = blockWidth - 4;
-            const textHeight = 20; // Approximate text height for 2-3 lines
-            
+            const textHeight = 20;
             const textoY = y + (altoCelda / 2) - (textHeight / 2);
+            
             doc.fillColor('black').font('Helvetica-Bold').fontSize(5).text(texto, blockLeft + 2, textoY, {
               width: textWidth,
               align: 'center',
               lineBreak: true,
               height: altoCelda - 4,
-              ellipsis: false // Don't truncate text
+              ellipsis: false
             });
           });
-
-          // Mark slots as occupied for vertical merging
+          
           if (span > 1) {
             for (let offset = 1; offset < span; offset++) {
-              slotsOcupados.add(`${dia}-${horas[horaIndex + offset]}`);
+              newSlotsOcupados.add(`${dia}-${horas[horaIndex + offset]}`);
             }
           }
         }
       });
+      
       y += gridRowHeight;
     });
   }
