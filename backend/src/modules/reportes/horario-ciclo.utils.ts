@@ -6,25 +6,18 @@ import {
 } from './reportes.types';
 
 const COLORES_PASTEL = [
-  '80FADBD8',
-'80D6EAF8',
-'80D5F5E3',
-'80FDEBD0',
-'80E8DAEF',
-'80D1F2EB',
-'80FCE5CD',
-'80D4E6F1',
-'80F5C6D6',
-'80D6F5F8','60FADBD8',
-'60D6EAF8',
-'60D5F5E3',
-'60FDEBD0',
-'60E8DAEF',
-'60D1F2EB',
-'60FCE5CD',
-'60D4E6F1',
-'60F5C6D6',
-'60D6F5F8',
+  'FFF9E795', // Amarillo claro
+  'FFE6F2FF', // Azul claro
+  'FFD5E8D4', // Verde claro
+  'FFD9EAD3', // Verde más claro
+  'FFEAD1DC', // Rosado claro
+  'FFF2DDDC', // Naranja claro
+  'FFDDD9C3', // Beige claro
+  'FFD4E4F7', // Azul más claro
+  'FFFCE4CD', // Naranja más claro
+  'FFE5E0EC', // Morado claro
+  'FFF5F0E6', // Arena claro
+  'FFE6EAF2', // Gris azulado claro
 ];
 
 const DEPARTAMENTO_FIJO = 'Ing. de Sistemas';

@@ -35,7 +35,7 @@ export class GeneradorExcelService {
      });
 
     // Definir columnas para cabecera, detalle y grilla
-    const colWidths = [15, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12];
+    const colWidths = [15, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12];
     colWidths.forEach((w, i) => {
       worksheet.getColumn(i + 1).width = w;
     });
@@ -83,10 +83,15 @@ export class GeneradorExcelService {
     detailHeaders.forEach((h, i) => {
       const cell = worksheet.getCell(detailStartRow, detailCols[i]);
       cell.value = h;
-      cell.font = { bold: true, size: 8, color: { argb: 'FFFFFFFF' } };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+      cell.font = { bold: true, size: 8, color: { argb: 'FF000000' } }; // Negro
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D2E9' } }; // Morado claro
       cell.alignment = { horizontal: 'center', vertical: 'middle' };
-      cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+      cell.border = { 
+        top: { style: 'thin', color: { argb: 'FF000000' } }, 
+        left: { style: 'thin', color: { argb: 'FF000000' } }, 
+        bottom: { style: 'thin', color: { argb: 'FF000000' } }, 
+        right: { style: 'thin', color: { argb: 'FF000000' } } 
+      };
     });
 
     const bloques = await prisma.bloque_horario.findMany({
@@ -131,41 +136,52 @@ export class GeneradorExcelService {
       data.forEach((val, i) => {
         const cell = worksheet.getCell(currentRowDetail, detailCols[i]);
         cell.value = val;
-        cell.font = { size: 8 };
+        cell.font = { size: 8, color: { argb: 'FF000000' } };
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: info.color } };
         cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+        cell.border = { 
+          top: { style: 'thin', color: { argb: 'FF000000' } }, 
+          left: { style: 'thin', color: { argb: 'FF000000' } }, 
+          bottom: { style: 'thin', color: { argb: 'FF000000' } }, 
+          right: { style: 'thin', color: { argb: 'FF000000' } } 
+        };
       });
       currentRowDetail++;
     }
 
     // --- FILA 2: HORARIO ---
     const startRowHorario = Math.max(currentRowDetail + 2, 12);
-    const dias = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES'];
+    const dias = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
     const horas = [
       '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00',
       '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'
     ];
 
-    // Header horario (A-L -> 12 cols, 2 por día aprox)
-    // Col 1-2: Hora, Col 3-4: Lunes, Col 5-6: Martes, Col 7-8: Miércoles, Col 9-10: Jueves, Col 11-12: Viernes
+    // Header horario (A-N -> 14 cols, 2 por día aprox)
+    // Col 1-2: Hora, Col 3-4: Lunes, Col 5-6: Martes, Col 7-8: Miércoles, Col 9-10: Jueves, Col 11-12: Viernes, Col 13-14: Sábado
     const gridCols = [
       { start: 1, end: 2, label: 'HORA' },
       { start: 3, end: 4, label: 'LUNES' },
       { start: 5, end: 6, label: 'MARTES' },
       { start: 7, end: 8, label: 'MIÉRCOLES' },
       { start: 9, end: 10, label: 'JUEVES' },
-      { start: 11, end: 12, label: 'VIERNES' }
+      { start: 11, end: 12, label: 'VIERNES' },
+      { start: 13, end: 14, label: 'SÁBADO' }
     ];
 
     gridCols.forEach(col => {
       worksheet.mergeCells(startRowHorario, col.start, startRowHorario, col.end);
       const cell = worksheet.getCell(startRowHorario, col.start);
       cell.value = col.label;
-      cell.font = { bold: true, size: 10, color: { argb: 'FFFFFFFF' } };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF334155' } };
-      cell.alignment = { horizontal: 'center' };
-      cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+      cell.font = { bold: true, size: 10, color: { argb: 'FF000000' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } }; // Blanco
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = { 
+        top: { style: 'thin', color: { argb: 'FF000000' } }, 
+        left: { style: 'thin', color: { argb: 'FF000000' } }, 
+        bottom: { style: 'thin', color: { argb: 'FF000000' } }, 
+        right: { style: 'thin', color: { argb: 'FF000000' } } 
+      };
     });
 
     horas.forEach((h, i) => {
@@ -173,9 +189,14 @@ export class GeneradorExcelService {
       worksheet.mergeCells(row, 1, row, 2);
       const hourCell = worksheet.getCell(row, 1);
       hourCell.value = h;
-      hourCell.font = { bold: true, size: 8 };
+      hourCell.font = { bold: true, size: 8, color: { argb: 'FF000000' } };
       hourCell.alignment = { horizontal: 'center', vertical: 'middle' };
-      hourCell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+      hourCell.border = { 
+        top: { style: 'thin', color: { argb: 'FF000000' } }, 
+        left: { style: 'thin', color: { argb: 'FF000000' } }, 
+        bottom: { style: 'thin', color: { argb: 'FF000000' } }, 
+        right: { style: 'thin', color: { argb: 'FF000000' } } 
+      };
       worksheet.getRow(row).height = 35;
 
       dias.forEach((d, di) => {
@@ -187,7 +208,12 @@ export class GeneradorExcelService {
           worksheet.mergeCells(row, cs, row, ce);
           const cell = worksheet.getCell(row, cs);
           cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-          cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+          cell.border = { 
+            top: { style: 'thin', color: { argb: 'FF000000' } }, 
+            left: { style: 'thin', color: { argb: 'FF000000' } }, 
+            bottom: { style: 'thin', color: { argb: 'FF000000' } }, 
+            right: { style: 'thin', color: { argb: 'FF000000' } } 
+          };
         } else {
           const colWidth = (ce - cs + 1) / numEntradas;
           let currentCol = cs;
@@ -198,13 +224,17 @@ export class GeneradorExcelService {
               worksheet.mergeCells(row, startCol, row, endCol);
             }
             const cell = worksheet.getCell(row, startCol);
-            const grupoEtiqueta = e.registro.tieneMultiplesGrupos ? `Gr. ${e.registro.grupoCodigo}` : '';
             const ambienteEtiqueta = e.bloque.ambiente?.codigo || 'Solic.';
-            cell.value = `${e.registro.indice}\n${grupoEtiqueta}\n${ambienteEtiqueta}`;
+            cell.value = `${e.registro.indice}\n(${ambienteEtiqueta})`;
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: e.registro.color } };
-            cell.font = { bold: true, size: 6 };
+            cell.font = { bold: true, size: 7, color: { argb: 'FF000000' } };
             cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-            cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+            cell.border = { 
+              top: { style: 'thin', color: { argb: 'FF000000' } }, 
+              left: { style: 'thin', color: { argb: 'FF000000' } }, 
+              bottom: { style: 'thin', color: { argb: 'FF000000' } }, 
+              right: { style: 'thin', color: { argb: 'FF000000' } } 
+            };
             currentCol = endCol + 1;
           });
         }
@@ -270,10 +300,15 @@ export class GeneradorExcelService {
     detailHeaders.forEach((h, i) => {
       const cell = worksheet.getCell(1, detailCols[i]);
       cell.value = h;
-      cell.font = { bold: true, size: 8, color: { argb: 'FFFFFFFF' } };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+      cell.font = { bold: true, size: 8, color: { argb: 'FF000000' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D2E9' } };
       cell.alignment = { horizontal: 'center' };
-      cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+      cell.border = { 
+        top: { style: 'thin', color: { argb: 'FF000000' } }, 
+        left: { style: 'thin', color: { argb: 'FF000000' } }, 
+        bottom: { style: 'thin', color: { argb: 'FF000000' } }, 
+        right: { style: 'thin', color: { argb: 'FF000000' } } 
+      };
     });
 
     const bloques = await prisma.bloque_horario.findMany({
@@ -285,7 +320,7 @@ export class GeneradorExcelService {
       }
     });
 
-    const coloresPasteles = ['FFF0F9FF', 'FFF5F3FF', 'FFECFDF5', 'FFFFFBEB', 'FFFFF1F2', 'FFEFF6FF', 'FFF5F5F4', 'FFF0FDFA', 'FFFFFAF0', 'FFFDF2F8'];
+    const coloresPasteles = ['FFF9E795', 'FFE6F2FF', 'FFD5E8D4', 'FFD9EAD3', 'FFEAD1DC', 'FFF2DDDC', 'FFDDD9C3', 'FFD4E4F7', 'FFFCE4CD', 'FFE5E0EC'];
     const mapaDocenteCurso: Record<string, any> = {};
     let indexDocente = 1;
 
@@ -313,12 +348,17 @@ export class GeneradorExcelService {
       data.forEach((val, i) => {
         const cell = worksheet.getCell(currentRow, detailCols[i]);
         cell.value = val;
-        cell.font = { size: 8 };
+        cell.font = { size: 8, color: { argb: 'FF000000' } };
         if (i === 1) {
           cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: false };
         }
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + info.color } };
-        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+        cell.border = { 
+          top: { style: 'thin', color: { argb: 'FF000000' } }, 
+          left: { style: 'thin', color: { argb: 'FF000000' } }, 
+          bottom: { style: 'thin', color: { argb: 'FF000000' } }, 
+          right: { style: 'thin', color: { argb: 'FF000000' } } 
+        };
       });
       currentRow++;
     }
@@ -333,17 +373,29 @@ export class GeneradorExcelService {
       worksheet.mergeCells(startRowHorario, col.s, startRowHorario, col.e);
       const cell = worksheet.getCell(startRowHorario, col.s);
       cell.value = col.l;
-      cell.font = { bold: true, size: 9, color: { argb: 'FFFFFFFF' } };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF334155' } };
-      cell.alignment = { horizontal: 'center' };
+      cell.font = { bold: true, size: 9, color: { argb: 'FF000000' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } }; // Blanco
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = { 
+        top: { style: 'thin', color: { argb: 'FF000000' } }, 
+        left: { style: 'thin', color: { argb: 'FF000000' } }, 
+        bottom: { style: 'thin', color: { argb: 'FF000000' } }, 
+        right: { style: 'thin', color: { argb: 'FF000000' } } 
+      };
     });
 
     horas.forEach((h, i) => {
       const row = startRowHorario + 1 + i;
       worksheet.mergeCells(row, 1, row, 2);
       worksheet.getCell(row, 1).value = h;
-      worksheet.getCell(row, 1).font = { bold: true, size: 8 };
+      worksheet.getCell(row, 1).font = { bold: true, size: 8, color: { argb: 'FF000000' } };
       worksheet.getRow(row).height = 35;
+      worksheet.getCell(row, 1).border = { 
+        top: { style: 'thin', color: { argb: 'FF000000' } }, 
+        left: { style: 'thin', color: { argb: 'FF000000' } }, 
+        bottom: { style: 'thin', color: { argb: 'FF000000' } }, 
+        right: { style: 'thin', color: { argb: 'FF000000' } } 
+      };
 
       dias.forEach((d, di) => {
         const cs = gridCols[di + 1].s, ce = gridCols[di + 1].e;
@@ -354,7 +406,12 @@ export class GeneradorExcelService {
           worksheet.mergeCells(row, cs, row, ce);
           const cell = worksheet.getCell(row, cs);
           cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-          cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+          cell.border = { 
+            top: { style: 'thin', color: { argb: 'FF000000' } }, 
+            left: { style: 'thin', color: { argb: 'FF000000' } }, 
+            bottom: { style: 'thin', color: { argb: 'FF000000' } }, 
+            right: { style: 'thin', color: { argb: 'FF000000' } } 
+          };
         } else {
           const colWidth = (ce - cs + 1) / numEntradas;
           let currentCol = cs;
@@ -368,9 +425,14 @@ export class GeneradorExcelService {
             const info = mapaDocenteCurso[`${b.id_docente}-${b.componente.id_oferta}`];
             cell.value = `${info?.indice || '?'}\n(Ciclo: ${b.componente.oferta.id_ciclo}°)`;
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + (info?.color || 'FFFFFF') } };
-            cell.font = { bold: true, size: 6 };
+            cell.font = { bold: true, size: 7, color: { argb: 'FF000000' } };
             cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-            cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+            cell.border = { 
+              top: { style: 'thin', color: { argb: 'FF000000' } }, 
+              left: { style: 'thin', color: { argb: 'FF000000' } }, 
+              bottom: { style: 'thin', color: { argb: 'FF000000' } }, 
+              right: { style: 'thin', color: { argb: 'FF000000' } } 
+            };
             currentCol = endCol + 1;
           });
         }
@@ -431,10 +493,15 @@ export class GeneradorExcelService {
     detailHeaders.forEach((h, i) => {
       const cell = ws.getCell(1, detailCols[i]);
       cell.value = h;
-      cell.font = { bold: true, size: 8, color: { argb: 'FFFFFFFF' } };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
-      cell.alignment = { horizontal: 'center' };
-      cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+      cell.font = { bold: true, size: 8, color: { argb: 'FF000000' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D2E9' } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = { 
+        top: { style: 'thin', color: { argb: 'FF000000' } }, 
+        left: { style: 'thin', color: { argb: 'FF000000' } }, 
+        bottom: { style: 'thin', color: { argb: 'FF000000' } }, 
+        right: { style: 'thin', color: { argb: 'FF000000' } } 
+      };
     });
 
     const asignaciones = await prisma.asignacion_docente_componente.findMany({
@@ -442,7 +509,7 @@ export class GeneradorExcelService {
       include: { componente: { include: { oferta: { include: { curso: true } }, grupos: true } } }
     });
 
-    const coloresPasteles = ['FFF0F9FF', 'FFF5F3FF', 'FFECFDF5', 'FFFFFBEB', 'FFFFF1F2', 'FFEFF6FF', 'FFF5F5F4', 'FFF0FDFA', 'FFFFFAF0', 'FFFDF2F8'];
+    const coloresPasteles = ['FFF9E795', 'FFE6F2FF', 'FFD5E8D4', 'FFD9EAD3', 'FFEAD1DC', 'FFF2DDDC', 'FFDDD9C3', 'FFD4E4F7', 'FFFCE4CD', 'FFE5E0EC'];
     const mapaCursos: Record<number, { indice: number; color: string; nombre: string; ciclo: number; teo: number; lab: number; grupos: number; total: number }> = {};
     let indexCurso = 1;
 
@@ -469,9 +536,14 @@ export class GeneradorExcelService {
       data.forEach((val, i) => {
         const cell = ws.getCell(currentRow, detailCols[i]);
         cell.value = val;
-        cell.font = { size: 8 };
+        cell.font = { size: 8, color: { argb: 'FF000000' } };
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + info.color } };
-        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+        cell.border = { 
+          top: { style: 'thin', color: { argb: 'FF000000' } }, 
+          left: { style: 'thin', color: { argb: 'FF000000' } }, 
+          bottom: { style: 'thin', color: { argb: 'FF000000' } }, 
+          right: { style: 'thin', color: { argb: 'FF000000' } } 
+        };
       });
       currentRow++;
     }
@@ -486,9 +558,15 @@ export class GeneradorExcelService {
       ws.mergeCells(startRowHorario, col.s, startRowHorario, col.e);
       const cell = ws.getCell(startRowHorario, col.s);
       cell.value = col.l;
-      cell.font = { bold: true, size: 9, color: { argb: 'FFFFFFFF' } };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF334155' } };
-      cell.alignment = { horizontal: 'center' };
+      cell.font = { bold: true, size: 9, color: { argb: 'FF000000' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D2E9' } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = { 
+        top: { style: 'thin', color: { argb: 'FF000000' } }, 
+        left: { style: 'thin', color: { argb: 'FF000000' } }, 
+        bottom: { style: 'thin', color: { argb: 'FF000000' } }, 
+        right: { style: 'thin', color: { argb: 'FF000000' } } 
+      };
     });
 
     const bloques = await prisma.bloque_horario.findMany({
@@ -500,8 +578,14 @@ export class GeneradorExcelService {
       const row = startRowHorario + 1 + i;
       ws.mergeCells(row, 1, row, 2);
       ws.getCell(row, 1).value = h;
-      ws.getCell(row, 1).font = { bold: true, size: 8 };
+      ws.getCell(row, 1).font = { bold: true, size: 8, color: { argb: 'FF000000' } };
       ws.getRow(row).height = 35;
+      ws.getCell(row, 1).border = { 
+        top: { style: 'thin', color: { argb: 'FF000000' } }, 
+        left: { style: 'thin', color: { argb: 'FF000000' } }, 
+        bottom: { style: 'thin', color: { argb: 'FF000000' } }, 
+        right: { style: 'thin', color: { argb: 'FF000000' } } 
+      };
 
       dias.forEach((d, di) => {
         const cs = gridCols[di + 1].s, ce = gridCols[di + 1].e;
@@ -512,7 +596,12 @@ export class GeneradorExcelService {
           ws.mergeCells(row, cs, row, ce);
           const cell = ws.getCell(row, cs);
           cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-          cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+          cell.border = { 
+            top: { style: 'thin', color: { argb: 'FF000000' } }, 
+            left: { style: 'thin', color: { argb: 'FF000000' } }, 
+            bottom: { style: 'thin', color: { argb: 'FF000000' } }, 
+            right: { style: 'thin', color: { argb: 'FF000000' } } 
+          };
         } else {
           const colWidth = (ce - cs + 1) / numEntradas;
           let currentCol = cs;
@@ -526,9 +615,14 @@ export class GeneradorExcelService {
             const info = mapaCursos[b.componente.oferta.id_curso];
             cell.value = `${info?.indice || '?'}\n(Aula: ${b.ambiente?.codigo || 'Solic.'})`;
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + (info?.color || 'FFFFFF') } };
-            cell.font = { bold: true, size: 6 };
+            cell.font = { bold: true, size: 7, color: { argb: 'FF000000' } };
             cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-            cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+            cell.border = { 
+              top: { style: 'thin', color: { argb: 'FF000000' } }, 
+              left: { style: 'thin', color: { argb: 'FF000000' } }, 
+              bottom: { style: 'thin', color: { argb: 'FF000000' } }, 
+              right: { style: 'thin', color: { argb: 'FF000000' } } 
+            };
             currentCol = endCol + 1;
           });
         }
