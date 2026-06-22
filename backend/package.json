@@ -19,6 +19,7 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@prisma/client": "^5.10.0",
     "@sendgrid/mail": "^8.1.6",
     "@types/pdfkit": "^0.17.6",

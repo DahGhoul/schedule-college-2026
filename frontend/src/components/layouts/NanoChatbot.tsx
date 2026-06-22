@@ -1,12 +1,17 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { Bot, X, Send, Loader2, User, Sparkles } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth.store';
 import { periodosService } from '@/services/periodos.service';
 import { estadisticasService } from '@/services/estadisticas.service';
 import { cargaHorariaService } from '@/services/carga-horaria.service';
 import { ventanasService } from '@/services/ventanas.service';
+import { docentesService } from '@/services/docentes.service';
+import { ambientesService } from '@/services/ambientes.service';
+import { horariosService } from '@/services/horarios.service';
+import { reportesService, descargarBlob } from '@/services/reportes.service';
+import { chatService } from '@/services/chat.service';
 import { cn } from '@/lib/utilidades';
 
 interface Message {
@@ -17,6 +22,21 @@ interface Message {
 }
 
 type UserRole = 'ADMIN' | 'DIRECTOR' | 'SECRETARIA' | 'DOCENTE';
+
+interface Sugerencia {
+  texto: string;
+  consulta: string;
+}
+
+const DIAS_MAP: Record<string, string> = {
+  lunes: 'LUNES', martes: 'MARTES', miercoles: 'MIERCOLES',
+  jueves: 'JUEVES', viernes: 'VIERNES', sabado: 'SABADO', domingo: 'DOMINGO',
+};
+
+const DIAS_LABEL: Record<string, string> = {
+  LUNES: 'Lunes', MARTES: 'Martes', MIERCOLES: 'Miércoles',
+  JUEVES: 'Jueves', VIERNES: 'Viernes', SABADO: 'Sábado', DOMINGO: 'Domingo',
+};
 
 export const NanoChatbot = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -40,7 +60,27 @@ export const NanoChatbot = () => {
     scrollToBottom();
   }, [messages, isOpen]);
 
-  // Helper to clean and normalize text for Spanish NLP
+  const role = usuario?.rol as UserRole;
+
+  const sugerencias = useMemo((): Sugerencia[] => {
+    if (role === 'DOCENTE') return [
+      { texto: 'Mis cursos', consulta: '¿Cuáles son mis cursos?' },
+      { texto: 'Mis horas', consulta: '¿Cuántas horas tengo?' },
+      { texto: 'Mi horario', consulta: '¿Dónde veo mi horario?' },
+    ];
+    if (role === 'SECRETARIA' || role === 'ADMIN') return [
+      { texto: 'Docentes pendientes', consulta: '¿Qué docentes faltan cargar horario?' },
+      { texto: 'Estado ventanas', consulta: 'Estado de las ventanas de atención' },
+      { texto: 'Ambientes disponibles', consulta: '¿Qué ambientes están disponibles?' },
+    ];
+    if (role === 'DIRECTOR') return [
+      { texto: 'Cursos del ciclo 1', consulta: 'Cursos del ciclo 1' },
+      { texto: 'Cursos del ciclo 5', consulta: 'Cursos del ciclo 5' },
+      { texto: 'Resumen general', consulta: 'Resumen general del periodo' },
+    ];
+    return [];
+  }, [role]);
+
   const normalizeText = (text: string): string => {
     return text
       .toLowerCase()
@@ -50,57 +90,88 @@ export const NanoChatbot = () => {
       .trim();
   };
 
-  // Helper to check if text matches any of the keywords
   const matchesKeywords = (text: string, keywords: string[]): boolean => {
     return keywords.some((keyword) => text.includes(keyword));
   };
 
-  // Process user message and generate response
-  const processMessage = async (userText: string) => {
-    const normalizedText = normalizeText(userText);
-    const role = usuario?.rol as UserRole;
-    let response = '';
-
-    try {
-      if (role === 'DOCENTE') {
-        response = await handleDocenteQuery(normalizedText);
-      } else if (role === 'SECRETARIA' || role === 'ADMIN') {
-        response = await handleSecretariaQuery(normalizedText);
-      } else if (role === 'DIRECTOR') {
-        response = await handleDirectorQuery(normalizedText);
-      } else {
-        response = 'No puedo identificar tu rol en el sistema. Por favor, inicia sesión nuevamente.';
-      }
-    } catch (err) {
-      console.error('Error processing query:', err);
-      response = 'Lo siento, ocurrió un error al procesar tu consulta. Por favor, intenta nuevamente más tarde.';
-    }
-
-    return response;
+  const getPeriodoActivo = async () => {
+    const periodosRes = await periodosService.listar();
+    const periodos = periodosRes.data || periodosRes;
+    return periodos.find((p: any) => p.activo);
   };
 
-  // Handle queries for DOCENTE role
+  const buscarDocente = async (nombre: string): Promise<any | null> => {
+    try {
+      const res = await docentesService.buscar(nombre);
+      const docentes = res.data || res;
+      if (Array.isArray(docentes) && docentes.length > 0) {
+        return docentes[0];
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
+  const consultarGemini = async (text: string): Promise<string | null> => {
+    try {
+      const res = await chatService.consultar({ consulta: text, rol: role });
+      if (res.data?.respuesta) return res.data.respuesta;
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
+  const formatBloquesHorario = (bloques: any[]): string => {
+    const sorted = [...bloques].sort((a, b) => {
+      const dias = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO', 'DOMINGO'];
+      const diaDiff = dias.indexOf(a.dia) - dias.indexOf(b.dia);
+      if (diaDiff !== 0) return diaDiff;
+      return (a.horaInicio || '').localeCompare(b.horaInicio || '');
+    });
+
+    return sorted.map((b: any) => {
+      const dia = DIAS_LABEL[b.dia] || b.dia;
+      const horaInicio = b.horaInicio ? b.horaInicio.slice(0, 5) : '--:--';
+      const horaFin = b.horaFin ? b.horaFin.slice(0, 5) : '--:--';
+      const curso = b.cursoNombre || b.curso?.nombre || 'Curso';
+      const codigo = b.cursoCodigo || b.curso?.codigo || '';
+      const aula = b.ambienteNombre || b.ambiente?.nombre || '';
+      return `- ${dia} ${horaInicio}-${horaFin} | ${codigo ? codigo + ' ' : ''}${curso}${aula ? ' (' + aula + ')' : ''}`;
+    }).join('\n');
+  };
+
+  const extractDocenteName = (text: string): string | null => {
+    const patterns = [
+      /(?:horario|clases|pdf|descargar|enviar|horario del?)\s+(?:docente\s+)?(.+)/,
+      /(?:que dias trabaja|que dias tiene|cuando trabaja|dias de clase del?)\s+(?:docente\s+)?(.+)/,
+    ];
+    for (const pattern of patterns) {
+      const match = text.match(pattern);
+      if (match && match[1].trim().length > 0) {
+        return match[1].trim();
+      }
+    }
+    return null;
+  };
+
+  // ============ DOCENTE QUERY HANDLERS ============
+
   const handleDocenteQuery = async (text: string): Promise<string> => {
     const idDocente = usuario?.idDocente;
     if (!idDocente) {
       return 'No puedo encontrar tu información como docente en el sistema.';
     }
 
-    // Horario personal
     if (matchesKeywords(text, ['horario', 'mi horario', 'ver horario', 'cual es mi horario', 'ver mi horario'])) {
       return 'Para consultar tu horario personal, accede a la sección Horarios > Mi Horario en el menú lateral del sistema.';
     }
 
-    // Cursos asignados
     if (matchesKeywords(text, ['curso', 'cursos', 'asignado', 'asignados', 'mis curso', 'mis cursos', 'que cursos', 'cuales son mis cursos', 'dame mis cursos'])) {
       try {
-        const periodosRes = await periodosService.listar();
-        const periodos = periodosRes.data || periodosRes;
-        const periodoActivo = periodos.find((p: any) => p.activo);
-        
-        if (!periodoActivo) {
-          return 'No hay un periodo académico activo actualmente.';
-        }
+        const periodoActivo = await getPeriodoActivo();
+        if (!periodoActivo) return 'No hay un periodo académico activo actualmente.';
 
         const resumen = await estadisticasService.resumenDocente(idDocente, periodoActivo.id);
         const componentes = resumen.data?.componentes || [];
@@ -123,16 +194,10 @@ export const NanoChatbot = () => {
       }
     }
 
-    // Horas lectivas
     if (matchesKeywords(text, ['hora', 'horas', 'lectiva', 'lectivas', 'cuantas horas', 'cuantas hora', 'total horas', 'horas totales', 'carga horaria', 'mi carga'])) {
       try {
-        const periodosRes = await periodosService.listar();
-        const periodos = periodosRes.data || periodosRes;
-        const periodoActivo = periodos.find((p: any) => p.activo);
-        
-        if (!periodoActivo) {
-          return 'No hay un periodo académico activo actualmente.';
-        }
+        const periodoActivo = await getPeriodoActivo();
+        if (!periodoActivo) return 'No hay un periodo académico activo actualmente.';
 
         const resumen = await estadisticasService.resumenDocente(idDocente, periodoActivo.id);
         const totalHoras = resumen.data?.horasLectivas || 0;
@@ -146,18 +211,140 @@ export const NanoChatbot = () => {
       }
     }
 
-    return 'Como docente, puedo ayudarte a consultar tus cursos asignados, tus horas lectivas y cómo acceder a tu horario personal. ¿Qué necesitas saber?';
+    return '__GENERIC_FALLBACK__Como docente, puedo ayudarte a consultar tus cursos asignados, tus horas lectivas y cómo acceder a tu horario personal. ¿Qué necesitas saber?';
   };
 
-  // Handle queries for SECRETARIA role
+  // ============ SECRETARIA QUERY HANDLERS ============
+
+  const handleDocenteSchedule = async (text: string): Promise<string | null> => {
+    const name = extractDocenteName(text);
+    if (!name) return null;
+
+    const docente = await buscarDocente(name);
+    if (!docente) return null;
+
+    const periodoActivo = await getPeriodoActivo();
+    if (!periodoActivo) return `No se pudo encontrar información del docente "${name}" en el periodo activo.`;
+
+    try {
+      const res = await horariosService.obtenerSeleccionesTemporales(docente.id);
+      const bloques = res.data || res;
+      if (!Array.isArray(bloques) || bloques.length === 0) {
+        return `El docente ${docente.apellidos}, ${docente.nombres} no tiene horario cargado actualmente.`;
+      }
+      const bloquesTexto = formatBloquesHorario(bloques);
+      return `Horario de ${docente.apellidos}, ${docente.nombres}:\n${bloquesTexto}`;
+    } catch {
+      return `No se pudo obtener el horario del docente ${docente.apellidos}, ${docente.nombres}.`;
+    }
+  };
+
+  const handleDocenteScheduleByDay = async (text: string): Promise<string | null> => {
+    const diaEncontrado = Object.keys(DIAS_MAP).find((d) => text.includes(d));
+    if (!diaEncontrado) return null;
+
+    const name = extractDocenteName(text);
+    if (!name) return null;
+
+    const docente = await buscarDocente(name);
+    if (!docente) return null;
+
+    const periodoActivo = await getPeriodoActivo();
+    if (!periodoActivo) return 'No se pudo obtener información del periodo activo.';
+
+    try {
+      const res = await horariosService.obtenerSeleccionesTemporales(docente.id);
+      const bloques = res.data || res;
+      if (!Array.isArray(bloques) || bloques.length === 0) {
+        return `El docente ${docente.apellidos}, ${docente.nombres} no tiene horario cargado.`;
+      }
+
+      const dia = DIAS_MAP[diaEncontrado];
+      const bloquesDia = bloques.filter((b: any) => b.dia === dia);
+      if (bloquesDia.length === 0) {
+        return `El docente ${docente.apellidos}, ${docente.nombres} no tiene clases el ${diaEncontrado}.`;
+      }
+
+      const bloquesTexto = formatBloquesHorario(bloquesDia);
+      return `Clases de ${docente.apellidos}, ${docente.nombres} el ${diaEncontrado}:\n${bloquesTexto}`;
+    } catch {
+      return 'No se pudo obtener la información de clases.';
+    }
+  };
+
+  const handleDocentePdf = async (text: string): Promise<string | null> => {
+    const name = extractDocenteName(text);
+    if (!name && !text.includes('todos') && !text.includes('global')) return null;
+
+    const periodoActivo = await getPeriodoActivo();
+    if (!periodoActivo) return 'No hay un periodo activo.';
+
+    if (text.includes('todos') || text.includes('global')) {
+      try {
+        const res = await reportesService.pdfGlobal(periodoActivo.id);
+        descargarBlob(res.data, `horarios-global-${periodoActivo.nombre}.pdf`);
+        return 'Descargando el reporte PDF global de todos los horarios.';
+      } catch {
+        return 'No se pudo generar el reporte PDF global.';
+      }
+    }
+
+    const docente = await buscarDocente(name!);
+    if (!docente) return `No se encontró un docente con el nombre "${name}".`;
+
+    try {
+      const res = await reportesService.pdfDocente(docente.id, periodoActivo.id);
+      const nombreArchivo = `horario-${docente.apellidos}-${docente.nombres}.pdf`.replace(/\s+/g, '-');
+      descargarBlob(res.data, nombreArchivo);
+      return `Descargando el horario de ${docente.apellidos}, ${docente.nombres} en PDF.`;
+    } catch {
+      return `No se pudo generar el PDF para ${docente.apellidos}, ${docente.nombres}.`;
+    }
+  };
+
+  const handleAmbientesDisponibles = async (): Promise<string> => {
+    const periodoActivo = await getPeriodoActivo();
+    if (!periodoActivo) return 'No hay un periodo activo.';
+
+    try {
+      const res = await ambientesService.disponibilidadGeneral(periodoActivo.id);
+      const ambientes = res.data || res;
+      if (!Array.isArray(ambientes) || ambientes.length === 0) {
+        return 'No se encontraron ambientes registrados en el sistema.';
+      }
+
+      return `Información de ambientes:\n${ambientes.map((a: any) => {
+        const nombre = a.nombre || a.ambiente?.nombre || `Ambiente #${a.id}`;
+        const capacidad = a.capacidad || a.ambiente?.capacidad || '?';
+        const ocupado = a.ocupado ? ' (ocupado)' : ' (disponible)';
+        return `- ${nombre} (${capacidad} pers.)${ocupado}`;
+      }).join('\n')}`;
+    } catch {
+      return 'No se pudo cargar la información de ambientes.';
+    }
+  };
+
   const handleSecretariaQuery = async (text: string): Promise<string> => {
-    // Docentes pendientes de horario
+    if (matchesKeywords(text, ['horario de', 'horario del', 'clases de', 'clases del', 'horario docente'])) {
+      const result = await handleDocenteSchedule(text);
+      if (result) return result;
+    }
+
+    const dayResult = await handleDocenteScheduleByDay(text);
+    if (dayResult) return dayResult;
+
+    if (matchesKeywords(text, ['pdf de', 'pdf del', 'descargar horario', 'enviar horario'])) {
+      const result = await handleDocentePdf(text);
+      if (result) return result;
+    }
+
+    if (matchesKeywords(text, ['ambiente disponible', 'ambiente libre', 'aula libre', 'aula disponible', 'laboratorio disponible', 'que ambientes'])) {
+      return await handleAmbientesDisponibles();
+    }
+
     if (matchesKeywords(text, ['falta', 'faltan', 'pendiente', 'pendientes', 'cargar horario', 'sin cargar', 'docentes pendientes', 'quien falta'])) {
       try {
-        const periodosRes = await periodosService.listar();
-        const periodos = periodosRes.data || periodosRes;
-        const periodoActivo = periodos.find((p: any) => p.activo);
-        
+        const periodoActivo = await getPeriodoActivo();
         const ventanas = await ventanasService.listar(periodoActivo?.id);
         const ventanasList = Array.isArray(ventanas) ? ventanas : ventanas.data || [];
         const pendientes = ventanasList.filter((v: any) => v.estado !== 'COMPLETADA');
@@ -166,12 +353,12 @@ export const NanoChatbot = () => {
           return 'Excelente. Todos los docentes han completado su carga horaria en las ventanas de atención.';
         }
 
-        const nombresPendientes = pendientes.map((v: any) => {
-          const nombreCompleto = v.docente 
-            ? `${v.docente.apellidos}, ${v.docente.nombres}` 
-            : `Docente ID: ${v.id_docente}`;
-          return `- ${nombreCompleto}`;
-        }).join('\n');
+        const nombresPendientes = pendientes.flatMap((v: any) =>
+          (v.atenciones || []).map((a: any) => {
+            if (a.docente) return `- ${a.docente.apellidos}, ${a.docente.nombres}`;
+            return `- Docente ID: ${a.id_docente || '?'}`;
+          })
+        ).join('\n');
 
         return `Los docentes que aún no han completado su horario son:\n${nombresPendientes}`;
       } catch (err) {
@@ -180,16 +367,10 @@ export const NanoChatbot = () => {
       }
     }
 
-    // Ventanas de atención
     if (matchesKeywords(text, ['ventana', 'ventanas', 'ventana de atencion', 'ventanas de atencion', 'estado de las ventanas'])) {
       try {
-        const periodosRes = await periodosService.listar();
-        const periodos = periodosRes.data || periodosRes;
-        const periodoActivo = periodos.find((p: any) => p.activo);
-        
-        if (!periodoActivo) {
-          return 'No hay un periodo académico activo actualmente.';
-        }
+        const periodoActivo = await getPeriodoActivo();
+        if (!periodoActivo) return 'No hay un periodo académico activo actualmente.';
 
         const ventanas = await ventanasService.listar(periodoActivo.id);
         const ventanasList = Array.isArray(ventanas) ? ventanas : ventanas.data || [];
@@ -211,21 +392,16 @@ export const NanoChatbot = () => {
       }
     }
 
-    return 'Como secretaria, puedo ayudarte a consultar los docentes pendientes de cargar horario y el estado de las ventanas de atención. ¿Qué necesitas?';
+    return '__GENERIC_FALLBACK__Como secretaria, puedo ayudarte a consultar los docentes pendientes de cargar horario, el estado de las ventanas de atención, el horario de un docente específico y los ambientes disponibles. ¿Qué necesitas?';
   };
 
-  // Handle queries for DIRECTOR role
+  // ============ DIRECTOR QUERY HANDLERS ============
+
   const handleDirectorQuery = async (text: string): Promise<string> => {
-    // Cursos por ciclo
     if (matchesKeywords(text, ['ciclo', 'cursos del ciclo', 'cursos por ciclo', 'cuales son los cursos del ciclo', 'dame los cursos del ciclo'])) {
       try {
-        const periodosRes = await periodosService.listar();
-        const periodos = periodosRes.data || periodosRes;
-        const periodoActivo = periodos.find((p: any) => p.activo);
-        
-        if (!periodoActivo) {
-          return 'No hay un periodo académico activo actualmente.';
-        }
+        const periodoActivo = await getPeriodoActivo();
+        if (!periodoActivo) return 'No hay un periodo académico activo actualmente.';
 
         const ciclos = await periodosService.obtenerCiclosActivo();
         const ciclosList = ciclos.data || ciclos;
@@ -234,7 +410,6 @@ export const NanoChatbot = () => {
           return 'No hay ciclos disponibles para el periodo activo.';
         }
 
-        // Find cycle number from query
         let cicloSeleccionado = null;
         for (let i = 1; i <= 10; i++) {
           if (text.includes(`ciclo ${i}`) || text.includes(`${i} ciclo`)) {
@@ -268,20 +443,14 @@ export const NanoChatbot = () => {
       }
     }
 
-    // Resumen general
     if (matchesKeywords(text, ['resumen', 'resumen general', 'estado general', 'como va el periodo', 'status del periodo', 'informacion general'])) {
       try {
-        const periodosRes = await periodosService.listar();
-        const periodos = periodosRes.data || periodosRes;
-        const periodoActivo = periodos.find((p: any) => p.activo);
-        
-        if (!periodoActivo) {
-          return 'No hay un periodo académico activo actualmente.';
-        }
+        const periodoActivo = await getPeriodoActivo();
+        if (!periodoActivo) return 'No hay un periodo académico activo actualmente.';
 
         const ciclos = await periodosService.obtenerCiclosActivo();
         const ciclosList = ciclos.data || ciclos;
-        
+
         const resumen = await estadisticasService.resumen(periodoActivo.id);
         const totalDocentes = resumen.data?.totalDocentes || 0;
         const totalCursos = resumen.data?.totalCursos || 0;
@@ -295,39 +464,63 @@ export const NanoChatbot = () => {
       }
     }
 
-    return 'Como director, puedo ayudarte a consultar los cursos por ciclo y el resumen general del periodo académico. ¿Qué necesitas?';
+    return '__GENERIC_FALLBACK__Como director, puedo ayudarte a consultar los cursos por ciclo y el resumen general del periodo académico. ¿Qué necesitas?';
   };
 
-  const handleSendMessage = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!inputValue.trim() || isProcessing) return;
+  // ============ MAIN PROCESSING ============
+
+  const processMessage = async (userText: string) => {
+    const normalizedText = normalizeText(userText);
+    let response = '';
+
+    try {
+      if (role === 'DOCENTE') {
+        response = await handleDocenteQuery(normalizedText);
+      } else if (role === 'SECRETARIA' || role === 'ADMIN') {
+        response = await handleSecretariaQuery(normalizedText);
+      } else if (role === 'DIRECTOR') {
+        response = await handleDirectorQuery(normalizedText);
+      } else {
+        response = 'No puedo identificar tu rol en el sistema. Por favor, inicia sesión nuevamente.';
+      }
+
+      if (response.startsWith('__GENERIC_FALLBACK__')) {
+        const geminiResponse = await consultarGemini(normalizedText);
+        if (geminiResponse) {
+          response = geminiResponse;
+        } else {
+          response = response.replace('__GENERIC_FALLBACK__', '');
+        }
+      }
+    } catch (err) {
+      console.error('Error processing query:', err);
+      response = 'Lo siento, ocurrió un error al procesar tu consulta. Por favor, intenta nuevamente más tarde.';
+    }
+
+    return response;
+  };
+
+  const sendMessage = async (text: string) => {
+    if (!text.trim() || isProcessing) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
-      content: inputValue,
+      content: text,
     };
 
     setMessages((prev) => [...prev, userMessage]);
     setInputValue('');
     setIsProcessing(true);
 
-    // Add loading message
     const loadingId = (Date.now() + 1).toString();
     setMessages((prev) => [
       ...prev,
-      {
-        id: loadingId,
-        role: 'assistant',
-        content: '',
-        isLoading: true,
-      },
+      { id: loadingId, role: 'assistant', content: '', isLoading: true },
     ]);
 
     try {
-      const response = await processMessage(userMessage.content);
-      
-      // Replace loading message with actual response
+      const response = await processMessage(text);
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === loadingId
@@ -340,11 +533,7 @@ export const NanoChatbot = () => {
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === loadingId
-            ? {
-                ...msg,
-                content: 'Lo siento, ocurrió un error. Por favor, intenta nuevamente.',
-                isLoading: false,
-              }
+            ? { ...msg, content: 'Lo siento, ocurrió un error. Por favor, intenta nuevamente.', isLoading: false }
             : msg
         )
       );
@@ -353,9 +542,17 @@ export const NanoChatbot = () => {
     }
   };
 
+  const handleSendMessage = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    sendMessage(inputValue);
+  };
+
+  const handleSugerenciaClick = (consulta: string) => {
+    sendMessage(consulta);
+  };
+
   return (
     <div className="fixed bottom-6 right-6 z-50">
-      {/* Floating button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-[#0b1f3a] via-[#123b6d] to-[#0f4c81] text-white shadow-2xl hover:shadow-3xl hover:scale-105 transition-all duration-300 group"
@@ -370,10 +567,8 @@ export const NanoChatbot = () => {
         )}
       </button>
 
-      {/* Chat window */}
       {isOpen && (
         <div className="absolute bottom-20 right-0 w-[420px] max-w-[92vw] h-[600px] bg-white rounded-[2.5rem] shadow-2xl border border-gray-100 overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-300">
-          {/* Header */}
           <div className="p-5 bg-gradient-to-br from-[#0b1f3a] via-[#123b6d] to-[#0f4c81] text-white">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-md">
@@ -389,7 +584,6 @@ export const NanoChatbot = () => {
             </div>
           </div>
 
-          {/* Messages container */}
           <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-gray-50/50">
             {messages.map((message) => (
               <div
@@ -435,7 +629,23 @@ export const NanoChatbot = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input area */}
+          {sugerencias.length > 0 && (
+            <div className="px-4 pb-2 pt-2 bg-white border-t border-gray-100">
+              <div className="flex flex-wrap gap-1.5">
+                {sugerencias.map((s) => (
+                  <button
+                    key={s.texto}
+                    type="button"
+                    onClick={() => handleSugerenciaClick(s.consulta)}
+                    className="px-3 py-1.5 rounded-full text-xs bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-700 border border-slate-200 hover:border-blue-200 transition-all cursor-pointer"
+                  >
+                    {s.texto}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <form
             onSubmit={handleSendMessage}
             className="p-4 bg-white border-t border-gray-100"

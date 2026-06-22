@@ -20,6 +20,7 @@ import rutasUsuarios from './modules/usuarios/usuarios.routes';
 import rutasCargaHoraria from './modules/carga-horaria/carga-horaria.routes';
 import rutasCargaNoLectiva from './modules/carga-no-lectiva/carga-no-lectiva.routes';
 import rutasCurricula from './modules/curricula/curricula.routes';
+import rutasChat from './modules/chat/chat.routes';
 
 const app: Express = express();
 
@@ -46,6 +47,7 @@ app.use('/api/usuarios', rutasUsuarios);
 app.use('/api/carga-horaria', rutasCargaHoraria);
 app.use('/api/carga-no-lectiva', rutasCargaNoLectiva);
 app.use('/api/curricula', rutasCurricula);
+app.use('/api/chat', rutasChat);
 
 
 // Ruta de salud
