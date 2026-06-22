@@ -5,13 +5,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { Search, Plus, BookOpen, Hash, Layers } from 'lucide-react';
+import { Search, Plus, BookOpen, Hash, Layers, FileText } from 'lucide-react';
 import { cursosService } from '@/services/cursos.service';
+import { curriculaService } from '@/services/curricula.service';
 import { useAuthStore } from '@/stores/auth.store';
 import { TablaDatos } from '@/components/ui/TablaDatos';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Modal } from '@/components/ui/Modal';
 import { CampoTexto } from '@/components/ui/CampoTexto';
+import { Selector } from '@/components/ui/Selector';
 import { Boton } from '@/components/ui/Boton';
 import { NotificacionToast } from '@/components/ui/NotificacionToast';
 
@@ -19,6 +21,7 @@ const cursoSchema = z.object({
   nombre: z.string().min(1, 'El nombre es obligatorio'),
   codigo: z.string().min(1, 'El código es obligatorio'),
   creditos: z.coerce.number().int().min(1, 'Debe ser al menos 1'),
+  id_curricula: z.number().int().positive().nullable().optional(),
 });
 
 type CursoFormData = z.infer<typeof cursoSchema>;
@@ -29,13 +32,21 @@ export default function CursosPage() {
   const esAdmin = usuario?.rol === 'ADMINISTRADOR';
 
   const [buscar, setBuscar] = useState('');
+  const [idCurriculaFiltro, setIdCurriculaFiltro] = useState<number | undefined>(undefined);
   const [mostrarModalCurso, setMostrarModalCurso] = useState(false);
   const [cursoEditando, setCursoEditando] = useState<any | null>(null);
   const [toast, setToast] = useState<{ mensaje: string; tipo: 'exito' | 'error' | 'advertencia' } | null>(null);
 
+  const { data: curriculaList } = useQuery({
+    queryKey: ['curricula'],
+    queryFn: () => curriculaService.listar().then((res) => res.data),
+  });
+
+  const curriculaOpts = Array.isArray(curriculaList) ? curriculaList : curriculaList?.data || [];
+
   const { data: response, isLoading } = useQuery({
-    queryKey: ['cursos', buscar],
-    queryFn: () => cursosService.listar({ buscar }).then((res) => res.data),
+    queryKey: ['cursos', buscar, idCurriculaFiltro],
+    queryFn: () => cursosService.listar({ buscar, id_curricula: idCurriculaFiltro }).then((res) => res.data),
   });
 
   const cursos = Array.isArray(response) ? response : response?.data || [];
@@ -51,6 +62,7 @@ export default function CursosPage() {
       nombre: '',
       codigo: '',
       creditos: 1,
+      id_curricula: null,
     },
   });
 
@@ -92,6 +104,7 @@ export default function CursosPage() {
       nombre: '',
       codigo: '',
       creditos: 1,
+      id_curricula: null,
     });
     setMostrarModalCurso(true);
   };
@@ -102,6 +115,7 @@ export default function CursosPage() {
       nombre: curso.nombre ?? '',
       codigo: curso.codigo ?? '',
       creditos: curso.creditos ?? 1,
+      id_curricula: curso.id_curricula ?? null,
     });
     setMostrarModalCurso(true);
   };
@@ -146,6 +160,22 @@ export default function CursosPage() {
       )
     },
     {
+      clave: 'curricula',
+      titulo: 'Currícula',
+      render: (item: any) => (
+        <div className="flex items-center gap-2">
+          <FileText className="w-4 h-4 text-slate-400" />
+          {item.curricula ? (
+            <span className={`text-xs font-bold px-2 py-1 rounded-lg ${item.curricula.vigente ? 'bg-unt-primary/10 text-unt-primary' : 'bg-slate-100 text-slate-500'}`}>
+              {item.curricula.nombre}
+            </span>
+          ) : (
+            <span className="text-xs text-slate-400 italic">Sin asignar</span>
+          )}
+        </div>
+      ),
+    },
+    {
       clave: 'activo',
       titulo: 'Estado',
       render: (item: any) => (
@@ -171,7 +201,24 @@ export default function CursosPage() {
           <p className="text-slate-500 mt-1">Gestiona el catálogo de cursos activos de la escuela.</p>
         </div>
 
-        <div className="flex w-full gap-3 sm:w-auto">
+        <div className="flex w-full flex-wrap gap-3 sm:w-auto sm:flex-nowrap items-end">
+          <div className="w-full sm:w-48">
+            <Selector label="Currícula">
+              <select
+                value={idCurriculaFiltro ?? ''}
+                onChange={(e) => setIdCurriculaFiltro(e.target.value ? Number(e.target.value) : undefined)}
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-unt-primary focus:ring-4 focus:ring-unt-primary/5 focus:outline-none"
+              >
+                <option value="">Vigente (predet.)</option>
+                <option value="0">Sin currícula</option>
+                {curriculaOpts.map((c: any) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nombre}{c.vigente ? ' (Vigente)' : ''}
+                  </option>
+                ))}
+              </select>
+            </Selector>
+          </div>
           <div className="relative flex-1 sm:w-80">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
@@ -234,6 +281,19 @@ export default function CursosPage() {
               {...registerCurso('creditos')} 
               error={erroresCurso.creditos?.message} 
             />
+            <Selector label="Currícula" error={erroresCurso.id_curricula?.message}>
+              <select
+                {...registerCurso('id_curricula', { valueAsNumber: true })}
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-unt-primary focus:ring-4 focus:ring-unt-primary/5 focus:outline-none"
+              >
+                <option value="">-- Sin asignar --</option>
+                {curriculaOpts.map((c: any) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nombre}{c.vigente ? ' (Vigente)' : ''}
+                  </option>
+                ))}
+              </select>
+            </Selector>
           </div>
 
           <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">

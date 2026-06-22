@@ -121,7 +121,21 @@ async function main() {
     }
 
     // ============================================================
-    // 5. AMBIENTES
+    // 5. CURRÍCULAS
+    // ============================================================
+    console.log('Configurando currículas...');
+    await prisma.curricula.deleteMany();
+
+    const curricula2024 = await prisma.curricula.create({
+      data: { codigo: '2024', nombre: 'Currícula 2024', vigente: true },
+    });
+    const curricula2020 = await prisma.curricula.create({
+      data: { codigo: '2020', nombre: 'Currícula 2020', vigente: false },
+    });
+    console.log(`Currículas: ${curricula2024.nombre} (vigente), ${curricula2020.nombre}`);
+
+    // ============================================================
+    // 6. AMBIENTES
     // ============================================================
     const ambientesCodigos = ambientesSeed;
     const labsCodigos = labsSeed;
@@ -211,8 +225,8 @@ async function main() {
       // Upsert curso
       const curso = await prisma.curso.upsert({
         where: { codigo: def.codigo },
-        update: { nombre: def.nombre, creditos: def.creditos, activo: true },
-        create: { nombre: def.nombre, codigo: def.codigo, creditos: def.creditos, activo: true },
+        update: { nombre: def.nombre, creditos: def.creditos, activo: true, id_curricula: curricula2024.id },
+        create: { nombre: def.nombre, codigo: def.codigo, creditos: def.creditos, activo: true, id_curricula: curricula2024.id },
       });
 
       const cicloObj = ciclosArr[def.ciclo - 1];

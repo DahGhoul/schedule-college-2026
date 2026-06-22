@@ -46,6 +46,7 @@ export function Sidebar() {
     { href: '/dashboard/usuarios', etiqueta: 'Cuentas de Usuario', Icono: Users },
     { href: '/dashboard/ambientes', etiqueta: 'Infraestructura/Aulas', Icono: School },
     { href: '/dashboard/cursos', etiqueta: 'Catálogo de Cursos', Icono: BookOpen },
+    { href: '/dashboard/curricula', etiqueta: 'Currículas', Icono: FileText },
     { href: '/dashboard/configuracion/restricciones', etiqueta: 'Reglas del Sistema', Icono: Settings },
     //{ href: '/dashboard/configuracion/dias-no-laborables', etiqueta: 'Feriados/No Laborables', Icono: CalendarOff },
   ];
