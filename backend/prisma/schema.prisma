@@ -198,13 +198,26 @@ model ciclo {
   @@map("ciclo")
 }
 
+model curricula {
+  id       Int      @id @default(autoincrement()) @map("id_curricula")
+  codigo   String   @unique @db.VarChar(20)
+  nombre   String   @db.VarChar(200)
+  vigente  Boolean  @default(false)
+  activo   Boolean  @default(true)
+  cursos   curso[]
+
+  @@map("curricula")
+}
+
 model curso {
-  id         Int      @id @default(autoincrement()) @map("id_curso")
-  nombre     String   @db.VarChar(150)
-  codigo     String   @unique @db.VarChar(20)
-  creditos   Int      @default(1)
-  activo     Boolean  @default(true)
-  ofertas    curso_oferta[]
+  id            Int        @id @default(autoincrement()) @map("id_curso")
+  nombre        String     @db.VarChar(150)
+  codigo        String     @unique @db.VarChar(20)
+  creditos      Int        @default(1)
+  activo        Boolean    @default(true)
+  id_curricula  Int?
+  curricula     curricula? @relation(fields: [id_curricula], references: [id])
+  ofertas       curso_oferta[]
 
   @@map("curso")
 }

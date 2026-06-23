@@ -2,10 +2,22 @@ import { prisma } from '@/lib/prisma';
 
 export class CursosService {
   /**
-   * Listar cursos con búsqueda opcional
+   * Listar cursos con búsqueda y filtro por currícula
    */
-  static async listar(buscar?: string) {
+  static async listar(buscar?: string, idCurricula?: number | null) {
     const where: any = { activo: true };
+
+    if (idCurricula === 0) {
+      where.id_curricula = null;
+    } else if (idCurricula && idCurricula > 0) {
+      where.id_curricula = idCurricula;
+    } else {
+      const vigente = await prisma.curricula.findFirst({ where: { vigente: true, activo: true } });
+      if (vigente) {
+        where.id_curricula = vigente.id;
+      }
+    }
+
     if (buscar) {
       where.OR = [
         { nombre: { contains: buscar, mode: 'insensitive' } },
@@ -14,6 +26,9 @@ export class CursosService {
     }
     return prisma.curso.findMany({
       where,
+      include: {
+        curricula: true,
+      },
       orderBy: { nombre: 'asc' },
     });
   }
@@ -25,6 +40,7 @@ export class CursosService {
     return prisma.curso.findUnique({
       where: { id },
       include: {
+        curricula: true,
         ofertas: {
           include: {
             periodo: true,
@@ -50,12 +66,14 @@ export class CursosService {
     nombre: string;
     codigo: string;
     creditos: number;
+    id_curricula?: number | null;
   }) {
     return prisma.curso.create({
       data: {
         nombre: datos.nombre,
         codigo: datos.codigo,
         creditos: datos.creditos,
+        id_curricula: datos.id_curricula ?? null,
       },
     });
   }

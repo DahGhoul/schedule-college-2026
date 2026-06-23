@@ -8,8 +8,9 @@ export class CursosController {
    */
   static async listar(req: Request, res: Response) {
     try {
-      const { buscar } = req.query;
-      const cursos = await CursosService.listar(buscar as string);
+      const { buscar, id_curricula } = req.query;
+      const idCurricula = id_curricula ? parseInt(id_curricula as string) : undefined;
+      const cursos = await CursosService.listar(buscar as string, idCurricula);
       res.json(cursos);
     } catch (error) {
       console.error('Error al listar cursos:', error);
