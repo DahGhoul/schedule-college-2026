@@ -63,13 +63,16 @@ export default function DashboardDocentePage() {
 
   const { data: resumen, isLoading: resumenLoading } = useResumenDocente(docenteId, idPeriodo);
 
+  const [descargando, setDescargando] = useState<'pdf' | 'excel' | null>(null);
+  const [exportOption, setExportOption] = useState<'completo' | 'carga-lectiva' | 'carga-no-lectiva'>('completo');
+
   const handleDescargarReporte = async (tipo: 'pdf' | 'excel') => {
     if (!idPeriodo || !docenteId) return;
     setDescargando(tipo);
     try {
       const response = tipo === 'pdf'
-        ? await reportesService.pdfDocente(docenteId, idPeriodo)
-        : await reportesService.excelDocente(docenteId, idPeriodo);
+        ? await reportesService.pdfDocente(docenteId, idPeriodo, exportOption)
+        : await reportesService.excelDocente(docenteId, idPeriodo, exportOption);
       const nombre = `${apellidoDocente.replace(/\s+/g, '_')}_${nombreDocente.replace(/\s+/g, '_')}`;
       descargarBlob(response.data, `horario_${nombre}.${tipo === 'pdf' ? 'pdf' : 'xlsx'}`);
       setToast({ mensaje: 'Reporte descargado correctamente', tipo: 'exito' });
@@ -403,21 +406,59 @@ export default function DashboardDocentePage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
-              <Boton
-                onClick={() => handleDescargarReporte('pdf')}
-                disabled={descargando !== null}
-                className="w-full flex items-center justify-center gap-2 bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 font-semibold transition-all disabled:opacity-50"
-              >
-                <FileText className="h-4 w-4 text-rose-500" />
-                {descargando === 'pdf' ? 'Generando PDF...' : 'Descargar Horario PDF'}
-              </Boton>
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-semibold text-slate-700">Tipo de exportación</label>
+                <div className="flex flex-col gap-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="exportOption"
+                      value="completo"
+                      checked={exportOption === 'completo'}
+                      onChange={(e) => setExportOption(e.target.value as any)}
+                      className="w-4 h-4 text-indigo-600"
+                    />
+                    <span className="text-sm text-slate-700">Horario completo (carga lectiva + no lectiva)</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="exportOption"
+                      value="carga-lectiva"
+                      checked={exportOption === 'carga-lectiva'}
+                      onChange={(e) => setExportOption(e.target.value as any)}
+                      className="w-4 h-4 text-indigo-600"
+                    />
+                    <span className="text-sm text-slate-700">Solo carga lectiva</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="exportOption"
+                      value="carga-no-lectiva"
+                      checked={exportOption === 'carga-no-lectiva'}
+                      onChange={(e) => setExportOption(e.target.value as any)}
+                      className="w-4 h-4 text-indigo-600"
+                    />
+                    <span className="text-sm text-slate-700">Solo carga no lectiva</span>
+                  </label>
+                </div>
+              </div>
               <Boton
                 onClick={() => handleDescargarReporte('excel')}
                 disabled={descargando !== null}
-                className="w-full flex items-center justify-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 font-semibold transition-all disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 font-semibold"
               >
                 <Clock className="h-4 w-4 text-emerald-500" />
                 {descargando === 'excel' ? 'Generando Excel...' : 'Descargar Horario Excel'}
+              </Boton>
+              <Boton
+                onClick={() => handleDescargarReporte('pdf')}
+                disabled={descargando !== null}
+                className="w-full flex items-center justify-center gap-2 bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 font-semibold"
+              >
+                <FileText className="h-4 w-4 text-rose-500" />
+                {descargando === 'pdf' ? 'Generando PDF...' : 'Descargar Horario PDF'}
               </Boton>
             </CardContent>
           </Card>

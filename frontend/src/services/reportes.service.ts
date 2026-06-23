@@ -2,16 +2,16 @@ import { apiClient } from '@/lib/api-client';
 
 export const reportesService = {
   // Download PDF report for a single teacher
-  pdfDocente: (idDocente: number, idPeriodo: number) =>
+  pdfDocente: (idDocente: number, idPeriodo: number, exportOption: 'completo' | 'carga-lectiva' | 'carga-no-lectiva' = 'completo') =>
     apiClient.get(`/reportes/docente/${idDocente}/pdf`, {
-      params: { idPeriodo },
+      params: { idPeriodo, exportOption },
       responseType: 'blob',
     }),
 
   // Download Excel report for a single teacher
-  excelDocente: (idDocente: number, idPeriodo: number) =>
+  excelDocente: (idDocente: number, idPeriodo: number, exportOption: 'completo' | 'carga-lectiva' | 'carga-no-lectiva' = 'completo') =>
     apiClient.get(`/reportes/docente/${idDocente}/excel`, {
-      params: { idPeriodo },
+      params: { idPeriodo, exportOption },
       responseType: 'blob',
     }),
 

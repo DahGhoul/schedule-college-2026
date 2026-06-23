@@ -10,10 +10,11 @@ export class ReportesController {
     try {
       const idDocente = parseInt(req.params.idDocente);
       const idPeriodo = parseInt(req.query.idPeriodo as string);
+      const exportOption = (req.query.exportOption as string) || 'completo';
       if (isNaN(idDocente) || isNaN(idPeriodo)) {
         return res.status(400).json({ error: 'idDocente e idPeriodo son requeridos' });
       }
-      const buffer = await GeneradorExcelService.generarHorarioDocenteExcel(idPeriodo, idDocente);
+      const buffer = await GeneradorExcelService.generarHorarioDocenteExcel(idPeriodo, idDocente, exportOption as any);
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', `attachment; filename="horario-docente-${idDocente}.xlsx"`);
       res.send(buffer);
@@ -27,10 +28,11 @@ export class ReportesController {
     try {
       const idDocente = parseInt(req.params.idDocente);
       const idPeriodo = parseInt(req.query.idPeriodo as string);
+      const exportOption = (req.query.exportOption as string) || 'completo';
       if (isNaN(idDocente) || isNaN(idPeriodo)) {
         return res.status(400).json({ error: 'idDocente e idPeriodo son requeridos' });
       }
-      const buffer = await GeneradorPdfService.generarHorarioDocentePdf(idPeriodo, idDocente);
+      const buffer = await GeneradorPdfService.generarHorarioDocentePdf(idPeriodo, idDocente, exportOption as any);
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="horario-docente-${idDocente}.pdf"`);
       res.send(buffer);

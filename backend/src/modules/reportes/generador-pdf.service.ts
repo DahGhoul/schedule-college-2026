@@ -123,7 +123,7 @@ export class GeneradorPdfService {
     });
   }
 
-  static async generarHorarioDocentePdf(idPeriodo: number, idDocente: number, exportOption: 'ambos' | 'solo_lectiva' | 'solo_no_lectiva' = 'ambos'): Promise<Buffer> {
+  static async generarHorarioDocentePdf(idPeriodo: number, idDocente: number, exportOption: 'completo' | 'carga-lectiva' | 'carga-no-lectiva' = 'completo'): Promise<Buffer> {
     const periodo = await prisma.periodo_academico.findUnique({ where: { id: idPeriodo } });
     const docente = await prisma.docente.findUnique({ where: { id: idDocente } });
     
@@ -145,7 +145,10 @@ export class GeneradorPdfService {
     });
   }
 
-  private static async generarPaginaDocente(doc: PDFDocumentWithTable, idPeriodo: number, idDocente: number, periodo: any, docente: any, exportOption: 'ambos' | 'solo_lectiva' | 'solo_no_lectiva' = 'ambos') {
+  private static async generarPaginaDocente(doc: PDFDocumentWithTable, idPeriodo: number, idDocente: number, periodo: any, docente: any, exportOption: 'completo' | 'carga-lectiva' | 'carga-no-lectiva' | 'ambos' | 'solo_lectiva' | 'solo_no_lectiva' = 'completo') {
+    // Map old options to new ones for backward compatibility
+    const normalizedOption = exportOption === 'ambos' ? 'completo' : exportOption === 'solo_lectiva' ? 'carga-lectiva' : exportOption === 'solo_no_lectiva' ? 'carga-no-lectiva' : exportOption;
+    
     const leftColX = 40;
     const topMargin = 40;
     const pageWidth = doc.page.width - 80;
@@ -235,7 +238,7 @@ export class GeneradorPdfService {
     const slotsOcupados = new Set<string>();
 
     // Fill detail table
-    if (exportOption !== 'solo_no_lectiva') {
+    if (normalizedOption !== 'carga-no-lectiva') {
       for (const info of contexto.registros) {
         // Encontrar el ciclo a partir de los bloques de este registro (curso + docente)
         const bloqueDelRegistro = bloques.find(b => 
@@ -317,53 +320,96 @@ export class GeneradorPdfService {
     y = horarioTop + 15;
     const newSlotsOcupados = new Set<string>();
     
-    horas.forEach((hora, horaIndex) => {
-      dias.forEach((dia, dIdx) => {
-        const x = leftColX + (dIdx + 1) * gridColWidth;
-        const slotKey = `${dia}-${hora}`;
-        
-        if (newSlotsOcupados.has(slotKey)) {
-          return;
-        }
-        
-        const entradas = contexto.celdas[slotKey] ?? [];
-        
-        if (entradas.length > 0) {
-          let span = 1;
-          if (entradas.length === 1) {
-            span = calcularFusionPdf(contexto.celdas, dia, horaIndex, horas, entradas[0].bloque);
+    // Helper to draw blocks
+    const drawBlocks = (entries: any[], color: string, isLectiva: boolean) => {
+      horas.forEach((hora, horaIndex) => {
+        dias.forEach((dia, dIdx) => {
+          const x = leftColX + (dIdx + 1) * gridColWidth;
+          const slotKey = `${dia}-${hora}`;
+          
+          if (newSlotsOcupados.has(slotKey)) {
+            return;
           }
-          const altoCelda = gridRowHeight * span;
           
-          const blockWidth = gridColWidth / entradas.length;
-          entradas.forEach((celda, idx) => {
-            const blockLeft = x + idx * blockWidth;
-            doc.rect(blockLeft, y, blockWidth, altoCelda).fillAndStroke(`#${celda.registro.color.slice(2)}`, BORDER_COLOR);
+          const slotEntries = entries.filter(e => e.dia_semana === dia && e.hora_inicio === hora);
+          
+          if (slotEntries.length > 0) {
+            let span = 1;
+            if (slotEntries.length === 1) {
+              // Calculate span
+              let currentHora = hora;
+              let currentIndex = horaIndex;
+              while (currentIndex + 1 < horas.length) {
+                const nextHora = horas[currentIndex + 1];
+                const nextEntry = entries.find(e => 
+                  e.dia_semana === dia && 
+                  e.hora_inicio === nextHora &&
+                  (isLectiva 
+                    ? (e.id_componente === slotEntries[0].id_componente && e.id_grupo === slotEntries[0].id_grupo && e.id_ambiente === slotEntries[0].id_ambiente)
+                    : (e.seccion === slotEntries[0].seccion)
+                  )
+                );
+                if (nextEntry) {
+                  span++;
+                  currentIndex++;
+                  currentHora = nextHora;
+                } else {
+                  break;
+                }
+              }
+            }
+            const altoCelda = gridRowHeight * span;
             
-            const texto = formatearEtiquetaCeldaPdf(celda.registro, celda.bloque, true);
-            const textWidth = blockWidth - 4;
-            const textHeight = 20;
-            const textoY = y + (altoCelda / 2) - (textHeight / 2);
-            
-            doc.fillColor('black').font('Helvetica-Bold').fontSize(5).text(texto, blockLeft + 2, textoY, {
-              width: textWidth,
-              align: 'center',
-              lineBreak: true,
-              height: altoCelda - 4,
-              ellipsis: false
+            const blockWidth = gridColWidth / slotEntries.length;
+            slotEntries.forEach((entry, idx) => {
+              const blockLeft = x + idx * blockWidth;
+              doc.rect(blockLeft, y, blockWidth, altoCelda).fillAndStroke(color, BORDER_COLOR);
+              
+              // Draw text
+              let texto = '';
+              if (isLectiva) {
+                // Find the corresponding registro in contexto
+                const registro = contexto.registros.find(r => 
+                  r.cursoId === entry.componente?.oferta?.id_curso
+                );
+                texto = formatearEtiquetaCeldaPdf(registro, entry, true);
+              } else {
+                texto = entry.seccion.replace(/_/g, ' ');
+              }
+              
+              doc.fillColor('black').font('Helvetica-Bold').fontSize(isLectiva ? 5 : 6).text(texto, blockLeft + 2, y + (altoCelda / 2) - 5, {
+                width: blockWidth - 4,
+                align: 'center',
+                lineBreak: true,
+                height: altoCelda - 4,
+                ellipsis: false
+              });
             });
-          });
-          
-          if (span > 1) {
-            for (let offset = 1; offset < span; offset++) {
-              newSlotsOcupados.add(`${dia}-${horas[horaIndex + offset]}`);
+            
+            if (span > 1) {
+              for (let offset = 1; offset < span; offset++) {
+                newSlotsOcupados.add(`${dia}-${horas[horaIndex + offset]}`);
+              }
             }
           }
-        }
+        });
+        
+        y += gridRowHeight;
       });
-      
-      y += gridRowHeight;
-    });
+    };
+    
+    if (normalizedOption === 'completo' || normalizedOption === 'carga-lectiva') {
+      // Draw lectiva blocks
+      const lectivaEntries = bloques.map(b => ({ ...b, isLectiva: true }));
+      drawBlocks(lectivaEntries, '#D9D2E9', true);
+    }
+    
+    if (normalizedOption === 'completo' || normalizedOption === 'carga-no-lectiva') {
+      // Draw no-lectiva blocks (reset y first)
+      y = horarioTop + 15;
+      const noLectivaEntries = bloquesNoLectivos.map(b => ({ ...b, isLectiva: false }));
+      drawBlocks(noLectivaEntries, '#FFE4B5', false);
+    }
   }
 
   private static async generarPaginaCiclo(doc: PDFDocumentWithTable, idPeriodo: number, idCiclo: number, periodo: any, ciclo: any) {

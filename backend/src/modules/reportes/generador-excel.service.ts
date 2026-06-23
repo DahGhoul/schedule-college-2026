@@ -31,7 +31,6 @@ export class GeneradorExcelService {
         fitToPage: true,
          fitToWidth: 1,
          margins: { left: 0.4, right: 0.4, top: 0.4, bottom: 0.4, header: 0.2, footer: 0.2 }
-       }
      });
 
     // Definir columnas para cabecera, detalle y grilla
@@ -440,12 +439,12 @@ export class GeneradorExcelService {
     });
   }
 
-  static async generarHorarioDocenteExcel(idPeriodo: number, idDocente: number): Promise<Buffer> {
+  static async generarHorarioDocenteExcel(idPeriodo: number, idDocente: number, exportOption: 'completo' | 'carga-lectiva' | 'carga-no-lectiva' = 'completo'): Promise<Buffer> {
     const workbook = new ExcelJS.Workbook();
     const periodo = await prisma.periodo_academico.findUnique({ where: { id: idPeriodo } });
     const docente = await prisma.docente.findUnique({ where: { id: idDocente } });
     
-    await this.generarHojaDocente(workbook, idPeriodo, idDocente, periodo, docente);
+    await this.generarHojaDocente(workbook, idPeriodo, idDocente, periodo, docente, exportOption);
     return workbook.xlsx.writeBuffer() as unknown as Promise<Buffer>;
   }
 
@@ -464,7 +463,7 @@ export class GeneradorExcelService {
     return workbook.xlsx.writeBuffer() as unknown as Promise<Buffer>;
   }
 
-  private static async generarHojaDocente(workbook: ExcelJS.Workbook, idPeriodo: number, idDocente: number, periodo: any, docente: any) {
+  private static async generarHojaDocente(workbook: ExcelJS.Workbook, idPeriodo: number, idDocente: number, periodo: any, docente: any, exportOption: 'completo' | 'carga-lectiva' | 'carga-no-lectiva' = 'completo') {
     const ws = workbook.addWorksheet(`${docente.apellidos.substring(0,10)}`, {
       pageSetup: { paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1 }
     });
@@ -530,22 +529,24 @@ export class GeneradorExcelService {
     }
 
     let currentRow = 2;
-    for (const cid in mapaCursos) {
-      const info = mapaCursos[cid];
-      const data = [info.indice, info.nombre, `${info.ciclo}°`, info.teo, info.lab, info.grupos, info.total, 'SISTEMAS'];
-      data.forEach((val, i) => {
-        const cell = ws.getCell(currentRow, detailCols[i]);
-        cell.value = val;
-        cell.font = { size: 8, color: { argb: 'FF000000' } };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + info.color } };
-        cell.border = { 
-          top: { style: 'thin', color: { argb: 'FF000000' } }, 
-          left: { style: 'thin', color: { argb: 'FF000000' } }, 
-          bottom: { style: 'thin', color: { argb: 'FF000000' } }, 
-          right: { style: 'thin', color: { argb: 'FF000000' } } 
-        };
-      });
-      currentRow++;
+    if (exportOption !== 'carga-no-lectiva') {
+      for (const cid in mapaCursos) {
+        const info = mapaCursos[cid];
+        const data = [info.indice, info.nombre, `${info.ciclo}°`, info.teo, info.lab, info.grupos, info.total, 'SISTEMAS'];
+        data.forEach((val, i) => {
+          const cell = ws.getCell(currentRow, detailCols[i]);
+          cell.value = val;
+          cell.font = { size: 8, color: { argb: 'FF000000' } };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + info.color } };
+          cell.border = { 
+            top: { style: 'thin', color: { argb: 'FF000000' } }, 
+            left: { style: 'thin', color: { argb: 'FF000000' } }, 
+            bottom: { style: 'thin', color: { argb: 'FF000000' } }, 
+            right: { style: 'thin', color: { argb: 'FF000000' } } 
+          };
+        });
+        currentRow++;
+      }
     }
 
     // 3. HORARIO
@@ -569,9 +570,17 @@ export class GeneradorExcelService {
       };
     });
 
-    const bloques = await prisma.bloque_horario.findMany({
+    const bloquesLectivos = await prisma.bloque_horario.findMany({
       where: { id_periodo: idPeriodo, id_docente: idDocente },
-      include: { componente: { include: { oferta: { include: { curso: true } } } }, ambiente: true, grupo: true }
+      include: { 
+        componente: { include: { oferta: { include: { curso: true } } } }, 
+        ambiente: true, 
+        grupo: true 
+      }
+    });
+    const bloquesNoLectivos = await prisma.carga_no_lectiva_bloque.findMany({
+      where: { id_periodo: idPeriodo, id_docente: idDocente },
+      orderBy: [{ dia_semana: 'asc' }, { hora_inicio: 'asc' }]
     });
 
     horas.forEach((h, i) => {
@@ -589,12 +598,34 @@ export class GeneradorExcelService {
 
       dias.forEach((d, di) => {
         const cs = gridCols[di + 1].s, ce = gridCols[di + 1].e;
-        const celdasEnHora = bloques.filter(bl => bl.dia_semana === d && bl.hora_inicio === h);
-        const numEntradas = celdasEnHora.length;
+        let cellValue = '';
+        let cellColor = 'FFFFFFFF';
         
-        if (numEntradas === 0) {
-          ws.mergeCells(row, cs, row, ce);
-          const cell = ws.getCell(row, cs);
+        if (exportOption === 'completo' || exportOption === 'carga-lectiva') {
+          const lectivosEnHora = bloquesLectivos.filter(b => b.dia_semana === d && b.hora_inicio === h);
+          if (lectivosEnHora.length > 0) {
+            const b = lectivosEnHora[0];
+            const info = mapaCursos[b.componente.oferta.id_curso];
+            cellValue = `${info?.indice || '?'}\n(Aula: ${b.ambiente?.codigo || 'Solic.'})`;
+            cellColor = 'FF' + (info?.color || 'FFFFFF');
+          }
+        }
+        
+        if (exportOption === 'completo' || exportOption === 'carga-no-lectiva') {
+          const noLectivosEnHora = bloquesNoLectivos.filter(b => b.dia_semana === d && b.hora_inicio === h);
+          if (noLectivosEnHora.length > 0) {
+            const b = noLectivosEnHora[0];
+            cellValue = cellValue ? `${cellValue}\n${b.seccion.replace(/_/g, ' ')}` : b.seccion.replace(/_/g, ' ');
+            cellColor = cellColor !== 'FFFFFFFF' ? cellColor : 'FFFFE4B5';
+          }
+        }
+
+        // Apply cell styles
+        for (let col = cs; col <= ce; col++) {
+          const cell = ws.getCell(row, col);
+          cell.value = col === cs ? cellValue : '';
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: cellColor } };
+          cell.font = { bold: true, size: 7, color: { argb: 'FF000000' } };
           cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
           cell.border = { 
             top: { style: 'thin', color: { argb: 'FF000000' } }, 
@@ -602,29 +633,10 @@ export class GeneradorExcelService {
             bottom: { style: 'thin', color: { argb: 'FF000000' } }, 
             right: { style: 'thin', color: { argb: 'FF000000' } } 
           };
-        } else {
-          const colWidth = (ce - cs + 1) / numEntradas;
-          let currentCol = cs;
-          celdasEnHora.forEach((b, idx) => {
-            const startCol = currentCol;
-            const endCol = idx === numEntradas - 1 ? ce : Math.floor(currentCol + colWidth - 1);
-            if (startCol < endCol) {
-              ws.mergeCells(row, startCol, row, endCol);
-            }
-            const cell = ws.getCell(row, startCol);
-            const info = mapaCursos[b.componente.oferta.id_curso];
-            cell.value = `${info?.indice || '?'}\n(Aula: ${b.ambiente?.codigo || 'Solic.'})`;
-            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + (info?.color || 'FFFFFF') } };
-            cell.font = { bold: true, size: 7, color: { argb: 'FF000000' } };
-            cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-            cell.border = { 
-              top: { style: 'thin', color: { argb: 'FF000000' } }, 
-              left: { style: 'thin', color: { argb: 'FF000000' } }, 
-              bottom: { style: 'thin', color: { argb: 'FF000000' } }, 
-              right: { style: 'thin', color: { argb: 'FF000000' } } 
-            };
-            currentCol = endCol + 1;
-          });
+        }
+        
+        if (cs < ce) {
+          ws.mergeCells(row, cs, row, ce);
         }
       });
     });

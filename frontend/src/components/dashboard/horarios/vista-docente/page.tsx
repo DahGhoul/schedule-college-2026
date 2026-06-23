@@ -19,6 +19,7 @@ export default function VistaHorarioDocentePage() {
   const docenteIdFromSession = usuario?.idDocente || null;
   const [docenteSeleccionado, setDocenteSeleccionado] = useState<number | null>(docenteIdFromSession);
   const [toast, setToast] = useState<{ mensaje: string; tipo: 'exito' | 'error' } | null>(null);
+  const [exportOption, setExportOption] = useState<'completo' | 'carga-lectiva' | 'carga-no-lectiva'>('completo');
   const [exportandoPdf, setExportandoPdf] = useState(false);
   const [exportandoExcel, setExportandoExcel] = useState(false);
 
@@ -46,7 +47,7 @@ export default function VistaHorarioDocentePage() {
 
     setExportandoPdf(true);
     try {
-      const response = await reportesService.pdfDocente(docenteSeleccionado, idPeriodo);
+      const response = await reportesService.pdfDocente(docenteSeleccionado, idPeriodo, exportOption);
       const nombreDocente = usuario?.docente
         ? `${usuario.docente.apellidos || ''}_${usuario.docente.nombres || ''}`.replace(/\s+/g, '_')
         : 'horario';
@@ -64,7 +65,7 @@ export default function VistaHorarioDocentePage() {
 
     setExportandoExcel(true);
     try {
-      const response = await reportesService.excelDocente(docenteSeleccionado, idPeriodo);
+      const response = await reportesService.excelDocente(docenteSeleccionado, idPeriodo, exportOption);
       const nombreDocente = usuario?.docente
         ? `${usuario.docente.apellidos || ''}_${usuario.docente.nombres || ''}`.replace(/\s+/g, '_')
         : 'horario';
@@ -127,23 +128,63 @@ export default function VistaHorarioDocentePage() {
         </div>
       ) : docenteSeleccionado && idPeriodo ? (
         <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row justify-end gap-3">
-            <Boton
-              onClick={handleExportarExcel}
-              disabled={exportandoExcel}
-              className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 font-semibold rounded-[1.5rem]"
-            >
-              <Clock className="h-4 w-4" />
-              {exportandoExcel ? 'Generando Excel...' : 'Exportar Excel'}
-            </Boton>
-            <Boton
-              onClick={handleExportarPdf}
-              disabled={exportandoPdf}
-              className="flex items-center gap-2 bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 font-semibold rounded-[1.5rem]"
-            >
-              <FileText className="h-4 w-4" />
-              {exportandoPdf ? 'Generando PDF...' : 'Exportar PDF'}
-            </Boton>
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-700">Tipo de exportación</label>
+              <div className="flex flex-wrap gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="exportOption"
+                    value="completo"
+                    checked={exportOption === 'completo'}
+                    onChange={(e) => setExportOption(e.target.value as any)}
+                    className="w-4 h-4 text-indigo-600"
+                  />
+                  <span className="text-sm text-slate-700">Horario completo</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="exportOption"
+                    value="carga-lectiva"
+                    checked={exportOption === 'carga-lectiva'}
+                    onChange={(e) => setExportOption(e.target.value as any)}
+                    className="w-4 h-4 text-indigo-600"
+                  />
+                  <span className="text-sm text-slate-700">Carga lectiva</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="exportOption"
+                    value="carga-no-lectiva"
+                    checked={exportOption === 'carga-no-lectiva'}
+                    onChange={(e) => setExportOption(e.target.value as any)}
+                    className="w-4 h-4 text-indigo-600"
+                  />
+                  <span className="text-sm text-slate-700">Carga no lectiva</span>
+                </label>
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row justify-end gap-3">
+              <Boton
+                onClick={handleExportarExcel}
+                disabled={exportandoExcel}
+                className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 font-semibold rounded-[1.5rem]"
+              >
+                <Clock className="h-4 w-4" />
+                {exportandoExcel ? 'Generando Excel...' : 'Exportar Excel'}
+              </Boton>
+              <Boton
+                onClick={handleExportarPdf}
+                disabled={exportandoPdf}
+                className="flex items-center gap-2 bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 font-semibold rounded-[1.5rem]"
+              >
+                <FileText className="h-4 w-4" />
+                {exportandoPdf ? 'Generando PDF...' : 'Exportar PDF'}
+              </Boton>
+            </div>
           </div>
 
           <div className="bg-white rounded-[1.5rem] shadow-sm border border-slate-200 overflow-hidden">
