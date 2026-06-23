@@ -765,6 +765,12 @@ async function generarPaginaDocente(
   // ── Página 1: Detalle ──
   if (exportOption === 'completo') {
     // Tabla lectiva
+    // Separador visual
+    currentY += 8;
+    doc.font('Helvetica-Bold').fontSize(7).fillColor('#000000ff')
+      .text('CARGA LECTIVA', tableStartX, currentY);
+    currentY += 10;
+
     currentY = dibujarTablaDetalleLectiva(
       doc, contexto, mapaColores,
       tableStartX, colWidthsLectiva, currentY
@@ -772,7 +778,7 @@ async function generarPaginaDocente(
 
     // Separador visual
     currentY += 8;
-    doc.font('Helvetica-Bold').fontSize(7).fillColor('#555555')
+    doc.font('Helvetica-Bold').fontSize(7).fillColor('#000000ff')
       .text('CARGA NO LECTIVA', tableStartX, currentY);
     currentY += 10;
 
