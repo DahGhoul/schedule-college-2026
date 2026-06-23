@@ -7,7 +7,7 @@ export class ConfiguracionService {
    */
   static async obtenerRestricciones(): Promise<RestriccionInstitucional> {
     const periodo = await prisma.periodo_academico.findFirst({
-      where: { estado: 'ACTIVO' },
+      where: { activo: true },
     });
     if (!periodo) throw new Error('No hay período activo');
 
@@ -37,7 +37,7 @@ export class ConfiguracionService {
    */
   static async actualizarRestricciones(datos: Record<string, string | number>): Promise<void> {
     const periodo = await prisma.periodo_academico.findFirst({
-      where: { estado: 'ACTIVO' },
+      where: { activo: true },
     });
     if (!periodo) throw new Error('No hay período activo');
 
