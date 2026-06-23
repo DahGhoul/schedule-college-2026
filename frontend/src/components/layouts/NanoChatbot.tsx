@@ -166,14 +166,61 @@ export const NanoChatbot = () => {
 
   // ============ DOCENTE QUERY HANDLERS ============
 
+  const getHoyDia = () => {
+    const dias = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+    return dias[new Date().getDay()];
+  };
+
   const handleDocenteQuery = async (text: string): Promise<string> => {
     const idDocente = usuario?.idDocente;
     if (!idDocente) {
       return 'No puedo encontrar tu información como docente en el sistema.';
     }
 
-    if (matchesKeywords(text, ['horario', 'mi horario', 'ver horario', 'cual es mi horario', 'ver mi horario'])) {
-      return 'Para consultar tu horario personal, accede a la sección Horarios > Mi Horario en el menú lateral del sistema.';
+    // Handle horario-related queries (hoy, semana, dia especifico)
+    if (matchesKeywords(text, ['horario', 'mi horario', 'ver horario', 'cual es mi horario', 'ver mi horario', 'que clases', 'mis clases', 'clases hoy', 'clases mañana', 'horario completo', 'horario semana'])) {
+      try {
+        const periodoActivo = await getPeriodoActivo();
+        if (!periodoActivo) return 'No hay un periodo académico activo actualmente.';
+
+        const res = await horariosService.obtenerSeleccionesTemporales(idDocente);
+        let bloques = res.data || res;
+        if (!Array.isArray(bloques)) bloques = [];
+
+        if (bloques.length === 0) {
+          return 'No tienes horario cargado en el periodo activo.';
+        }
+
+        // Check if querying a specific day
+        let diaFiltrado = null;
+        if (matchesKeywords(text, ['hoy'])) {
+          diaFiltrado = getHoyDia();
+        } else {
+          for (const dia of Object.keys(DIAS_MAP)) {
+            if (text.includes(dia)) {
+              diaFiltrado = dia;
+              break;
+            }
+          }
+        }
+
+        if (diaFiltrado) {
+          const diaDb = DIAS_MAP[diaFiltrado as keyof typeof DIAS_MAP];
+          const bloquesDia = bloques.filter((b: any) => b.dia === diaDb);
+          if (bloquesDia.length === 0) {
+            return `No tienes clases ${diaFiltrado === getHoyDia() ? 'hoy' : 'el ' + diaFiltrado}.`;
+          }
+          const textoBloques = formatBloquesHorario(bloquesDia);
+          return `Tu horario ${diaFiltrado === getHoyDia() ? 'hoy' : 'el ' + diaFiltrado} es:\n${textoBloques}`;
+        }
+
+        // Otherwise, show full week
+        const textoBloques = formatBloquesHorario(bloques);
+        return `Tu horario completo de la semana es:\n${textoBloques}`;
+      } catch (err) {
+        console.error('Error loading docente horario:', err);
+        return 'No pude cargar tu horario. Por favor, verifica más tarde.';
+      }
     }
 
     if (matchesKeywords(text, ['curso', 'cursos', 'asignado', 'asignados', 'mis curso', 'mis cursos', 'que cursos', 'cuales son mis cursos', 'dame mis cursos'])) {
@@ -332,6 +379,72 @@ export const NanoChatbot = () => {
     }
   };
 
+  const handleCursosPorCiclo = async (text: string): Promise<string | null> => {
+    try {
+      const periodoActivo = await getPeriodoActivo();
+      if (!periodoActivo) return 'No hay un periodo académico activo actualmente.';
+
+      const ciclos = await periodosService.obtenerCiclosActivo();
+      const ciclosList = ciclos.data || ciclos;
+
+      if (ciclosList.length === 0) {
+        return 'No hay ciclos disponibles para el periodo activo.';
+      }
+
+      let cicloSeleccionado = null;
+      for (let i = 1; i <= 10; i++) {
+        if (text.includes(`ciclo ${i}`) || text.includes(`${i} ciclo`)) {
+          cicloSeleccionado = ciclosList.find((c: any) => c.numero === i);
+          break;
+        }
+      }
+
+      if (!cicloSeleccionado) {
+        const ciclosDisponibles = ciclosList.map((c: any) => `Ciclo ${c.numero}`).join(', ');
+        return `¿De qué ciclo quieres conocer los cursos? Los ciclos disponibles son: ${ciclosDisponibles}. Por favor, menciona el número del ciclo.`;
+      }
+
+      const cursosPorCiclo = await cargaHorariaService.obtenerCursosPorCiclo(periodoActivo.id, cicloSeleccionado.id);
+      const cursosList = cursosPorCiclo.data || cursosPorCiclo;
+
+      if (cursosList.length === 0) {
+        return `No hay cursos asignados al Ciclo ${cicloSeleccionado.numero} en el periodo activo.`;
+      }
+
+      const nombresCursos = cursosList.map((c: any) => {
+        const codigo = c.curso?.codigo || c.cursoCodigo || '';
+        const nombre = c.curso?.nombre || c.cursoNombre || 'Curso sin nombre';
+        return `- ${codigo ? codigo + ': ' : ''}${nombre}`;
+      }).join('\n');
+
+      return `Cursos del Ciclo ${cicloSeleccionado.numero}:\n${nombresCursos}`;
+    } catch (err) {
+      console.error('Error loading courses by cycle:', err);
+      return 'No pude cargar la información de los cursos por ciclo.';
+    }
+  };
+
+  const handleResumenGeneral = async (): Promise<string> => {
+    try {
+      const periodoActivo = await getPeriodoActivo();
+      if (!periodoActivo) return 'No hay un periodo académico activo actualmente.';
+
+      const ciclos = await periodosService.obtenerCiclosActivo();
+      const ciclosList = ciclos.data || ciclos;
+
+      const resumen = await estadisticasService.resumen(periodoActivo.id);
+      const totalDocentes = resumen.data?.totalDocentes || 0;
+      const totalCursos = resumen.data?.totalCursos || 0;
+
+      return `Resumen general del periodo activo (${periodoActivo.nombre}):
+- Total de ciclos: ${ciclosList.length}
+- Total de docentes: ${totalDocentes}
+- Total de cursos: ${totalCursos}`;
+    } catch {
+      return 'No pude cargar el resumen general del periodo.';
+    }
+  };
+
   const handleSecretariaQuery = async (text: string): Promise<string> => {
     if (matchesKeywords(text, ['horario de', 'horario del', 'clases de', 'clases del', 'horario docente'])) {
       const result = await handleDocenteSchedule(text);
@@ -348,6 +461,15 @@ export const NanoChatbot = () => {
 
     if (matchesKeywords(text, ['ambiente disponible', 'ambiente libre', 'aula libre', 'aula disponible', 'laboratorio disponible', 'que ambientes'])) {
       return await handleAmbientesDisponibles();
+    }
+
+    if (matchesKeywords(text, ['ciclo', 'cursos del ciclo', 'cursos por ciclo', 'cuales son los cursos del ciclo', 'dame los cursos del ciclo'])) {
+      const result = await handleCursosPorCiclo(text);
+      if (result) return result;
+    }
+
+    if (matchesKeywords(text, ['resumen', 'resumen general', 'estado general', 'como va el periodo', 'status del periodo', 'informacion general'])) {
+      return await handleResumenGeneral();
     }
 
     if (matchesKeywords(text, ['falta', 'faltan', 'pendiente', 'pendientes', 'cargar horario', 'sin cargar', 'docentes pendientes', 'quien falta'])) {
@@ -407,68 +529,35 @@ export const NanoChatbot = () => {
 
   const handleDirectorQuery = async (text: string): Promise<string> => {
     if (matchesKeywords(text, ['ciclo', 'cursos del ciclo', 'cursos por ciclo', 'cuales son los cursos del ciclo', 'dame los cursos del ciclo'])) {
-      try {
-        const periodoActivo = await getPeriodoActivo();
-        if (!periodoActivo) return 'No hay un periodo académico activo actualmente.';
-
-        const ciclos = await periodosService.obtenerCiclosActivo();
-        const ciclosList = ciclos.data || ciclos;
-
-        if (ciclosList.length === 0) {
-          return 'No hay ciclos disponibles para el periodo activo.';
-        }
-
-        let cicloSeleccionado = null;
-        for (let i = 1; i <= 10; i++) {
-          if (text.includes(`ciclo ${i}`) || text.includes(`${i} ciclo`)) {
-            cicloSeleccionado = ciclosList.find((c: any) => c.numero === i);
-            break;
-          }
-        }
-
-        if (!cicloSeleccionado) {
-          const ciclosDisponibles = ciclosList.map((c: any) => `Ciclo ${c.numero}`).join(', ');
-          return `¿De qué ciclo quieres conocer los cursos? Los ciclos disponibles son: ${ciclosDisponibles}. Por favor, menciona el número del ciclo.`;
-        }
-
-        const cursosPorCiclo = await cargaHorariaService.obtenerCursosPorCiclo(periodoActivo.id, cicloSeleccionado.id);
-        const cursosList = cursosPorCiclo.data || cursosPorCiclo;
-
-        if (cursosList.length === 0) {
-          return `No hay cursos asignados al Ciclo ${cicloSeleccionado.numero} en el periodo activo.`;
-        }
-
-        const nombresCursos = cursosList.map((c: any) => {
-          const codigo = c.curso?.codigo || c.cursoCodigo || '';
-          const nombre = c.curso?.nombre || c.cursoNombre || 'Curso sin nombre';
-          return `- ${codigo ? codigo + ': ' : ''}${nombre}`;
-        }).join('\n');
-
-        return `Cursos del Ciclo ${cicloSeleccionado.numero}:\n${nombresCursos}`;
-      } catch (err) {
-        console.error('Error loading courses by cycle:', err);
-        return 'No pude cargar la información de los cursos por ciclo.';
-      }
+      const result = await handleCursosPorCiclo(text);
+      if (result) return result;
     }
 
     if (matchesKeywords(text, ['resumen', 'resumen general', 'estado general', 'como va el periodo', 'status del periodo', 'informacion general'])) {
+      return await handleResumenGeneral();
+    }
+
+    if (matchesKeywords(text, ['cuantos docentes', 'total docentes', 'numero de docentes', 'docentes registrados'])) {
       try {
         const periodoActivo = await getPeriodoActivo();
         if (!periodoActivo) return 'No hay un periodo académico activo actualmente.';
-
-        const ciclos = await periodosService.obtenerCiclosActivo();
-        const ciclosList = ciclos.data || ciclos;
-
         const resumen = await estadisticasService.resumen(periodoActivo.id);
         const totalDocentes = resumen.data?.totalDocentes || 0;
-        const totalCursos = resumen.data?.totalCursos || 0;
-
-        return `Resumen general del periodo activo (${periodoActivo.nombre}):
-- Total de ciclos: ${ciclosList.length}
-- Total de docentes: ${totalDocentes}
-- Total de cursos: ${totalCursos}`;
+        return `Hay ${totalDocentes} docentes registrados en el sistema.`;
       } catch {
-        return 'No pude cargar el resumen general del periodo.';
+        return 'No pude cargar el número de docentes.';
+      }
+    }
+
+    if (matchesKeywords(text, ['cuantos cursos', 'total cursos', 'numero de cursos', 'cursos dictados'])) {
+      try {
+        const periodoActivo = await getPeriodoActivo();
+        if (!periodoActivo) return 'No hay un periodo académico activo actualmente.';
+        const resumen = await estadisticasService.resumen(periodoActivo.id);
+        const totalCursos = resumen.data?.totalCursos || 0;
+        return `Hay ${totalCursos} cursos dictados en el periodo activo.`;
+      } catch {
+        return 'No pude cargar el número de cursos.';
       }
     }
 
