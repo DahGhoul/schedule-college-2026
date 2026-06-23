@@ -1,11 +1,105 @@
 import { prisma } from '@/lib/prisma';
 import PDFDocument from 'pdfkit';
-import { crearContextoHorarioCiclo, formatearEtiquetaCelda, obtenerColorCurso } from './horario-ciclo.utils';
+import { crearContextoHorarioCiclo } from './horario-ciclo.utils';
 
-const BORDER_COLOR = '#000000';
-const HEADER_BG = '#D9D2E9';
-const NO_LECTIVA_BG = '#FFE4B5';
-const NO_LECTIVA_COLOR_BASE = [255, 200, 100]; // base naranja para no-lectivas
+const BORDER_COLOR = '#1A1A2E';
+const HEADER_BG = '#E8E4F0';
+
+// ────────────────────────────────────────────────────────────
+// Sistema de paletas profesionales
+// ────────────────────────────────────────────────────────────
+
+/**
+ * 32 colores claros y profesionales, visualmente distintos entre sí.
+ * Inspirados en paletas de diseño editorial: lavandas, mints, cielos, rosas,
+ * sages, melocotones, índigos suaves, ámbar, etc. Todos superan el contraste
+ * necesario para texto negro sobre fondo claro.
+ */
+const PALETA_LECTIVA: string[] = [
+  '#C9E4F5', // Celeste suave
+  '#C5E8D3', // Mint fresco
+  '#F5D7E3', // Rosa palo
+  '#D4C9F0', // Lavanda
+  '#FAE8C2', // Ámbar claro
+  '#C2E8E8', // Turquesa suave
+  '#F0D9C5', // Melocotón
+  '#D1EAC5', // Verde sage
+  '#E8C9E4', // Malva claro
+  '#C5D4F0', // Azul pizarra suave
+  '#F5F0C2', // Lima pálido
+  '#F0C5C5', // Coral suave
+  '#C5E4D4', // Seafoam
+  '#E4D4C5', // Arena cálida
+  '#D4E8C2', // Pistacho
+  '#C5C9E8', // Perivenio
+  '#F0E4C5', // Crema dorada
+  '#E4C5D4', // Frambuesa suave
+  '#C5E8E4', // Aqua pálido
+  '#D8C5F0', // Violeta claro
+  '#E8D4C2', // Tostado suave
+  '#C2D8E8', // Denim suave
+  '#F5E4C5', // Vainilla
+  '#C8E4C5', // Eucalipto
+  '#F0C8D4', // Peonía suave
+  '#C5D8D4', // Grisáceo menta
+  '#E8E4C2', // Mostaza pálida
+  '#D4C5E8', // Orquídea suave
+  '#C5E4E8', // Cielo invierno
+  '#F0D4C5', // Salmón claro
+  '#D4E4C5', // Helecho pálido
+  '#E4C5C5', // Rosa empolvado
+];
+
+/**
+ * 20 colores para carga no-lectiva: distintos entre sí y claramente
+ * diferenciados del rango lectivo. Tonos más cálidos/neutros.
+ */
+const PALETA_NO_LECTIVA: string[] = [
+  '#FFE5A0', // Amarillo suave
+  '#FFD0A8', // Naranja claro
+  '#FFDBC5', // Durazno
+  '#F5D5A0', // Ocre claro
+  '#FFE0C8', // Albaricoque
+  '#F5E8A0', // Limón pálido
+  '#FFDAB5', // Mandarina suave
+  '#F0D890', // Miel pálida
+  '#FFD8B0', // Papaya claro
+  '#F5C8A8', // Terracota suave
+  '#FFE8B0', // Trigo
+  '#F5D0B0', // Bisque
+  '#FFD5C0', // Melón suave
+  '#F0E0A0', // Champagne
+  '#FFD0B8', // Coral claro
+  '#F5E0B0', // Crema caliente
+  '#FFD8A0', // Sol suave
+  '#F0D0A8', // Caramelo claro
+  '#FFE0B0', // Vainilla cálida
+  '#F5D8C0', // Piel suave
+];
+
+/** Devuelve el color lectivo para el índice dado (1-based), garantizando unicidad cíclica */
+function obtenerColorLectivo(index: number): string {
+  return PALETA_LECTIVA[(index - 1) % PALETA_LECTIVA.length];
+}
+
+/** Devuelve el color no-lectivo para el índice dado (0-based) */
+function obtenerColorNoLectiva(index: number): string {
+  return PALETA_NO_LECTIVA[index % PALETA_NO_LECTIVA.length];
+}
+
+const NO_LECTIVA_BG = PALETA_NO_LECTIVA[0];
+
+/**
+ * Sobreescribe los colores del contexto generado por crearContextoHorarioCiclo
+ * con nuestra paleta propia, garantizando que cada registro tenga un color único.
+ * El contexto usa formato '0xRRGGBB'; nosotros asignamos '#RRGGBB' directamente
+ * y añadimos la propiedad colorHex para uso interno seguro.
+ */
+function aplicarColoresPropios(contexto: any): void {
+  contexto.registros.forEach((reg: any, idx: number) => {
+    reg.colorHex = obtenerColorLectivo(idx + 1);
+  });
+}
 
 // ────────────────────────────────────────────────────────────
 // Helpers de formato
@@ -23,15 +117,6 @@ function obtenerClaveFusionPdf(bloque: any): string {
 
 function obtenerClaveNoLectiva(bloque: any): string {
   return `${bloque.dia_semana}-${bloque.seccion}-${bloque.id_docente}`;
-}
-
-/** Genera un color pastel distinto para cada índice de carga no-lectiva */
-function obtenerColorNoLectiva(index: number): string {
-  const paleta = [
-    '#FFD580', '#FFBC6B', '#FFA94D', '#FF8C42',
-    '#F4C842', '#F7A825', '#E8B84B', '#F0D060',
-  ];
-  return paleta[index % paleta.length];
 }
 
 function formatearEtiquetaCeldaPdf(
@@ -198,7 +283,7 @@ function dibujarBloquesCiclo(
 
       entradas.forEach((celda: any, idx: number) => {
         const blockLeft = x + idx * blockWidth;
-        const colorHex = `#${celda.registro.color.slice(2)}`;
+        const colorHex = celda.registro.colorHex ?? obtenerColorLectivo(celda.registro.indice ?? 1);
         doc.rect(blockLeft, y, blockWidth, altoCelda).fillAndStroke(colorHex, BORDER_COLOR);
         const texto = formatearEtiquetaCeldaPdf(celda.registro, celda.bloque);
         const textoY = y + altoCelda / 2 - 10;
@@ -271,7 +356,9 @@ function dibujarBloquesDocente(
         ) || contexto.registros.find((r: any) =>
           r.cursoId === entry.componente?.oferta?.id_curso
         );
-        const colorHex = registro ? `#${registro.color.slice(2)}` : HEADER_BG;
+        const colorHex = registro
+          ? (registro.colorHex ?? obtenerColorLectivo(registro.indice ?? 1))
+          : HEADER_BG;
         doc.rect(blockLeft, y, blockWidth, altoCelda).fillAndStroke(colorHex, BORDER_COLOR);
         const texto = formatearEtiquetaCeldaPdf(registro, entry, true);
         doc.fillColor('black').font('Helvetica-Bold').fontSize(5)
@@ -386,9 +473,10 @@ function dibujarTablaDetalleLectiva(
     ];
     currentX = tableStartX;
     doc.font('Helvetica').fontSize(6).fillColor('black');
+    const filaColor = info.colorHex ?? obtenerColorLectivo(info.indice ?? 1);
     rowData.forEach((val, i) => {
       doc.rect(currentX, currentY, colWidths[i], 10)
-        .fillAndStroke(`#${info.color.slice(2)}`, BORDER_COLOR);
+        .fillAndStroke(filaColor, BORDER_COLOR);
       doc.fillColor('black').text(val, currentX, currentY + 2, {
         width: colWidths[i],
         height: 10,
@@ -533,6 +621,7 @@ async function generarPaginaCiclo(
   });
 
   const contexto = crearContextoHorarioCiclo(bloques as any[]);
+  aplicarColoresPropios(contexto);
 
   for (const info of contexto.registros) {
     const rowData = [
@@ -548,9 +637,10 @@ async function generarPaginaCiclo(
     ];
     currentX = tableStartX;
     doc.font('Helvetica').fontSize(6).fillColor('black');
+    const filaColor = info.colorHex ?? obtenerColorLectivo(info.indice ?? 1);
     rowData.forEach((val, i) => {
       doc.rect(currentX, currentY, colWidths[i], 10)
-        .fillAndStroke(`#${info.color.slice(2)}`, BORDER_COLOR);
+        .fillAndStroke(filaColor, BORDER_COLOR);
       doc.fillColor('black').text(val, currentX, currentY + 2, {
         width: colWidths[i],
         height: 10,
@@ -637,6 +727,7 @@ async function generarPaginaDocente(
   const declaracion = declaraciones[0] ?? null;
 
   const contexto = crearContextoHorarioCiclo(bloques as any[]);
+  aplicarColoresPropios(contexto);
 
   // ── Mapa de colores para secciones no lectivas ──
   const mapaColoresNoLectiva = new Map<string, string>();
@@ -802,11 +893,12 @@ async function generarPaginaAmbiente(
     const key = `${b.id_docente}-${b.componente.id_oferta}`;
     if (!mapaDocenteCurso[key]) {
       if (!coloresPorCurso.has(cursoId)) {
-        coloresPorCurso.set(cursoId, '#' + obtenerColorCurso(coloresPorCurso.size + 1).slice(2));
+        // Asignamos un color de nuestra paleta lectiva (índice = tamaño actual + 1)
+        coloresPorCurso.set(cursoId, obtenerColorLectivo(coloresPorCurso.size + 1));
       }
       mapaDocenteCurso[key] = {
         indice: indexDocente++,
-        color: coloresPorCurso.get(cursoId) ?? '#' + obtenerColorCurso(1).slice(2),
+        color: coloresPorCurso.get(cursoId) ?? obtenerColorLectivo(1),
         nombre: `${b.docente.apellidos}, ${b.docente.nombres.substring(0, 1)}.`,
         cursoNombre: b.componente.oferta.curso.nombre,
         tipo: b.componente.tipo,
