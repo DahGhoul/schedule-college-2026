@@ -232,19 +232,19 @@ export default function CurriculaPage() {
               {...register('nombre')}
               error={errors.nombre?.message}
             />
-            <Selector label="Vigente" error={errors.vigente?.message}>
-              <select
-                value={vigenteValue ? 'true' : 'false'}
-                onChange={(e) => {
-                  const val = e.target.value === 'true';
-                  setValue('vigente', val, { shouldDirty: true, shouldTouch: true });
-                }}
-                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-unt-primary focus:ring-4 focus:ring-unt-primary/5 focus:outline-none"
-              >
-                <option value="false">No</option>
-                <option value="true">Sí</option>
-              </select>
-            </Selector>
+            <Selector
+              label="Vigente"
+              error={errors.vigente?.message}
+              opciones={[
+                { valor: 'false', etiqueta: 'No Vigente' },
+                { valor: 'true', etiqueta: 'Vigente' }
+              ]}
+              value={vigenteValue ? 'true' : 'false'}
+              onChange={(e) => {
+                const val = e.target.value === 'true';
+                setValue('vigente', val, { shouldDirty: true, shouldTouch: true });
+              }}
+            />
           </div>
 
           <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">

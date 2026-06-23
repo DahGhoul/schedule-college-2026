@@ -203,21 +203,19 @@ export default function CursosPage() {
 
         <div className="flex w-full flex-wrap gap-3 sm:w-auto sm:flex-nowrap items-end">
           <div className="w-full sm:w-48">
-            <Selector label="Currícula">
-              <select
-                value={idCurriculaFiltro ?? ''}
-                onChange={(e) => setIdCurriculaFiltro(e.target.value ? Number(e.target.value) : undefined)}
-                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-unt-primary focus:ring-4 focus:ring-unt-primary/5 focus:outline-none"
-              >
-                <option value="">Vigente (predet.)</option>
-                <option value="0">Sin currícula</option>
-                {curriculaOpts.map((c: any) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nombre}{c.vigente ? ' (Vigente)' : ''}
-                  </option>
-                ))}
-              </select>
-            </Selector>
+            <Selector
+              label="Currícula"
+              value={idCurriculaFiltro ?? ''}
+              onChange={(e) => setIdCurriculaFiltro(e.target.value ? Number(e.target.value) : undefined)}
+              opciones={[
+                { valor: '', etiqueta: 'Vigente (predet.)' },
+                { valor: '0', etiqueta: 'Sin currícula' },
+                ...(curriculaOpts.map((c: any) => ({
+                  valor: String(c.id),
+                  etiqueta: `${c.nombre}${c.vigente ? ' (Vigente)' : ''}`
+                })))
+              ]}
+            />
           </div>
           <div className="relative flex-1 sm:w-80">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -281,19 +279,18 @@ export default function CursosPage() {
               {...registerCurso('creditos')} 
               error={erroresCurso.creditos?.message} 
             />
-            <Selector label="Currícula" error={erroresCurso.id_curricula?.message}>
-              <select
-                {...registerCurso('id_curricula', { valueAsNumber: true })}
-                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-unt-primary focus:ring-4 focus:ring-unt-primary/5 focus:outline-none"
-              >
-                <option value="">-- Sin asignar --</option>
-                {curriculaOpts.map((c: any) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nombre}{c.vigente ? ' (Vigente)' : ''}
-                  </option>
-                ))}
-              </select>
-            </Selector>
+            <Selector
+              label="Currícula"
+              error={erroresCurso.id_curricula?.message}
+              opciones={[
+                { valor: '', etiqueta: '-- Sin asignar --' },
+                ...(curriculaOpts.map((c: any) => ({
+                  valor: String(c.id),
+                  etiqueta: `${c.nombre}${c.vigente ? ' (Vigente)' : ''}`
+                })))
+              ]}
+              {...registerCurso('id_curricula', { valueAsNumber: true })}
+            />
           </div>
 
           <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
