@@ -135,10 +135,11 @@ export class CargaHorariaController {
     try {
       const id_periodo = parseInt(req.params.id_periodo);
       const id_ciclo = req.query.id_ciclo ? parseInt(req.query.id_ciclo as string) : undefined;
+      const id_curricula = req.query.id_curricula ? parseInt(req.query.id_curricula as string) : undefined;
       
       if (isNaN(id_periodo)) return res.status(400).json({ error: 'ID de periodo inválido' });
       
-      const cursos = await CargaHorariaService.obtenerCursosPorCiclo(id_periodo, id_ciclo);
+      const cursos = await CargaHorariaService.obtenerCursosPorCiclo(id_periodo, id_ciclo, id_curricula);
       res.json(cursos);
     } catch (error: any) {
       res.status(500).json({ error: error.message });

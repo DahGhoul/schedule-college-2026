@@ -400,15 +400,20 @@ export class CargaHorariaService {
   }
 
   /**
-   * Obtener cursos con oferta por período y ciclo
+   * Obtener cursos con oferta por período, ciclo y/o currícula
    */
-  static async obtenerCursosPorCiclo(id_periodo: number, id_ciclo?: number) {
+  static async obtenerCursosPorCiclo(id_periodo: number, id_ciclo?: number, id_curricula?: number) {
     const where: any = { 
       id_periodo,
       estado: { not: 'ELIMINADO' }
     };
     if (id_ciclo) {
       where.id_ciclo = id_ciclo;
+    }
+    if (id_curricula) {
+      where.curso = {
+        id_curricula
+      };
     }
     
     return prisma.curso_oferta.findMany({

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utilidades';
 import { periodosService } from '@/services/periodos.service';
+import { curriculaService } from '@/services/curricula.service';
 import { cargaHorariaService } from '@/services/carga-horaria.service';
 import { docentesService } from '@/services/docentes.service';
 import { cursosService } from '@/services/cursos.service';
@@ -20,6 +21,7 @@ export default function CargaHorariaPage() {
   const queryClient = useQueryClient();
   const [idPeriodo, setIdPeriodo] = useState<number>(0);
   const [idCiclo, setIdCiclo] = useState<number>(0); // Nuevo estado para filtro por ciclo
+  const [idCurricula, setIdCurricula] = useState<number | null>(null);
   const [toast, setToast] = useState<{ mensaje: string; tipo: 'exito' | 'error' } | null>(null);
   const [modalAsignacion, setModalAsignacion] = useState(false);
   const [componenteSeleccionado, setComponenteSeleccionado] = useState<any>(null);
@@ -56,10 +58,23 @@ export default function CargaHorariaPage() {
   const resumenCarga = Array.isArray(responseResumen) ? responseResumen : responseResumen?.data || [];
 
   const { data: cursosConOferta, isLoading: loadingOferta } = useQuery({
-    queryKey: ['cursos-con-oferta', idPeriodo, idCiclo],
-    queryFn: () => cargaHorariaService.obtenerCursosPorCiclo(idPeriodo, idCiclo > 0 ? idCiclo : undefined).then(res => res.data),
+    queryKey: ['cursos-con-oferta', idPeriodo, idCiclo, idCurricula],
+    queryFn: () => cargaHorariaService.obtenerCursosPorCiclo(idPeriodo, idCiclo > 0 ? idCiclo : undefined, idCurricula!).then(res => res.data),
     enabled: idPeriodo > 0
   });
+
+  const { data: curricula } = useQuery({
+    queryKey: ['curricula'],
+    queryFn: () => curriculaService.listar().then(res => res.data),
+  });
+
+  const curriculaVigente = curricula?.find((c: any) => c.vigente);
+
+  useEffect(() => {
+    if (curriculaVigente && idCurricula === null) {
+      setIdCurricula(curriculaVigente.id);
+    }
+  }, [curriculaVigente, idCurricula]);
 
   const { data: ciclos } = useQuery({
     queryKey: ['ciclos', idPeriodo],
@@ -209,6 +224,19 @@ export default function CargaHorariaPage() {
                   <option key={c.id} value={c.id}>Ciclo {c.numero}</option>
                 ))}
               </Selector>
+            </div>
+
+            <div className="w-full sm:w-64">
+              <Selector
+                label="Filtrar por Currícula"
+                value={idCurricula?.toString() || ''}
+                onChange={(e) => setIdCurricula(e.target.value ? parseInt(e.target.value) : null)}
+                opciones={(curricula || []).map((c: any) => ({
+                  valor: String(c.id),
+                  etiqueta: `${c.codigo} - ${c.nombre}${c.vigente ? ' (Vigente)' : ''}`
+                }))}
+                className="bg-white/20 border-white/20 text-white"
+              />
             </div>
           </div>
         </div>

@@ -6,6 +6,7 @@ import { cn } from '@/lib/utilidades';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Selector } from '@/components/ui/Selector';
 import { periodosService } from '@/services/periodos.service';
+import { curriculaService } from '@/services/curricula.service';
 import { cargaHorariaService } from '@/services/carga-horaria.service';
 import { SpinnerCarga } from '@/components/ui/SpinnerCarga';
 import { NotificacionToast } from '@/components/ui/NotificacionToast';
@@ -14,6 +15,7 @@ import { LayoutGrid, Filter, BookOpen, Clock, Users, GraduationCap, Trash2 } fro
 export default function OfertaPorCiclosPage() {
   const queryClient = useQueryClient();
   const [cicloSeleccionado, setCicloSeleccionado] = useState<number | null>(null);
+  const [idCurricula, setIdCurricula] = useState<number | null>(null);
   const [toast, setToast] = useState<{ mensaje: string; tipo: 'exito' | 'error' } | null>(null);
 
   const getCardColor = (id: number) => {
@@ -37,6 +39,20 @@ export default function OfertaPorCiclosPage() {
 
   const periodoActivo = periodos?.find((p: any) => p.activo);
 
+  // Obtener currículas
+  const { data: curricula } = useQuery({
+    queryKey: ['curricula'],
+    queryFn: () => curriculaService.listar().then(res => res.data),
+  });
+
+  const curriculaVigente = curricula?.find((c: any) => c.vigente);
+
+  useEffect(() => {
+    if (curriculaVigente && idCurricula === null) {
+      setIdCurricula(curriculaVigente.id);
+    }
+  }, [curriculaVigente, idCurricula]);
+
   // Obtener ciclos del periodo activo
   const { data: ciclos, isLoading: isLoadingCiclos } = useQuery({
     queryKey: ['ciclos', periodoActivo?.id],
@@ -57,10 +73,10 @@ export default function OfertaPorCiclosPage() {
     }
   }, [ciclos, cicloSeleccionado]);
 
-  // Obtener cursos por ciclo
+  // Obtener cursos por ciclo y currícula
   const { data: cursos, isLoading: isLoadingCursos } = useQuery({
-    queryKey: ['cursos-oferta-ciclo', periodoActivo?.id, cicloSeleccionado],
-    queryFn: () => cargaHorariaService.obtenerCursosPorCiclo(periodoActivo.id, cicloSeleccionado!).then(res => res.data),
+    queryKey: ['cursos-oferta-ciclo', periodoActivo?.id, cicloSeleccionado, idCurricula],
+    queryFn: () => cargaHorariaService.obtenerCursosPorCiclo(periodoActivo.id, cicloSeleccionado!, idCurricula!).then(res => res.data),
     enabled: !!periodoActivo && !!cicloSeleccionado,
   });
 
@@ -107,7 +123,7 @@ export default function OfertaPorCiclosPage() {
           <div className="flex flex-wrap items-center gap-6">
             <div className="flex items-center gap-3 bg-slate-50 px-4 py-2 rounded-2xl border border-slate-100">
               <Filter className="w-4 h-4 text-slate-400" />
-              <span className="text-sm font-semibold text-slate-600">Filtrar Ciclo:</span>
+              <span className="text-sm font-semibold text-slate-600">Filtrar Ciclo y Currícula:</span>
             </div>
 
             <div className="w-64">
@@ -116,6 +132,17 @@ export default function OfertaPorCiclosPage() {
                 opciones={opcionesCiclos}
                 value={cicloSeleccionado?.toString() || ''}
                 onChange={(e) => setCicloSeleccionado(e.target.value ? parseInt(e.target.value) : null)}
+              />
+            </div>
+            <div className="w-72">
+              <Selector
+                label="Currícula"
+                value={idCurricula?.toString() || ''}
+                onChange={(e) => setIdCurricula(e.target.value ? parseInt(e.target.value) : null)}
+                opciones={(curricula || []).map((c: any) => ({
+                  valor: String(c.id),
+                  etiqueta: `${c.codigo} - ${c.nombre}${c.vigente ? ' (Vigente)' : ''}`
+                }))}
               />
             </div>
 

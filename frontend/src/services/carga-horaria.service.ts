@@ -33,8 +33,10 @@ export const cargaHorariaService = {
   obtenerCiclosPorPeriodo: (idPeriodo: number) =>
     apiClient.get(`/carga-horaria/ciclos/${idPeriodo}`),
 
-  obtenerCursosPorCiclo: (idPeriodo: number, idCiclo?: number) => {
-    const params = idCiclo ? { id_ciclo: idCiclo } : {};
+  obtenerCursosPorCiclo: (idPeriodo: number, idCiclo?: number, idCurricula?: number) => {
+    const params: any = {};
+    if (idCiclo) params.id_ciclo = idCiclo;
+    if (idCurricula) params.id_curricula = idCurricula;
     return apiClient.get(`/carga-horaria/cursos/${idPeriodo}`, { params });
   },
 };

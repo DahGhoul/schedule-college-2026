@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { periodosService } from '@/services/periodos.service';
 import { cursosService } from '@/services/cursos.service';
+import { curriculaService } from '@/services/curricula.service';
 import { cargaHorariaService } from '@/services/carga-horaria.service';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Selector } from '@/components/ui/Selector';
@@ -18,6 +19,7 @@ export default function OfertaAcademicaPage() {
   const [idPeriodo, setIdPeriodo] = useState<number>(0);
   const [idCurso, setIdCurso] = useState<number>(0);
   const [idCiclo, setIdCiclo] = useState<number>(0);
+  const [idCurricula, setIdCurricula] = useState<number | null>(null);
   const [tipoCurso, setTipoCurso] = useState<'REGULAR' | 'ELECTIVO'>('REGULAR');
   const [componentes, setComponentes] = useState<any[]>([]);
   
@@ -39,9 +41,25 @@ export default function OfertaAcademicaPage() {
     }
   }, [periodos, idPeriodo]);
 
+  const { data: curricula } = useQuery({
+    queryKey: ['curricula'],
+    queryFn: () => curriculaService.listar().then(res => res.data)
+  });
+
+  // Find vigente curricula to set as default
+  const curriculaVigente = curricula?.find((c: any) => c.vigente);
+
+  // Auto-set idCurricula to vigente when curricula loads
+  useEffect(() => {
+    if (curriculaVigente && idCurricula === null) {
+      setIdCurricula(curriculaVigente.id);
+    }
+  }, [curriculaVigente, idCurricula]);
+
   const { data: cursos } = useQuery({
-    queryKey: ['cursos'],
-    queryFn: () => cursosService.listar().then(res => res.data)
+    queryKey: ['cursos', idCurricula],
+    queryFn: () => cursosService.listar({ id_curricula: idCurricula || undefined }).then(res => res.data),
+    enabled: idCurricula !== null
   });
 
   const { data: periodoDetalle } = useQuery({
@@ -212,6 +230,18 @@ export default function OfertaAcademicaPage() {
                 <option key={c.id} value={c.id}>Ciclo {c.numero}</option>
               ))}
             </Selector>
+
+            <Selector
+              label="Currícula"
+              value={idCurricula?.toString() || ''}
+              onChange={(e) => setIdCurricula(e.target.value ? parseInt(e.target.value) : null)}
+              opciones={
+                (curricula || []).map((c: any) => ({
+                  valor: String(c.id),
+                  etiqueta: `${c.codigo} - ${c.nombre}${c.vigente ? ' (Vigente)' : ''}`
+                }))
+              }
+            />
 
             <SelectorFiltrable
               label="Curso"
