@@ -28,7 +28,6 @@ export default function DashboardDocentePage() {
   const router = useRouter();
   const { usuario } = useAuthStore();
   const [toast, setToast] = useState<{ mensaje: string; tipo: 'exito' | 'error' } | null>(null);
-  const [descargando, setDescargando] = useState<'pdf' | 'excel' | null>(null);
 
   useEffect(() => {
     router.prefetch('/dashboard/horarios/seleccion');
