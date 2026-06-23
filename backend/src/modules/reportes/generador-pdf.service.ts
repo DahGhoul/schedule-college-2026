@@ -767,7 +767,7 @@ async function generarPaginaDocente(
     // Tabla lectiva
     // Separador visual
     
-    doc.font('Helvetica-Bold').fontSize(7).fillColor('#181717ff')
+    doc.font('Helvetica-Bold').fontSize(7).fillColor('#000000ff')
       .text('CARGA LECTIVA', tableStartX, currentY);
     currentY += 10;
 
@@ -778,7 +778,7 @@ async function generarPaginaDocente(
 
     // Separador visual
     currentY += 8;
-    doc.font('Helvetica-Bold').fontSize(7).fillColor('#181717ff')
+    doc.font('Helvetica-Bold').fontSize(7).fillColor('#000000ff')
       .text('CARGA NO LECTIVA', tableStartX, currentY);
     currentY += 10;
 

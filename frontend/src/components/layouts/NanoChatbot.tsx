@@ -64,19 +64,27 @@ export const NanoChatbot = () => {
 
   const sugerencias = useMemo((): Sugerencia[] => {
     if (role === 'DOCENTE') return [
-      { texto: 'Mis cursos', consulta: '¿Cuáles son mis cursos?' },
-      { texto: 'Mis horas', consulta: '¿Cuántas horas tengo?' },
-      { texto: 'Mi horario', consulta: '¿Dónde veo mi horario?' },
+      { texto: 'Mis cursos', consulta: '¿Cuáles son mis cursos asignados?' },
+      { texto: 'Mis horas', consulta: '¿Cuántas horas lectivas tengo?' },
+      { texto: 'Mi horario hoy', consulta: '¿Qué clases tengo hoy?' },
+      { texto: 'Mi horario semana', consulta: '¿Cuál es mi horario completo esta semana?' },
+      { texto: 'Componentes de curso', consulta: '¿Qué componentes tengo de cada curso?' },
+      { texto: 'Declaración de carga', consulta: '¿He presentado mi declaración de carga?' },
     ];
     if (role === 'SECRETARIA' || role === 'ADMIN') return [
       { texto: 'Docentes pendientes', consulta: '¿Qué docentes faltan cargar horario?' },
       { texto: 'Estado ventanas', consulta: 'Estado de las ventanas de atención' },
       { texto: 'Ambientes disponibles', consulta: '¿Qué ambientes están disponibles?' },
+      { texto: 'Cursos por ciclo', consulta: '¿Qué cursos se dictan en el ciclo 1?' },
+      { texto: 'Horario docente', consulta: '¿Qué horario tiene el docente [nombre]?' },
+      { texto: 'Resumen general', consulta: 'Resumen general del periodo activo' },
     ];
     if (role === 'DIRECTOR') return [
       { texto: 'Cursos del ciclo 1', consulta: 'Cursos del ciclo 1' },
-      { texto: 'Cursos del ciclo 5', consulta: 'Cursos del ciclo 5' },
       { texto: 'Resumen general', consulta: 'Resumen general del periodo' },
+      { texto: 'Total docentes', consulta: '¿Cuántos docentes hay registrados?' },
+      { texto: 'Total cursos', consulta: '¿Cuántos cursos se dictan en total?' },
+      { texto: 'Cursos electivos', consulta: '¿Cuántos cursos electivos vs regulares hay?' },
     ];
     return [];
   }, [role]);
