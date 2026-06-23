@@ -8,6 +8,7 @@ import { SpinnerCarga } from '@/components/ui/SpinnerCarga';
 interface Props {
   idPeriodo: number;
   idDocente: number;
+  exportOption?: 'completo' | 'carga-lectiva' | 'carga-no-lectiva';
 }
 
 const DIAS = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'];
@@ -37,7 +38,7 @@ function getLabelSeccion(clave: string) {
   return labels[clave] || clave;
 }
 
-export function CalendarioGeneralConNoLectivos({ idPeriodo, idDocente }: Props) {
+export function CalendarioGeneralConNoLectivos({ idPeriodo, idDocente, exportOption = 'completo' }: Props) {
   const { data: horarios, isLoading: loadingHorarios } = useQuery({
     queryKey: ['horarios-general', idPeriodo, 'DOCENTE', idDocente],
     queryFn: async () => {
@@ -111,7 +112,7 @@ export function CalendarioGeneralConNoLectivos({ idPeriodo, idDocente }: Props) 
                         className="p-1 border-r border-b border-gray-100 relative min-h-[80px] align-top transition-all duration-200 bg-white hover:bg-unt-primary/5"
                       >
                         <div className="grid gap-1 min-h-[60px] p-1">
-                          {clasesEnCelda.map((clase: any, idx: number) => {
+                          {(exportOption === 'completo' || exportOption === 'carga-lectiva') && clasesEnCelda.map((clase: any, idx: number) => {
                             const cursoNombre =
                               clase.componente?.oferta?.curso?.nombre ||
                               clase.grupo?.componente?.oferta?.curso?.nombre ||
@@ -148,7 +149,7 @@ export function CalendarioGeneralConNoLectivos({ idPeriodo, idDocente }: Props) 
                               </div>
                             );
                           })}
-                          {noLectivoEnCelda && !clasesEnCelda.length && (
+                          {(exportOption === 'completo' || exportOption === 'carga-no-lectiva') && noLectivoEnCelda && (
                             <div className="p-2.5 rounded-xl text-xs border shadow-sm transition-all flex flex-col justify-between min-h-[55px] bg-indigo-50 border-indigo-200">
                               <div className="font-bold text-[10px] text-indigo-600 uppercase tracking-tighter">
                                 No Lectivo

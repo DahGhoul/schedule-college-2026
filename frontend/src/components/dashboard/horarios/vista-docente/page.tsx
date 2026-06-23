@@ -128,46 +128,34 @@ export default function VistaHorarioDocentePage() {
         </div>
       ) : docenteSeleccionado && idPeriodo ? (
         <div className="space-y-6">
-          <div className="space-y-3">
+          <div className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-700">Tipo de exportación</label>
-              <div className="flex flex-wrap gap-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="exportOption"
-                    value="completo"
-                    checked={exportOption === 'completo'}
-                    onChange={(e) => setExportOption(e.target.value as any)}
-                    className="w-4 h-4 text-indigo-600"
-                  />
-                  <span className="text-sm text-slate-700">Horario completo</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="exportOption"
-                    value="carga-lectiva"
-                    checked={exportOption === 'carga-lectiva'}
-                    onChange={(e) => setExportOption(e.target.value as any)}
-                    className="w-4 h-4 text-indigo-600"
-                  />
-                  <span className="text-sm text-slate-700">Carga lectiva</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="exportOption"
-                    value="carga-no-lectiva"
-                    checked={exportOption === 'carga-no-lectiva'}
-                    onChange={(e) => setExportOption(e.target.value as any)}
-                    className="w-4 h-4 text-indigo-600"
-                  />
-                  <span className="text-sm text-slate-700">Carga no lectiva</span>
-                </label>
+              <label className="text-sm font-semibold text-slate-700">Selecciona el tipo de horario</label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <button
+                  onClick={() => setExportOption('completo')}
+                  className={`p-4 rounded-xl border-2 text-left transition-all duration-300 ${exportOption === 'completo' ? 'border-indigo-500 bg-indigo-50 shadow-md' : 'border-slate-200 bg-white hover:border-indigo-300'}`}
+                >
+                  <div className="font-bold text-slate-800 text-sm mb-1">Horario Completo</div>
+                  <div className="text-xs text-slate-500">Incluye carga lectiva y no lectiva</div>
+                </button>
+                <button
+                  onClick={() => setExportOption('carga-lectiva')}
+                  className={`p-4 rounded-xl border-2 text-left transition-all duration-300 ${exportOption === 'carga-lectiva' ? 'border-blue-500 bg-blue-50 shadow-md' : 'border-slate-200 bg-white hover:border-blue-300'}`}
+                >
+                  <div className="font-bold text-slate-800 text-sm mb-1">Carga Lectiva</div>
+                  <div className="text-xs text-slate-500">Solo clases y grupos</div>
+                </button>
+                <button
+                  onClick={() => setExportOption('carga-no-lectiva')}
+                  className={`p-4 rounded-xl border-2 text-left transition-all duration-300 ${exportOption === 'carga-no-lectiva' ? 'border-indigo-500 bg-indigo-50 shadow-md' : 'border-slate-200 bg-white hover:border-indigo-300'}`}
+                >
+                  <div className="font-bold text-slate-800 text-sm mb-1">Carga No Lectiva</div>
+                  <div className="text-xs text-slate-500">Actividades académicas no lectivas</div>
+                </button>
               </div>
             </div>
-            <div className="flex flex-col sm:flex-row justify-end gap-3">
+            <div className="flex flex-col sm:flex-row justify-end gap-3 pt-2">
               <Boton
                 onClick={handleExportarExcel}
                 disabled={exportandoExcel}
@@ -188,7 +176,7 @@ export default function VistaHorarioDocentePage() {
           </div>
 
           <div className="bg-white rounded-[1.5rem] shadow-sm border border-slate-200 overflow-hidden">
-            <CalendarioGeneralConNoLectivos idPeriodo={idPeriodo} idDocente={docenteSeleccionado} />
+            <CalendarioGeneralConNoLectivos idPeriodo={idPeriodo} idDocente={docenteSeleccionado} exportOption={exportOption} />
           </div>
         </div>
       ) : (

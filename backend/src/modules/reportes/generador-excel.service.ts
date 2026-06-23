@@ -484,10 +484,10 @@ export class GeneradorExcelService {
       cell.font = { bold: i < 3 || i === 4, size: i < 3 ? 10 : 9 };
     });
 
-    // 2. TABLA DETALLE
-    const detailHeaders = ['N°', 'ASIGNATURA', 'CICLO', 'T', 'L', 'GRP', 'TOTAL', 'DEP.'];
-    const detailCols = [5, 6, 7, 8, 9, 10, 11, 12];
-    ws.getColumn(5).width = 4; ws.getColumn(6).width = 30; ws.getColumn(7).width = 8;
+    // 2. TABLA DETALLE DE CARGA LECTIVA
+    const detailHeaders = ['N°', 'ASIGNATURA', 'T', 'L', 'GRP', 'TOTAL', 'DEP.'];
+    const detailCols = [5, 6, 8, 9, 10, 11, 12];
+    ws.getColumn(5).width = 4; ws.getColumn(6).width = 30;
     
     detailHeaders.forEach((h, i) => {
       const cell = ws.getCell(1, detailCols[i]);
@@ -543,7 +543,7 @@ export class GeneradorExcelService {
     if (exportOption !== 'carga-no-lectiva') {
       for (const cid in mapaCursos) {
         const info = mapaCursos[cid];
-        const data = [info.indice, info.nombre, `${info.ciclo}°`, info.teo, info.lab, info.grupos, info.total, 'SISTEMAS'];
+        const data = [info.indice, info.nombre, info.teo, info.lab, info.grupos, info.total, 'SISTEMAS'];
         data.forEach((val, i) => {
           const cell = ws.getCell(currentRow, detailCols[i]);
           cell.value = val;
