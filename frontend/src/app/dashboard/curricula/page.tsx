@@ -229,7 +229,7 @@ export default function CurriculaPage() {
               error={errors.nombre?.message}
             />
             <Selector label="Vigente" error={errors.vigente?.message}>
-              <select {...register('vigente')} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-unt-primary focus:ring-4 focus:ring-unt-primary/5 focus:outline-none">
+              <select {...register('vigente', { setValueAs: (v) => v === 'true' })} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-unt-primary focus:ring-4 focus:ring-unt-primary/5 focus:outline-none">
                 <option value="false">No</option>
                 <option value="true">Sí</option>
               </select>
