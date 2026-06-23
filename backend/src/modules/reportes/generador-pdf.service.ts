@@ -223,11 +223,12 @@ export class GeneradorPdfService {
     });
 
     // Query carga no lectiva
-    const declaraciones = await prisma.carga_no_lectiva_declaracion.findMany({
+    const declaraciones = await prisma.declaracion_carga.findMany({
       where: { id_periodo: idPeriodo, id_docente: idDocente },
       include: { secciones: true }
     });
-    const bloquesNoLectivos = await prisma.carga_no_lectiva_bloque.findMany({
+
+    const bloquesNoLectivos = await prisma.bloque_no_lectivo.findMany({
       where: { id_periodo: idPeriodo, id_docente: idDocente },
       orderBy: [{ dia_semana: 'asc' }, { hora_inicio: 'asc' }]
     });
