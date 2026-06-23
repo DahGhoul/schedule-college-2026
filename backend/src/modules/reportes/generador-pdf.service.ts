@@ -123,7 +123,7 @@ export class GeneradorPdfService {
     });
   }
 
-  static async generarHorarioDocentePdf(idPeriodo: number, idDocente: number): Promise<Buffer> {
+  static async generarHorarioDocentePdf(idPeriodo: number, idDocente: number, exportOption: 'ambos' | 'solo_lectiva' | 'solo_no_lectiva' = 'ambos'): Promise<Buffer> {
     const periodo = await prisma.periodo_academico.findUnique({ where: { id: idPeriodo } });
     const docente = await prisma.docente.findUnique({ where: { id: idDocente } });
     
@@ -139,13 +139,13 @@ export class GeneradorPdfService {
     return new Promise((resolve, reject) => {
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
-      this.generarPaginaDocente(doc, idPeriodo, idDocente, periodo, docente).then(() => {
+      this.generarPaginaDocente(doc, idPeriodo, idDocente, periodo, docente, exportOption).then(() => {
         doc.end();
       });
     });
   }
 
-  private static async generarPaginaDocente(doc: PDFDocumentWithTable, idPeriodo: number, idDocente: number, periodo: any, docente: any) {
+  private static async generarPaginaDocente(doc: PDFDocumentWithTable, idPeriodo: number, idDocente: number, periodo: any, docente: any, exportOption: 'ambos' | 'solo_lectiva' | 'solo_no_lectiva' = 'ambos') {
     const leftColX = 40;
     const topMargin = 40;
     const pageWidth = doc.page.width - 80;
@@ -219,44 +219,64 @@ export class GeneradorPdfService {
       ]
     });
 
+    // Query carga no lectiva
+    const declaraciones = await prisma.carga_no_lectiva_declaracion.findMany({
+      where: { id_periodo: idPeriodo, id_docente: idDocente },
+      include: { secciones: true }
+    });
+    const bloquesNoLectivos = await prisma.carga_no_lectiva_bloque.findMany({
+      where: { id_periodo: idPeriodo, id_docente: idDocente },
+      orderBy: [{ dia_semana: 'asc' }, { hora_inicio: 'asc' }]
+    });
+    const declaracion = declaraciones.length > 0 ? declaraciones[0] : null;
+
     // Use the same context creator as cycle schedule
     const contexto = crearContextoHorarioCiclo(bloques as any[]);
     const slotsOcupados = new Set<string>();
 
     // Fill detail table
-    for (const info of contexto.registros) {
-      // Encontrar el ciclo a partir de los bloques de este registro (curso + docente)
-      const bloqueDelRegistro = bloques.find(b => 
-        b.componente.oferta.id_curso === info.cursoId && 
-        b.id_docente === idDocente
-      );
-      const cicloNumero = bloqueDelRegistro?.componente.oferta.ciclo?.numero;
-      
-      const rowData = [
-        String(info.indice),
-        info.cursoNombre,
-        cicloNumero ? `${cicloNumero}°` : '',
-        String(info.teoria),
-        String(info.practica),
-        String(info.laboratorio),
-        info.grupoCodigo,
-        String(info.totalHoras)
-      ];
+    if (exportOption !== 'solo_no_lectiva') {
+      for (const info of contexto.registros) {
+        // Encontrar el ciclo a partir de los bloques de este registro (curso + docente)
+        const bloqueDelRegistro = bloques.find(b => 
+          b.componente.oferta.id_curso === info.cursoId && 
+          b.id_docente === idDocente
+        );
+        const cicloNumero = bloqueDelRegistro?.componente.oferta.ciclo?.numero;
+        
+        const rowData = [
+          String(info.indice),
+          info.cursoNombre,
+          cicloNumero ? `${cicloNumero}°` : '',
+          String(info.teoria),
+          String(info.practica),
+          String(info.laboratorio),
+          info.grupoCodigo,
+          String(info.totalHoras)
+        ];
 
-      currentX = tableStartX;
-      doc.font('Helvetica').fontSize(6).fillColor('black');
-      rowData.forEach((val, i) => {
-        doc.rect(currentX, currentY, colWidths[i], 10).fillAndStroke(`#${info.color.slice(2)}`, BORDER_COLOR);
-        doc.fillColor('black').text(val, currentX, currentY + 2, {
-          width: colWidths[i],
-          height: 10,
-          align: i === 1 ? 'left' : 'center',
-          ellipsis: true,
-          lineBreak: false
+        currentX = tableStartX;
+        doc.font('Helvetica').fontSize(6).fillColor('black');
+        rowData.forEach((val, i) => {
+          doc.rect(currentX, currentY, colWidths[i], 10).fillAndStroke(`#${info.color.slice(2)}`, BORDER_COLOR);
+          doc.fillColor('black').text(val, currentX, currentY + 2, {
+            width: colWidths[i],
+            height: 10,
+            align: i === 1 ? 'left' : 'center',
+            ellipsis: true,
+            lineBreak: false
+          });
+          currentX += colWidths[i];
         });
-        currentX += colWidths[i];
-      });
-      currentY += 10;
+        currentY += 10;
+      }
+    } else if (declaracion?.secciones.length) {
+      // If solo no lectiva, show secciones in detalle
+      doc.font('Helvetica').fontSize(7).fillColor('black');
+      for (const s of declaracion.secciones) {
+        doc.text(`${s.seccion.replace(/_/g, ' ')}: ${s.horas_declaradas}h ${s.descripcion ? `(${s.descripcion})` : ''}`, tableStartX, currentY + 2, { width: availableTableWidth - 10 });
+        currentY += 10;
+      }
     }
 
     // --- PÁGINA 2: HORARIO COMPLETO ---
