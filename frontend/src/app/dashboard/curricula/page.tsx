@@ -45,6 +45,8 @@ export default function CurriculaPage() {
     register,
     handleSubmit,
     reset,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm<CurriculaFormData>({
     resolver: zodResolver(curriculaSchema),
@@ -54,6 +56,8 @@ export default function CurriculaPage() {
       vigente: false,
     },
   });
+
+  const vigenteValue = watch('vigente');
 
   const guardarMutation = useMutation({
     mutationFn: (datos: CurriculaFormData) => {
@@ -229,7 +233,14 @@ export default function CurriculaPage() {
               error={errors.nombre?.message}
             />
             <Selector label="Vigente" error={errors.vigente?.message}>
-              <select {...register('vigente', { setValueAs: (v) => v === 'true' })} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-unt-primary focus:ring-4 focus:ring-unt-primary/5 focus:outline-none">
+              <select
+                value={vigenteValue ? 'true' : 'false'}
+                onChange={(e) => {
+                  const val = e.target.value === 'true';
+                  setValue('vigente', val, { shouldDirty: true, shouldTouch: true });
+                }}
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-unt-primary focus:ring-4 focus:ring-unt-primary/5 focus:outline-none"
+              >
                 <option value="false">No</option>
                 <option value="true">Sí</option>
               </select>
