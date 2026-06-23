@@ -90,15 +90,15 @@ function obtenerColorNoLectiva(index: number): string {
 const NO_LECTIVA_BG = PALETA_NO_LECTIVA[0];
 
 /**
- * Sobreescribe los colores del contexto generado por crearContextoHorarioCiclo
- * con nuestra paleta propia, garantizando que cada registro tenga un color único.
- * El contexto usa formato '0xRRGGBB'; nosotros asignamos '#RRGGBB' directamente
- * y añadimos la propiedad colorHex para uso interno seguro.
+ * Construye un Map<indice, colorHex> para los registros del contexto,
+ * usando nuestra paleta propia. No muta el objeto externo tipado.
  */
-function aplicarColoresPropios(contexto: any): void {
-  contexto.registros.forEach((reg: any, idx: number) => {
-    reg.colorHex = obtenerColorLectivo(idx + 1);
+function construirMapaColoresLectivos(contexto: any): Map<number, string> {
+  const mapa = new Map<number, string>();
+  (contexto.registros as any[]).forEach((reg, idx) => {
+    mapa.set(reg.indice, obtenerColorLectivo(idx + 1));
   });
+  return mapa;
 }
 
 // ────────────────────────────────────────────────────────────
@@ -257,6 +257,7 @@ function dibujarRejillaBase(
 function dibujarBloquesCiclo(
   doc: PDFDocumentWithTable,
   contexto: any,
+  mapaColores: Map<number, string>,
   leftColX: number,
   horarioTop: number,
   gridColWidth: number,
@@ -283,7 +284,7 @@ function dibujarBloquesCiclo(
 
       entradas.forEach((celda: any, idx: number) => {
         const blockLeft = x + idx * blockWidth;
-        const colorHex = celda.registro.colorHex ?? obtenerColorLectivo(celda.registro.indice ?? 1);
+        const colorHex = mapaColores.get(celda.registro.indice) ?? obtenerColorLectivo(celda.registro.indice ?? 1);
         doc.rect(blockLeft, y, blockWidth, altoCelda).fillAndStroke(colorHex, BORDER_COLOR);
         const texto = formatearEtiquetaCeldaPdf(celda.registro, celda.bloque);
         const textoY = y + altoCelda / 2 - 10;
@@ -313,6 +314,7 @@ function dibujarBloquesDocente(
   doc: PDFDocumentWithTable,
   bloques: any[],
   contexto: any,
+  mapaColores: Map<number, string>,
   leftColX: number,
   horarioTop: number,
   gridColWidth: number,
@@ -357,7 +359,7 @@ function dibujarBloquesDocente(
           r.cursoId === entry.componente?.oferta?.id_curso
         );
         const colorHex = registro
-          ? (registro.colorHex ?? obtenerColorLectivo(registro.indice ?? 1))
+          ? (mapaColores.get(registro.indice) ?? obtenerColorLectivo(registro.indice ?? 1))
           : HEADER_BG;
         doc.rect(blockLeft, y, blockWidth, altoCelda).fillAndStroke(colorHex, BORDER_COLOR);
         const texto = formatearEtiquetaCeldaPdf(registro, entry, true);
@@ -443,8 +445,7 @@ function dibujarBloquesNoLectivos(
 function dibujarTablaDetalleLectiva(
   doc: PDFDocumentWithTable,
   contexto: any,
-  bloques: any[],
-  idDocente: number,
+  mapaColores: Map<number, string>,
   tableStartX: number,
   colWidths: number[],
   startY: number
@@ -473,7 +474,7 @@ function dibujarTablaDetalleLectiva(
     ];
     currentX = tableStartX;
     doc.font('Helvetica').fontSize(6).fillColor('black');
-    const filaColor = info.colorHex ?? obtenerColorLectivo(info.indice ?? 1);
+    const filaColor = mapaColores.get(info.indice) ?? obtenerColorLectivo(info.indice ?? 1);
     rowData.forEach((val, i) => {
       doc.rect(currentX, currentY, colWidths[i], 10)
         .fillAndStroke(filaColor, BORDER_COLOR);
@@ -621,7 +622,7 @@ async function generarPaginaCiclo(
   });
 
   const contexto = crearContextoHorarioCiclo(bloques as any[]);
-  aplicarColoresPropios(contexto);
+  const mapaColores = construirMapaColoresLectivos(contexto);
 
   for (const info of contexto.registros) {
     const rowData = [
@@ -637,7 +638,7 @@ async function generarPaginaCiclo(
     ];
     currentX = tableStartX;
     doc.font('Helvetica').fontSize(6).fillColor('black');
-    const filaColor = info.colorHex ?? obtenerColorLectivo(info.indice ?? 1);
+    const filaColor = mapaColores.get(info.indice) ?? obtenerColorLectivo(info.indice ?? 1);
     rowData.forEach((val, i) => {
       doc.rect(currentX, currentY, colWidths[i], 10)
         .fillAndStroke(filaColor, BORDER_COLOR);
@@ -660,7 +661,7 @@ async function generarPaginaCiclo(
   const gridRowHeight = 32;
 
   dibujarRejillaBase(doc, leftColX, horarioTop, gridColWidth, gridRowHeight);
-  dibujarBloquesCiclo(doc, contexto, leftColX, horarioTop, gridColWidth, gridRowHeight);
+  dibujarBloquesCiclo(doc, contexto, mapaColores, leftColX, horarioTop, gridColWidth, gridRowHeight);
 }
 
 // ────────────────────────────────────────────────────────────
@@ -727,7 +728,7 @@ async function generarPaginaDocente(
   const declaracion = declaraciones[0] ?? null;
 
   const contexto = crearContextoHorarioCiclo(bloques as any[]);
-  aplicarColoresPropios(contexto);
+  const mapaColores = construirMapaColoresLectivos(contexto);
 
   // ── Mapa de colores para secciones no lectivas ──
   const mapaColoresNoLectiva = new Map<string, string>();
@@ -765,7 +766,7 @@ async function generarPaginaDocente(
   if (exportOption === 'completo') {
     // Tabla lectiva
     currentY = dibujarTablaDetalleLectiva(
-      doc, contexto, bloques, idDocente,
+      doc, contexto, mapaColores,
       tableStartX, colWidthsLectiva, currentY
     );
 
@@ -783,7 +784,7 @@ async function generarPaginaDocente(
 
   } else if (exportOption === 'carga-lectiva') {
     dibujarTablaDetalleLectiva(
-      doc, contexto, bloques, idDocente,
+      doc, contexto, mapaColores,
       tableStartX, colWidthsLectiva, currentY
     );
 
@@ -807,7 +808,7 @@ async function generarPaginaDocente(
 
   if (exportOption === 'completo' || exportOption === 'carga-lectiva') {
     dibujarBloquesDocente(
-      doc, bloques, contexto,
+      doc, bloques, contexto, mapaColores,
       leftColX, horarioTop, gridColWidth, gridRowHeight, slotsOcupados
     );
   }
