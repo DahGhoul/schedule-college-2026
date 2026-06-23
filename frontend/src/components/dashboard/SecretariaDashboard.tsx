@@ -81,21 +81,18 @@ export default function SecretariaDashboard() {
     }
   };
 
-  const enviarCorreosTodosMutation = useMutation({
-    mutationFn: () => reportesService.enviarCorreosTodos(idPeriodo),
+  const publicarPeriodoMutation = useMutation({
+    mutationFn: () => reportesService.publicarPeriodo(idPeriodo),
     onSuccess: (res: any) => {
-      const { enviados, errores } = res.data;
       setToast({
-        mensaje: errores > 0 
-          ? `Publicación con advertencias. Se enviaron ${enviados} correos, pero hubo ${errores} errores.`
-          : `Publicación exitosa. Se enviaron ${enviados} correos.`,
-        tipo: errores > 0 ? 'error' : 'exito',
+        mensaje: res.data.mensaje || 'Periodo publicado exitosamente',
+        tipo: 'exito',
       });
       setModalPublicarOpen(false);
     },
     onError: (err: any) => {
       setToast({
-        mensaje: err.response?.data?.error || 'Error al publicar e informar',
+        mensaje: err.response?.data?.error || 'Error al publicar el periodo',
         tipo: 'error',
       });
       setModalPublicarOpen(false);
@@ -329,21 +326,21 @@ export default function SecretariaDashboard() {
             
             <div className="relative z-10 space-y-8">
               <div className="p-5 bg-white/10 rounded-[2rem] text-white w-fit">
-                <Mail className="w-10 h-10" />
+                <CheckSquare className="w-10 h-10" />
               </div>
               <div>
                 <h3 className="text-3xl font-black tracking-tight mb-4">Publicación Oficial</h3>
                 <p className="text-white/60 leading-relaxed mb-6">
-                  Una vez finalizada la carga horaria, notifica automáticamente a todos los docentes con sus horarios adjuntos en formato oficial.
+                  Publica todos los horarios del periodo, cambiando su estado de borrador a publicado.
                 </p>
                 <div className="space-y-4">
                   <div className="flex items-center gap-3 text-sm font-bold text-white/80">
                     <ShieldCheck className="w-5 h-5 text-emerald-400" />
-                    Genera PDF personalizado por docente
+                    Actualiza estado de horarios a PUBLICADO
                   </div>
                   <div className="flex items-center gap-3 text-sm font-bold text-white/80">
                     <ShieldCheck className="w-5 h-5 text-emerald-400" />
-                    Envío masivo vía correo institucional
+                    Marca el periodo como publicado
                   </div>
                 </div>
               </div>
@@ -352,9 +349,9 @@ export default function SecretariaDashboard() {
             <Boton
               className="relative z-10 w-full py-8 rounded-[2rem] bg-white text-[#0b1f3a] hover:bg-indigo-50 transition-all duration-500 font-black text-xl flex items-center justify-center gap-3 mt-12 shadow-2xl shadow-black/20"
               onClick={() => setModalPublicarOpen(true)}
-              disabled={enviarCorreosTodosMutation.isPending}
+              disabled={publicarPeriodoMutation.isPending}
             >
-              {enviarCorreosTodosMutation.isPending ? 'PROCESANDO...' : 'PUBLICAR Y ENVIAR'}
+              {publicarPeriodoMutation.isPending ? 'PROCESANDO...' : 'PUBLICAR'}
               <ArrowRight className="w-6 h-6" />
             </Boton>
           </div>
@@ -425,35 +422,35 @@ export default function SecretariaDashboard() {
         <div className="p-6 space-y-6">
           <div className="flex flex-col items-center text-center space-y-4">
             <div className="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center ring-8 ring-indigo-50/50">
-              <Mail className="w-10 h-10 text-indigo-600" />
+              <CheckSquare className="w-10 h-10 text-indigo-600" />
             </div>
-            <h2 className="text-2xl font-black text-slate-900">Notificación Masiva</h2>
+            <h2 className="text-2xl font-black text-slate-900">Publicación de Horarios</h2>
             <p className="text-slate-500 font-medium leading-relaxed">
-              Esta acción enviará automáticamente los horarios personalizados (PDF + Excel) a los correos institucionales de todos los docentes activos con carga horaria.
+              Esta acción marcará todos los horarios como PUBLICADOS, incluyendo el periodo académico, cursos, y bloques de horario.
             </p>
           </div>
 
-          <div className="bg-amber-50 border border-amber-100 rounded-3xl p-5 flex gap-4">
-            <AlertCircle className="w-6 h-6 text-amber-500 flex-shrink-0" />
-            <p className="text-xs text-amber-800 font-bold leading-relaxed">
-              Asegúrate de que la configuración SMTP esté correcta. El proceso puede tardar unos minutos dependiendo de la cantidad de docentes.
+          <div className="bg-blue-50 border border-blue-100 rounded-3xl p-5 flex gap-4">
+            <AlertCircle className="w-6 h-6 text-blue-500 flex-shrink-0" />
+            <p className="text-xs text-blue-800 font-bold leading-relaxed">
+              Después de publicar, los horarios dejarán de estar en estado borrador (amarillo).
             </p>
           </div>
 
           <div className="flex gap-4 pt-4">
-            <Boton 
-              variante="secundario" 
-              onClick={() => setModalPublicarOpen(false)} 
+            <Boton
+              variante="secundario"
+              onClick={() => setModalPublicarOpen(false)}
               className="flex-1 py-4 rounded-2xl font-bold"
             >
               Cancelar
             </Boton>
             <Boton
-              onClick={() => enviarCorreosTodosMutation.mutate()}
-              disabled={enviarCorreosTodosMutation.isPending}
+              onClick={() => publicarPeriodoMutation.mutate()}
+              disabled={publicarPeriodoMutation.isPending}
               className="flex-1 py-4 rounded-2xl font-black shadow-lg"
             >
-              {enviarCorreosTodosMutation.isPending ? 'Enviando...' : 'Confirmar Envío'}
+              {publicarPeriodoMutation.isPending ? 'Publicando...' : 'Confirmar Publicación'}
             </Boton>
           </div>
         </div>

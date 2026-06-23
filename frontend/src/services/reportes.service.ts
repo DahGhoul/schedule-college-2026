@@ -103,9 +103,13 @@ export const reportesService = {
   enviarCorreoDocente: (idDocente: number, idPeriodo: number) =>
     apiClient.post(`/reportes/enviar-correo/docente/${idDocente}`, { idPeriodo }),
 
-  // Send reports by email to all teachers in a period
+  // ---- Send reports by email to all teachers in period ----
   enviarCorreosTodos: (idPeriodo: number) =>
     apiClient.post('/reportes/enviar-correo/todos', { idPeriodo }),
+
+  // ---- Publish Period ----
+  publicarPeriodo: (idPeriodo: number) =>
+    apiClient.post('/reportes/publicar', { idPeriodo }),
 
   // Legacy queue-based endpoints
   generar: (datos: any) =>

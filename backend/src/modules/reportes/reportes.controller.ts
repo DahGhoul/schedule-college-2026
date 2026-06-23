@@ -316,4 +316,17 @@ export class ReportesController {
       res.status(500).json({ error: error.message });
     }
   }
+
+  static async publicarPeriodo(req: Request, res: Response) {
+    try {
+      const idPeriodo = parseInt(req.body.idPeriodo ?? req.query.idPeriodo as string);
+      if (isNaN(idPeriodo)) {
+        return res.status(400).json({ error: 'idPeriodo es requerido' });
+      }
+      const resultado = await ReportesService.publicarPeriodo(idPeriodo);
+      res.json(resultado);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
 }

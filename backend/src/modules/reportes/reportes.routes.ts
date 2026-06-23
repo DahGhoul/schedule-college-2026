@@ -24,6 +24,8 @@ router.get('/global/excel', ReportesController.excelGlobal);
 // ---- Email endpoints ----
 router.post('/enviar-correo/docente/:idDocente', ReportesController.enviarCorreoDocente);
 router.post('/enviar-correo/todos', ReportesController.enviarCorreosTodos);
+// ---- Publish endpoint ----
+router.post('/publicar', ReportesController.publicarPeriodo);
 
 // ---- Legacy queue-based endpoints ----
 router.get('/descargar-excel', ReportesController.descargarExcel);

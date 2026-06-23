@@ -584,4 +584,33 @@ export class ReportesService {
     if (fs.existsSync(pdfPath)) return pdfPath;
     return null;
   }
+
+  // ---- Publish Period Method ----
+  static async publicarPeriodo(idPeriodo: number) {
+    // Update everything to PUBLICADO
+    await prisma.$transaction([
+      // Update periodo estado
+      prisma.periodo_academico.update({
+        where: { id: idPeriodo },
+        data: { estado: 'PUBLICADO' }
+      }),
+      // Update all course offers (curso_oferta)
+      prisma.curso_oferta.updateMany({
+        where: { id_periodo: idPeriodo },
+        data: { estado: 'PUBLICADO' }
+      }),
+      // Update all schedule blocks (bloque_horario)
+      prisma.bloque_horario.updateMany({
+        where: { id_periodo: idPeriodo },
+        data: { estado: 'PUBLICADO' }
+      }),
+      // Update all non-lective blocks (bloque_no_lectivo)
+      prisma.bloque_no_lectivo.updateMany({
+        where: { id_periodo: idPeriodo },
+        data: { estado: 'PUBLICADO' }
+      })
+    ]);
+
+    return { mensaje: 'Periodo publicado correctamente' };
+  }
 }
