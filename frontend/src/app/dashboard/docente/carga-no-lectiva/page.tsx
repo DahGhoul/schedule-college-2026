@@ -105,12 +105,9 @@ export default function CargaNoLectivaPage() {
   const [secciones, setSecciones] = useState<Record<SeccionNoLectivaKey, FormularioSeccion>>(crearSeccionesIniciales());
   const [habilitaGobierno, setHabilitaGobierno] = useState(false);
   const [habilitaAdministracion, setHabilitaAdministracion] = useState(false);
-  const [erroresFormulario, setErroresFormulario] = useState<string[]>([]);
   const [toast, setToast] = useState<{ mensaje: string; tipo: 'exito' | 'error' } | null>(null);
 
   const [pestanaActiva, setPestanaActiva] = useState<'declaracion' | 'calendario' | 'formatos'>('declaracion');
-  const [seccionesVisibles, setSeccionesVisibles] = useState<SeccionNoLectivaKey[]>(['PREPARACION_EVALUACION']);
-  const [nuevaSeccionClave, setNuevaSeccionClave] = useState<string>('');
 
   const [seccionActiva, setSeccionActiva] = useState<SeccionNoLectivaKey | null>(null);
   const [bloquesAsignados, setBloquesAsignados] = useState<any[]>([]);
@@ -207,24 +204,11 @@ export default function CargaNoLectivaPage() {
     setHabilitaAdministracion(Boolean(declaracionData?.banderas?.habilita_actividades_administracion));
 
     setSecciones(nuevasSecciones);
-    
-    // Auto-populate visible sections
-    const visibles: SeccionNoLectivaKey[] = ['PREPARACION_EVALUACION'];
-    Object.entries(nuevasSecciones).forEach(([clave, valor]) => {
-      if (clave !== 'PREPARACION_EVALUACION' && (Number(valor.horas) > 0 || valor.codigo_resolucion || valor.descripcion)) {
-        if (!visibles.includes(clave as SeccionNoLectivaKey)) {
-          visibles.push(clave as SeccionNoLectivaKey);
-        }
-      }
-    });
-    setSeccionesVisibles(visibles);
-    
-    setErroresFormulario([]);
   }, [declaracionData, usuario]);
 
   useEffect(() => {
     validarSeccionesEnTiempoReal();
-  }, [secciones, reglas, habilitaGobierno, habilitaAdministracion]);
+  }, [secciones, reglas]);
 
   const validarSeccionesEnTiempoReal = () => {
     const nuevosErrores: Record<string, string> = {};
@@ -236,27 +220,21 @@ export default function CargaNoLectivaPage() {
       nuevosErrores.PREPARACION_EVALUACION = `Mínimo requerido: ${formatearHoras(limiteMinPreparacion)}h (50% de la carga lectiva).`;
     }
 
-    const horasInvestigacion = Number(secciones.INVESTIGACION.horas || 0);
-    const limiteInvestigacion = Number(reglas.limites_fijos_por_seccion?.INVESTIGACION ?? 0);
-    if (limiteInvestigacion > 0 && horasInvestigacion > limiteInvestigacion) {
-      nuevosErrores.INVESTIGACION = `Máximo permitido: ${formatearHoras(limiteInvestigacion)}h.`;
-    }
-
-    const horasTesis = Number(secciones.ASESORIA_TESIS.horas || 0);
-    const limiteTesis = Number(reglas.limites_fijos_por_seccion?.ASESORIA_TESIS ?? 0);
-    if (limiteTesis > 0 && horasTesis > limiteTesis) {
-      nuevosErrores.ASESORIA_TESIS = `Máximo permitido: ${formatearHoras(limiteTesis)}h.`;
+    if (reglas.limites_fijos_por_seccion) {
+      Object.entries(reglas.limites_fijos_por_seccion).forEach(([clave, max]) => {
+        const limite = Number(max);
+        const horas = Number(secciones[clave as SeccionNoLectivaKey]?.horas || 0);
+        if (limite > 0 && horas > limite) {
+          nuevosErrores[clave] = `Máximo permitido: ${formatearHoras(limite)}h.`;
+        }
+      });
     }
 
     const horasGobierno = Number(secciones.ACTIVIDADES_GOBIERNO.horas || 0);
-    if (!habilitaGobierno && horasGobierno > 0) {
-      nuevosErrores.ACTIVIDADES_GOBIERNO = 'Requiere cargo por elección marcado.';
-    }
-
+    // Ya no bloqueamos por frontend, se valida administrativamente con la resolución
+    
     const horasAdministracion = Number(secciones.ACTIVIDADES_ADMINISTRACION.horas || 0);
-    if (!habilitaAdministracion && horasAdministracion > 0) {
-      nuevosErrores.ACTIVIDADES_ADMINISTRACION = 'Requiere encargatura marcada.';
-    }
+    // Ya no bloqueamos por frontend, se valida administrativamente con la resolución
 
     setErroresSecciones(nuevosErrores);
   };
@@ -301,7 +279,6 @@ export default function CargaNoLectivaPage() {
       setSecciones(crearSeccionesIniciales());
       setHabilitaGobierno(false);
       setHabilitaAdministracion(false);
-      setErroresFormulario([]);
       await queryClient.invalidateQueries({ queryKey: ['mi-carga-no-lectiva', usuario?.idDocente, idPeriodo] });
       setPestanaActiva('declaracion');
     },
@@ -317,7 +294,6 @@ export default function CargaNoLectivaPage() {
 
   const manejarCambioSeccion = (clave: SeccionNoLectivaKey, campo: keyof FormularioSeccion, valor: string) => {
     if (campo === 'horas') {
-      // Only allow positive integers
       const num = parseInt(valor, 10);
       const nuevoValor = !isNaN(num) && num >= 0 ? String(num) : valor.replace(/[^0-9]/g, '');
       setSecciones((actual) => ({
@@ -336,13 +312,6 @@ export default function CargaNoLectivaPage() {
         },
       }));
     }
-  };
-
-  const manejarEliminarSeccion = (clave: SeccionNoLectivaKey) => {
-    manejarCambioSeccion(clave, 'horas', '0');
-    manejarCambioSeccion(clave, 'codigo_resolucion', '');
-    manejarCambioSeccion(clave, 'descripcion', '');
-    setSeccionesVisibles(prev => prev.filter(c => c !== clave));
   };
 
   const handleCeldaClick = (diaSemana: string, horaInicio: string) => {
@@ -450,19 +419,10 @@ export default function CargaNoLectivaPage() {
   const guardarDeclaracion = () => {
     if (!usuario?.idDocente || !idPeriodo) return;
 
-    const errores: string[] = [];
-
     if (reglas && Math.abs(horasTotales - horasObjetivo) > 0.01) {
-      errores.push(`La carga total debe completar ${formatearHoras(horasObjetivo)}h. Actualmente tienes ${formatearHoras(horasTotales)}h (lectiva + no lectiva).`);
-    }
-
-    if (errores.length > 0) {
-      setErroresFormulario(errores);
-      setToast({ mensaje: 'Revisa las validaciones antes de guardar', tipo: 'error' });
+      setToast({ mensaje: 'Completa la jornada para guardar', tipo: 'error' });
       return;
     }
-
-    setErroresFormulario([]);
 
     const payload = {
       docente: {
@@ -667,115 +627,77 @@ export default function CargaNoLectivaPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4 pt-6">
-                  <div className="grid grid-cols-1 gap-4">
-                    {seccionesVisibles.map((clave) => {
-                      const seccion = SECCIONES.find(s => s.clave === clave);
-                      if (!seccion) return null;
-                      return (
-                      <div key={seccion.clave} className="rounded-2xl border border-slate-100 bg-slate-50/40 p-5 shadow-sm relative group">
-                        {seccion.clave !== 'PREPARACION_EVALUACION' && (
-                          <button 
-                            onClick={() => manejarEliminarSeccion(seccion.clave)}
-                            className="absolute top-5 right-5 text-slate-400 hover:text-red-500 bg-white hover:bg-red-50 p-2 rounded-lg border border-transparent hover:border-red-200 transition-colors shadow-sm"
-                            title="Quitar sección"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        )}
-                        <div className="flex flex-col gap-3">
-                          <div className="flex items-start justify-between">
-                            <div className="space-y-1">
-                              <h3 className="text-sm font-bold text-slate-900">{seccion.titulo}</h3>
-                              <p className="text-xs text-slate-500">{seccion.ayuda}</p>
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  {SECCIONES.map((seccion) => {
+                    const deshabilitado = false;
+                    const maxPermitido = reglas?.limites_fijos_por_seccion?.[seccion.clave];
+                    
+                    return (
+                      <div key={seccion.clave} className={cn("rounded-2xl border bg-slate-50/40 p-5 shadow-sm relative group flex flex-col lg:flex-row gap-6 items-start transition-opacity", deshabilitado ? "opacity-60 border-gray-200" : "border-slate-200")}>
+                        {/* Title and Help text */}
+                        <div className="w-full lg:w-1/4 space-y-1">
+                          <h3 className="text-sm font-bold text-slate-900">{seccion.titulo}</h3>
+                          <p className="text-xs text-slate-500 leading-relaxed">{seccion.ayuda}</p>
+                          {deshabilitado && (
+                            <span className="inline-block mt-2 text-[10px] font-bold uppercase tracking-wider text-amber-600 bg-amber-100 px-2 py-0.5 rounded">No Habilitado</span>
+                          )}
+                        </div>
+                        
+                        {/* Description Textarea */}
+                        <div className="w-full lg:w-1/2">
+                          <textarea
+                            value={secciones[seccion.clave].descripcion}
+                            onChange={(e) => manejarCambioSeccion(seccion.clave, 'descripcion', e.target.value)}
+                            disabled={deshabilitado}
+                            placeholder={deshabilitado ? "Esta sección no está habilitada para tu perfil." : "Detallar número de alumnos, ciclo académico, proyectos, etc..."}
+                            rows={3}
+                            className="w-full rounded-xl border border-gray-300 bg-white p-3 text-sm text-gray-900 placeholder-gray-400 shadow-sm transition-all focus:border-unt-primary focus:outline-none focus:ring-2 focus:ring-unt-primary/20 disabled:cursor-not-allowed disabled:bg-gray-100"
+                          />
+                        </div>
+
+                        {/* Hours and Code */}
+                        <div className="w-full lg:w-1/4 flex flex-col gap-3">
                             <div className="relative">
                               <CampoTexto
-                                label="Horas (Enteros)"
+                                label={maxPermitido ? `Horas (Max. ${maxPermitido}h)` : "Horas"}
                                 type="number"
                                 step="1"
                                 min="0"
                                 value={secciones[seccion.clave].horas}
                                 onChange={(e) => manejarCambioSeccion(seccion.clave, 'horas', e.target.value)}
-                                disabled={
-                                  (seccion.clave === 'ACTIVIDADES_GOBIERNO' && !habilitaGobierno) ||
-                                  (seccion.clave === 'ACTIVIDADES_ADMINISTRACION' && !habilitaAdministracion)
-                                }
+                                disabled={deshabilitado}
                                 placeholder="0"
-                                className={erroresSecciones[seccion.clave] ? 'border-red-400 focus:border-red-500 focus:ring-red-500 bg-red-50' : ''}
+                                className={cn("text-center text-lg font-bold h-11", erroresSecciones[seccion.clave] ? 'border-red-400 focus:border-red-500 focus:ring-red-500 bg-red-50 text-red-700' : 'text-slate-800')}
                               />
                               {erroresSecciones[seccion.clave] && (
-                                <p className="absolute -bottom-6 left-1 text-[10px] font-bold text-red-600 truncate max-w-full" title={erroresSecciones[seccion.clave]}>
+                                <p className="absolute -bottom-5 left-1 text-[10px] font-bold text-red-600 truncate max-w-full" title={erroresSecciones[seccion.clave]}>
                                   {erroresSecciones[seccion.clave]}
                                 </p>
                               )}
                             </div>
                             <CampoTexto
-                              label="Código resolución"
+                              label="Resolución (Opcional)"
                               value={secciones[seccion.clave].codigo_resolucion}
                               onChange={(e) => manejarCambioSeccion(seccion.clave, 'codigo_resolucion', e.target.value)}
-                              disabled={
-                                (seccion.clave === 'ACTIVIDADES_GOBIERNO' && !habilitaGobierno) ||
-                                (seccion.clave === 'ACTIVIDADES_ADMINISTRACION' && !habilitaAdministracion)
-                              }
-                              placeholder="Opcional"
-                              className="sm:col-span-2"
+                              disabled={deshabilitado}
+                              placeholder="Ej. RES-001-2026"
+                              className="text-xs h-9"
                             />
-                          </div>
-                          <div className="mt-2">
-                            <label className="mb-1.5 block text-sm font-bold text-gray-700 ml-1">Descripción</label>
-                            <textarea
-                              value={secciones[seccion.clave].descripcion}
-                              onChange={(e) => manejarCambioSeccion(seccion.clave, 'descripcion', e.target.value)}
-                              disabled={
-                                (seccion.clave === 'ACTIVIDADES_GOBIERNO' && !habilitaGobierno) ||
-                                (seccion.clave === 'ACTIVIDADES_ADMINISTRACION' && !habilitaAdministracion)
-                              }
-                              placeholder="Descripción detallada de las actividades..."
-                              rows={2}
-                              className="w-full rounded-xl border border-gray-300 bg-white p-3 text-sm text-gray-900 placeholder-gray-400 shadow-sm transition-all focus:border-unt-primary focus:outline-none focus:ring-2 focus:ring-unt-primary/20 disabled:cursor-not-allowed disabled:bg-gray-50"
-                            />
-                          </div>
                         </div>
                       </div>
                     )})}
-                  </div>
-
-                  {/* Agregar nueva sección dinámica */}
-                  <div className="mt-6 flex flex-col sm:flex-row items-center gap-3 border-t border-slate-100 pt-6">
-                    <div className="flex-1 w-full">
-                      <Selector
-                        label=""
-                        value={nuevaSeccionClave}
-                        onChange={(e) => setNuevaSeccionClave(e.target.value)}
-                        className="w-full"
-                      >
-                        <option value="">Selecciona una sección opcional para agregar...</option>
-                        {SECCIONES.filter(s => 
-                          !seccionesVisibles.includes(s.clave) && 
-                          !(s.clave === 'ACTIVIDADES_GOBIERNO' && !habilitaGobierno) &&
-                          !(s.clave === 'ACTIVIDADES_ADMINISTRACION' && !habilitaAdministracion)
-                        ).map(s => (
-                          <option key={s.clave} value={s.clave}>{s.titulo}</option>
-                        ))}
-                      </Selector>
+                  
+                  {/* Totalizador de horas inferior */}
+                  <div className="mt-8 flex justify-end border-t border-slate-200 pt-6">
+                    <div className="flex items-center gap-4 bg-slate-50 px-6 py-4 rounded-2xl border border-slate-200 shadow-sm">
+                      <span className="text-sm font-bold text-slate-600 uppercase tracking-widest">Total Horas Declaradas:</span>
+                      <span className={cn(
+                        "text-3xl font-black", 
+                        reglas && horasTotales > horasObjetivo ? "text-red-600" : 
+                        reglas && horasTotales < horasObjetivo ? "text-amber-500" : "text-emerald-600"
+                      )}>
+                        {formatearHoras(horasTotales)}
+                      </span>
                     </div>
-                    <Boton 
-                      type="button" 
-                      variante="secundario"
-                      onClick={() => {
-                        if (nuevaSeccionClave && !seccionesVisibles.includes(nuevaSeccionClave as SeccionNoLectivaKey)) {
-                          setSeccionesVisibles(prev => [...prev, nuevaSeccionClave as SeccionNoLectivaKey]);
-                          setNuevaSeccionClave('');
-                        }
-                      }}
-                      disabled={!nuevaSeccionClave}
-                      className="whitespace-nowrap rounded-xl mt-1"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Agregar Sección
-                    </Boton>
                   </div>
                 </CardContent>
               </Card>
@@ -815,24 +737,24 @@ export default function CargaNoLectivaPage() {
             </div>
 
             {/* Columna derecha: Resumen y acciones */}
-            <div className="space-y-6">
-              <Card className="border-none shadow-lg rounded-[2rem] overflow-hidden sticky top-6">
-                <CardHeader className="bg-gradient-to-r from-unt-primary to-[#0f4c81] text-white">
-                  <CardTitle className="flex items-center gap-2 text-white text-lg">
-                    <Save className="h-5 w-5" />
+            <div className="space-y-6 lg:sticky lg:top-6 lg:self-start">
+              <Card className="border-none shadow-lg rounded-[2rem] overflow-hidden">
+                <CardHeader className="bg-gradient-to-r from-unt-primary to-[#0f4c81] text-white py-4">
+                  <CardTitle className="flex items-center gap-2 text-white text-base">
+                    <Save className="h-4 w-4" />
                     Resumen de la Declaración
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-5 pt-6">
-                  <div className="rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 p-6 border border-slate-100">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500 mb-3">Total horas no lectivas</p>
-                    <p className="text-5xl font-extrabold text-slate-900">{formatearHoras(totalHoras)}h</p>
-                    <p className="mt-2 text-sm text-slate-500">Suma automática de todas las secciones declaradas.</p>
+                <CardContent className="space-y-4 pt-5 max-h-[calc(100vh-6rem)] overflow-y-auto">
+                  <div className="rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 p-4 border border-slate-100">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 mb-2">Total horas no lectivas</p>
+                    <p className="text-4xl font-extrabold text-slate-900">{formatearHoras(totalHoras)}h</p>
+                    <p className="mt-1 text-xs text-slate-500">Suma automática de todas las secciones declaradas.</p>
                   </div>
 
-                  <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500 mb-4">Validación de jornada</p>
-                    <div className="space-y-3 text-sm text-slate-600">
+                  <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 mb-3">Validación de jornada</p>
+                    <div className="space-y-2 text-sm text-slate-600">
                       <div className="flex items-center justify-between">
                         <span className="font-semibold text-slate-900">Carga lectiva:</span>
                         <span className="font-mono text-lg">{formatearHoras(horasLectivas)}h</span>
@@ -861,59 +783,18 @@ export default function CargaNoLectivaPage() {
                       )}>
                         {Math.abs(horasTotales - horasObjetivo) < 0.01
                           ? '✅ La jornada está completa según dedicación.'
-                          : `⚠️ Faltan o sobran ${formatearHoras(Math.abs(horasObjetivo - horasTotales))}h para completar la jornada.`}
+                          : horasTotales < horasObjetivo
+                            ? `⚠️ Faltan ${formatearHoras(horasObjetivo - horasTotales)}h para completar la jornada.`
+                            : `⚠️ Sobran ${formatearHoras(horasTotales - horasObjetivo)}h (has excedido tu jornada).`}
                       </p>
                     )}
                   </div>
 
-                  <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm space-y-4">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Cargos y habilitaciones</p>
-                    <label className="flex items-start gap-3 text-sm text-slate-700 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                      <input
-                        type="checkbox"
-                        checked={habilitaGobierno}
-                        onChange={(e) => setHabilitaGobierno(e.target.checked)}
-                        className="mt-1 h-5 w-5 rounded border-slate-300 text-unt-primary focus:ring-unt-primary"
-                      />
-                      <div>
-                        <span className="font-semibold block">Tengo cargo por elección para declarar Actividades de Gobierno.</span>
-                        <span className="text-xs text-slate-500 mt-1">Nota: Al marcarlo como declaración jurada, esta habilitación será visible para la Secretaría y autoridades pertinentes.</span>
-                      </div>
-                    </label>
-                    <label className="flex items-start gap-3 text-sm text-slate-700 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                      <input
-                        type="checkbox"
-                        checked={habilitaAdministracion}
-                        onChange={(e) => setHabilitaAdministracion(e.target.checked)}
-                        className="mt-1 h-5 w-5 rounded border-slate-300 text-unt-primary focus:ring-unt-primary"
-                      />
-                      <div>
-                        <span className="font-semibold block">Tengo encargatura/cargo de confianza para declarar Actividades de Administración.</span>
-                        <span className="text-xs text-slate-500 mt-1">Nota: Al marcarlo como declaración jurada, esta habilitación será visible para la Secretaría y autoridades pertinentes.</span>
-                      </div>
-                    </label>
-                  </div>
 
-                  {erroresFormulario.length > 0 && (
-                    <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
-                      <p className="text-[11px] font-black uppercase tracking-[0.16em] text-red-700 mb-3 flex items-center gap-2">
-                        <AlertCircle className="h-4 w-4" />
-                        Validaciones pendientes
-                      </p>
-                      <ul className="mt-2 space-y-1.5 text-sm text-red-700">
-                        {erroresFormulario.map((error, index) => (
-                          <li key={`${error}-${index}`} className="flex items-start gap-2">
-                            <span className="text-red-500 mt-1">•</span>
-                            {error}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
 
-                  <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500 mb-4">Datos guardados</p>
-                    <div className="space-y-3 text-sm text-slate-600">
+                  <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 mb-3">Datos guardados</p>
+                    <div className="space-y-2 text-xs text-slate-600">
                       <div className="flex justify-between">
                         <span className="font-semibold text-slate-900">Periodo:</span>
                         <span>{periodos.find((p: any) => p.id === idPeriodo)?.nombre || idPeriodo}</span>
@@ -933,35 +814,15 @@ export default function CargaNoLectivaPage() {
                     </div>
                   </div>
 
-                  <div className="space-y-3 pt-2">
+                  <div className="space-y-2 pt-1">
                     <Boton
                       onClick={guardarDeclaracion}
-                      className="w-full justify-center gap-2 rounded-[1.5rem] bg-gradient-to-r from-unt-primary to-[#0f4c81] px-5 py-4 text-sm font-bold text-white shadow-lg shadow-unt-primary/20 hover:from-[#0a2a52] hover:to-[#0a3a6e] transition-all"
+                      className="w-full justify-center gap-2 rounded-[1.5rem] bg-gradient-to-r from-unt-primary to-[#0f4c81] px-4 py-3 text-sm font-bold text-white shadow-lg shadow-unt-primary/20 hover:from-[#0a2a52] hover:to-[#0a3a6e] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                       cargando={mutationGuardar.isPending || cargandoDeclaracion}
+                      disabled={Math.abs(horasTotales - horasObjetivo) > 0.01 || Object.keys(erroresSecciones).length > 0}
                     >
                       <Save className="h-4 w-4" />
-                      {mutationGuardar.isPending ? 'Guardando...' : 'Guardar y Continuar a Calendario'}
-                    </Boton>
-                    <Boton
-                      variante="borde"
-                      onClick={() => router.push('/dashboard/docente')}
-                      className="w-full justify-center gap-2 rounded-[1.5rem] px-5 py-4 text-sm font-bold"
-                    >
-                      <ArrowLeft className="h-4 w-4" />
-                      Volver al Dashboard
-                    </Boton>
-                    <Boton
-                      variante="peligro"
-                      onClick={() => {
-                        if (confirm('¿Desea eliminar la declaración no lectiva de este período?')) {
-                          mutationEliminar.mutate();
-                        }
-                      }}
-                      className="w-full justify-center gap-2 rounded-[1.5rem] px-5 py-4 text-sm font-bold"
-                      disabled={!declaracionData?.declaracion}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      Eliminar declaración
+                      {mutationGuardar.isPending ? 'Guardando...' : 'Guardar y Continuar'}
                     </Boton>
                   </div>
                 </CardContent>
