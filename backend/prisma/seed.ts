@@ -342,7 +342,7 @@ async function main() {
     await syncAndAssignTeachers(prisma);
     console.log('=== SEMILLA DE HORARIOS COMPLETADA CON ÉXITO ===');
     console.log(`Total cursos creados: ${ofertasDef.length}`);
-    console.log(`Total docentes configurados: ${docentesDef.length}`);
+    console.log(`Total docentes configurados: ${docentesSeed.length}`);
   } catch (error: any) {
     console.error('=== ERROR EN SEMILLA ===');
     console.error(error);
