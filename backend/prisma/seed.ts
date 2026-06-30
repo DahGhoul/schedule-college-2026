@@ -45,7 +45,13 @@ async function main() {
     await prisma.usuario.deleteMany();
     
     await prisma.atencion_docente.deleteMany();
-
+    await prisma.bloque_no_lectivo.deleteMany();
+    await prisma.carga_no_lectiva.deleteMany();
+    await prisma.declaracion_carga.deleteMany();
+    await prisma.formato_generado.deleteMany();
+    await prisma.historial_notificacion.deleteMany();
+    await prisma.preferencia_notificacion.deleteMany();
+    await prisma.cola_notificacion.deleteMany();
     await prisma.docente.deleteMany();
     await prisma.curso.deleteMany();
 
